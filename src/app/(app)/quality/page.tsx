@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { pieces, scrap } from "@/lib/data";
-import { PlusCircle } from "lucide-react";
+import { FileUp, PlusCircle } from "lucide-react";
 
 export default function QualityPage() {
   return (
@@ -12,9 +12,14 @@ export default function QualityPage() {
           <h1 className="text-3xl font-headline font-bold">Gestión de Calidad</h1>
           <p className="text-muted-foreground">Registrar y analizar el scrap de producción.</p>
         </div>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Añadir Registro de Scrap
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline">
+            <FileUp className="mr-2 h-4 w-4" /> Importar Historial de Scrap
+          </Button>
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Registro de Scrap
+          </Button>
+        </div>
       </div>
       <Card>
         <CardHeader>
