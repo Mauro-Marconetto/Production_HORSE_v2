@@ -9,11 +9,11 @@ export default function AdminMachinesPage() {
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Machine Catalog</h1>
-          <p className="text-muted-foreground">Manage production machines.</p>
+          <h1 className="text-3xl font-headline font-bold">Catálogo de Máquinas</h1>
+          <p className="text-muted-foreground">Gestiona las máquinas de producción.</p>
         </div>
         <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Machine
+          <PlusCircle className="mr-2 h-4 w-4" /> Añadir Máquina
         </Button>
       </div>
       <Card>
@@ -21,11 +21,11 @@ export default function AdminMachinesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Tonnage</TableHead>
-                <TableHead>Shifts/Week</TableHead>
-                <TableHead>OEE Target</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Tonelaje</TableHead>
+                <TableHead>Turnos/Semana</TableHead>
+                <TableHead>OEE Objetivo</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -36,7 +36,7 @@ export default function AdminMachinesPage() {
                   <TableCell>{machine.turnosSemana}</TableCell>
                   <TableCell>{machine.OEE_obj * 100}%</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">Edit</Button>
+                    <Button variant="ghost" size="sm">Editar</Button>
                   </TableCell>
                 </TableRow>
               ))}

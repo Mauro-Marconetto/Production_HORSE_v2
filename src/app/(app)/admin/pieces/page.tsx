@@ -9,11 +9,11 @@ export default function AdminPiecesPage() {
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Piece Catalog</h1>
-          <p className="text-muted-foreground">Manage all manufactured pieces.</p>
+          <h1 className="text-3xl font-headline font-bold">Catálogo de Piezas</h1>
+          <p className="text-muted-foreground">Gestiona todas las piezas fabricadas.</p>
         </div>
         <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Piece
+          <PlusCircle className="mr-2 h-4 w-4" /> Añadir Pieza
         </Button>
       </div>
        <Card>
@@ -21,12 +21,12 @@ export default function AdminPiecesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Code</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Family</TableHead>
-                <TableHead className="text-right">Stock Min</TableHead>
-                <TableHead className="text-right">Stock Max</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Código</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Familia</TableHead>
+                <TableHead className="text-right">Stock Mín.</TableHead>
+                <TableHead className="text-right">Stock Máx.</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -38,7 +38,7 @@ export default function AdminPiecesPage() {
                   <TableCell className="text-right">{piece.stockMin.toLocaleString()}</TableCell>
                   <TableCell className="text-right">{piece.stockMax.toLocaleString()}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">Edit</Button>
+                    <Button variant="ghost" size="sm">Editar</Button>
                   </TableCell>
                 </TableRow>
               ))}

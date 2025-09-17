@@ -15,7 +15,7 @@ const spaceGrotesk = SpaceGrotesk({
 
 export const metadata: Metadata = {
   title: "ForgeFlow",
-  description: "Optimized production planning for aluminum injection.",
+  description: "Planificación de producción optimizada para inyección de aluminio.",
 };
 
 export default function RootLayout({
@@ -24,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

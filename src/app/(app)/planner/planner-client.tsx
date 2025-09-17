@@ -80,8 +80,8 @@ export default function PlannerClient({
       if (result.success) {
         setAssignments(result.plan);
         toast({
-          title: "Plan Generated",
-          description: "The new production plan has been successfully generated.",
+          title: "Plan Generado",
+          description: "El nuevo plan de producción se ha generado correctamente.",
         });
       } else {
         toast({
@@ -97,26 +97,26 @@ export default function PlannerClient({
     <TooltipProvider>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Production Planner</h1>
+          <h1 className="text-3xl font-headline font-bold">Planificador de Producción</h1>
           <p className="text-muted-foreground">
-            Weekly schedule for all machines.
+            Programa semanal para todas las máquinas.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline">
-            <FileDown className="mr-2 h-4 w-4" /> Export Plan
+            <FileDown className="mr-2 h-4 w-4" /> Exportar Plan
           </Button>
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline">
-                <SlidersHorizontal className="mr-2 h-4 w-4" /> What-If
+                <SlidersHorizontal className="mr-2 h-4 w-4" /> Simulación
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>What-If Scenario</DialogTitle>
+                <DialogTitle>Escenario de Simulación</DialogTitle>
                 <DialogDescription>
-                  Adjust parameters to simulate a new plan.
+                  Ajusta los parámetros para simular un nuevo plan.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
@@ -150,7 +150,7 @@ export default function PlannerClient({
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="shifts" className="text-right">
-                    Shifts
+                    Turnos
                   </Label>
                   <Slider
                     id="shifts"
@@ -160,22 +160,22 @@ export default function PlannerClient({
                     step={1}
                     className="col-span-2"
                   />
-                  <span className="text-sm font-medium">{shifts}/week</span>
+                  <span className="text-sm font-medium">{shifts}/sem</span>
                 </div>
               </div>
               <DialogFooter>
                 <Button onClick={handleGeneratePlan} disabled={isPending}>
-                  {isPending ? "Simulating..." : "Run Simulation"}
+                  {isPending ? "Simulando..." : "Ejecutar Simulación"}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
           <Button onClick={handleGeneratePlan} disabled={isPending}>
             <BrainCircuit className="mr-2 h-4 w-4" />{" "}
-            {isPending ? "Generating..." : "Generate Suggested Plan"}
+            {isPending ? "Generando..." : "Generar Plan Sugerido"}
           </Button>
           <Button variant="default" className="bg-green-600 hover:bg-green-700">
-            <Play className="mr-2 h-4 w-4" /> Publish Plan
+            <Play className="mr-2 h-4 w-4" /> Publicar Plan
           </Button>
         </div>
       </div>
@@ -186,11 +186,11 @@ export default function PlannerClient({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[150px] sticky left-0 bg-card z-10">
-                    Machine
+                    Máquina
                   </TableHead>
                   {WEEKS.map((week) => (
                     <TableHead key={week} className="text-center">
-                      Week {week.substring(4)}
+                      Semana {week.substring(4)}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -246,11 +246,11 @@ export default function PlannerClient({
                                       {piece?.codigo} ({mold?.nombre})
                                     </p>
                                     <p>
-                                      Production: {a.prodUnidades.toLocaleString()}{" "}
-                                      units
+                                      Producción: {a.prodUnidades.toLocaleString()}{" "}
+                                      unidades
                                     </p>
-                                    <p>Hours: {a.horas}</p>
-                                    {a.setup && <p>Includes setup time</p>}
+                                    <p>Horas: {a.horas}</p>
+                                    {a.setup && <p>Incluye tiempo de preparación</p>}
                                   </TooltipContent>
                                 </Tooltip>
                               );

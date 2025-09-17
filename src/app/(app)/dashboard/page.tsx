@@ -47,54 +47,54 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Stock Coverage
+              Cobertura de Stock
             </CardTitle>
             <Hourglass className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">~21 Days</div>
+            <div className="text-2xl font-bold">~21 Días</div>
             <p className="text-xs text-muted-foreground">
-              Average across all pieces
+              Promedio de todas las piezas
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Machine Utilization
+              Utilización de Máquina
             </CardTitle>
             <Factory className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">80.5%</div>
             <p className="text-xs text-muted-foreground">
-              vs 82.5% goal
+              vs 82.5% objetivo
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Mold Changes</CardTitle>
+            <CardTitle className="text-sm font-medium">Cambios de Molde</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">3</div>
             <p className="text-xs text-muted-foreground">
-              Scheduled this week
+              Programados esta semana
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Stockout Risk
+              Riesgo de Rotura de Stock
             </CardTitle>
             <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{criticalStockItems} Pieces</div>
+            <div className="text-2xl font-bold text-destructive">{criticalStockItems} Piezas</div>
             <p className="text-xs text-muted-foreground">
-              Within 10% of min. stock
+              Dentro del 10% del stock mín.
             </p>
           </CardContent>
         </Card>
@@ -104,21 +104,21 @@ export default function DashboardPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Inventory Status</CardTitle>
+          <CardTitle>Estado de Inventario</CardTitle>
           <CardDescription>
-            Overview of current stock levels against min/max targets.
+            Resumen de los niveles de stock actuales frente a los objetivos mín/máx.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Piece</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead className="text-right">Current Stock</TableHead>
-                <TableHead className="text-right">Min Stock</TableHead>
-                <TableHead className="text-right">Max Stock</TableHead>
-                <TableHead className="text-center">Status</TableHead>
+                <TableHead>Pieza</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead className="text-right">Stock Actual</TableHead>
+                <TableHead className="text-right">Stock Mín.</TableHead>
+                <TableHead className="text-right">Stock Máx.</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -127,6 +127,7 @@ export default function DashboardPage() {
                   if (!inv) return null;
                   const stockPercentage = (inv.stock - piece.stockMin) / (piece.stockMax - piece.stockMin);
                   const status = stockPercentage < 0.1 ? 'critical' : stockPercentage > 0.9 ? 'high' : 'ok';
+                  const statusText = status === 'critical' ? 'Crítico' : status === 'high' ? 'Alto' : 'Ok';
                   
                   return (
                     <TableRow key={piece.id}>
@@ -145,7 +146,7 @@ export default function DashboardPage() {
                             {status === 'critical' && <AlertCircle className="mr-1 h-3 w-3"/>}
                             {status === 'ok' && <CheckCircle className="mr-1 h-3 w-3 text-green-500"/>}
                             {status === 'high' && <TrendingUp className="mr-1 h-3 w-3 text-amber-500"/>}
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                            {statusText}
                         </Badge>
                       </TableCell>
                     </TableRow>

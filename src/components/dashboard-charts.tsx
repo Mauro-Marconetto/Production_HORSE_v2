@@ -39,7 +39,7 @@ export function DashboardCharts() {
         <>
             <Card className="xl:col-span-2">
             <CardHeader>
-                <CardTitle>Machine Utilization (OEE)</CardTitle>
+                <CardTitle>Utilización de Máquina (OEE)</CardTitle>
             </CardHeader>
             <CardContent className="pl-2">
                 <ResponsiveContainer width="100%" height={350}>
@@ -67,16 +67,16 @@ export function DashboardCharts() {
                     }}
                     />
                     <Bar dataKey="utilization" name="Actual" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="goal" name="Goal" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="goal" name="Objetivo" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
                 </BarChart>
                 </ResponsiveContainer>
             </CardContent>
             </Card>
             <Card>
             <CardHeader>
-                <CardTitle>Stock Coverage by Piece (Days)</CardTitle>
+                <CardTitle>Cobertura de Stock por Pieza (Días)</CardTitle>
                 <CardDescription>
-                Estimated days of supply based on current demand.
+                Días de suministro estimados según la demanda actual.
                 </CardDescription>
             </CardHeader>
             <CardContent>

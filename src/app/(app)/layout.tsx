@@ -34,19 +34,19 @@ import { UserNav } from "@/components/user-nav";
 import { Separator } from "@/components/ui/separator";
 
 const navItems = [
-  { href: "/dashboard", icon: Home, label: "Dashboard" },
-  { href: "/planner", icon: GanttChartSquare, label: "Planner" },
-  { href: "/demand", icon: Truck, label: "Demand" },
-  { href: "/inventory", icon: Warehouse, label: "Inventory" },
-  { href: "/execution", icon: LineChart, label: "Execution" },
-  { href: "/downtime", icon: Wrench, label: "Downtime" },
+  { href: "/dashboard", icon: Home, label: "Panel" },
+  { href: "/planner", icon: GanttChartSquare, label: "Planificador" },
+  { href: "/demand", icon: Truck, label: "Demanda" },
+  { href: "/inventory", icon: Warehouse, label: "Inventario" },
+  { href: "/execution", icon: LineChart, label: "Ejecución" },
+  { href: "/downtime", icon: Wrench, label: "Inactividad" },
 ];
 
 const adminNavItems = [
-  { href: "/admin/pieces", icon: Package, label: "Pieces" },
-  { href: "/admin/molds", icon: Factory, label: "Molds" },
-  { href: "/admin/machines", icon: Cog, label: "Machines" },
-  { href: "/admin/users", icon: Users, label: "Users" },
+  { href: "/admin/pieces", icon: Package, label: "Piezas" },
+  { href: "/admin/molds", icon: Factory, label: "Moldes" },
+  { href: "/admin/machines", icon: Cog, label: "Máquinas" },
+  { href: "/admin/users", icon: Users, label: "Usuarios" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -80,7 +80,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
 
           <SidebarGroup className="mt-auto">
-            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupLabel>Administración</SidebarGroupLabel>
             <SidebarMenu>
               {adminNavItems.map((item) => (
                 <SidebarMenuItem key={item.href}>

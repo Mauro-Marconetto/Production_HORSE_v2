@@ -12,28 +12,28 @@ export default function InventoryPage() {
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Inventory</h1>
-          <p className="text-muted-foreground">Monitor and manage stock levels.</p>
+          <h1 className="text-3xl font-headline font-bold">Inventario</h1>
+          <p className="text-muted-foreground">Monitoriza y gestiona los niveles de stock.</p>
         </div>
         <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> New Stock Entry
+          <PlusCircle className="mr-2 h-4 w-4" /> Nueva Entrada de Stock
         </Button>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Current Stock Levels</CardTitle>
-          <CardDescription>Overview of all pieces in inventory.</CardDescription>
+          <CardTitle>Niveles de Stock Actuales</CardTitle>
+          <CardDescription>Resumen de todas las piezas en inventario.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[400px]">Piece</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead className="text-right">Current Stock</TableHead>
-                <TableHead className="text-right">Min/Max</TableHead>
-                <TableHead className="w-[200px] text-center">Capacity</TableHead>
-                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="w-[400px]">Pieza</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead className="text-right">Stock Actual</TableHead>
+                <TableHead className="text-right">Mín/Máx</TableHead>
+                <TableHead className="w-[200px] text-center">Capacidad</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -43,6 +43,7 @@ export default function InventoryPage() {
 
                 const stockPercentage = Math.round(((inv.stock - piece.stockMin) / (piece.stockMax - piece.stockMin)) * 100);
                 const status = stockPercentage < 10 ? 'critical' : stockPercentage > 90 ? 'high' : 'ok';
+                const statusText = status === 'critical' ? 'Crítico' : status === 'high' ? 'Alto' : 'Ok';
 
                 return (
                   <TableRow key={inv.pieceId}>
@@ -61,7 +62,7 @@ export default function InventoryPage() {
                         {status === 'critical' && <AlertCircle className="mr-1 h-3 w-3" />}
                         {status === 'ok' && <CheckCircle className="mr-1 h-3 w-3 text-green-500" />}
                         {status === 'high' && <TrendingUp className="mr-1 h-3 w-3 text-amber-500" />}
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                        {statusText}
                       </Badge>
                     </TableCell>
                   </TableRow>

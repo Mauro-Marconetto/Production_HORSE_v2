@@ -9,29 +9,29 @@ export default function DemandPage() {
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Demand Management</h1>
-          <p className="text-muted-foreground">Import and view customer demand.</p>
+          <h1 className="text-3xl font-headline font-bold">Gestión de Demanda</h1>
+          <p className="text-muted-foreground">Importar y ver la demanda de los clientes.</p>
         </div>
         <Button>
-          <FileUp className="mr-2 h-4 w-4" /> Import CSV
+          <FileUp className="mr-2 h-4 w-4" /> Importar CSV
         </Button>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Weekly Demand</CardTitle>
-          <CardDescription>Forecasted units per piece for the upcoming weeks.</CardDescription>
+          <CardTitle>Demanda Semanal</CardTitle>
+          <CardDescription>Unidades previstas por pieza para las próximas semanas.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Week</TableHead>
-                <TableHead>Piece Code</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead className="text-right">Quantity</TableHead>
-                <TableHead className="text-center">Priority</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Semana</TableHead>
+                <TableHead>Código de Pieza</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead className="text-right">Cantidad</TableHead>
+                <TableHead className="text-center">Prioridad</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -46,14 +46,14 @@ export default function DemandPage() {
                     <TableCell className="text-center">{demand.prioridad}</TableCell>
                     <TableCell className="text-center">
                       {demand.congelado ? (
-                        <span className="flex items-center justify-center text-green-600"><CheckCircle className="h-4 w-4 mr-1"/> Frozen</span>
+                        <span className="flex items-center justify-center text-green-600"><CheckCircle className="h-4 w-4 mr-1"/> Congelado</span>
                       ) : (
-                        "Draft"
+                        "Borrador"
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">Edit</Button>
-                      <Button variant="ghost" size="sm" className="text-green-600 hover:text-green-700">Freeze</Button>
+                      <Button variant="ghost" size="sm">Editar</Button>
+                      <Button variant="ghost" size="sm" className="text-green-600 hover:text-green-700">Congelar</Button>
                     </TableCell>
                   </TableRow>
                 );
