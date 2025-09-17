@@ -2,9 +2,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { format, getMonth, getYear, startOfYear, endOfYear, eachDayOfInterval, getISODay, getISOWeek } from "date-fns";
+import { format, getMonth, getYear, startOfYear, endOfYear, eachDayOfInterval, getISODay, getISOWeek, addYears, subYears } from "date-fns";
 import { es } from 'date-fns/locale';
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 
 import {
   Select,
@@ -84,11 +84,19 @@ export default function CalendarPage() {
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-headline font-bold">Calendario de Disponibilidad {year}</h1>
-          <p className="text-muted-foreground">
-            Gestiona los días no productivos para toda la planta. Los fines de semana no son laborables por defecto.
-          </p>
+        <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" onClick={() => setYear(year - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div>
+                <h1 className="text-3xl font-headline font-bold">Calendario de Disponibilidad {year}</h1>
+                <p className="text-muted-foreground">
+                    Gestiona los días no productivos para toda la planta. Los domingos no son laborables por defecto.
+                </p>
+            </div>
+            <Button variant="outline" size="icon" onClick={() => setYear(year + 1)}>
+                <ChevronRight className="h-4 w-4" />
+            </Button>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
