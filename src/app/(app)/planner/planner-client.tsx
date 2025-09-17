@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
@@ -212,7 +213,7 @@ export default function PlannerClient({
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="min-w-full">
+            <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[150px] sticky left-0 bg-card z-10">
