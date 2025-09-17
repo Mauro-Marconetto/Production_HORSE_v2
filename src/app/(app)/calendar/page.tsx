@@ -2,24 +2,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { format, addDays, getWeek, getMonth, getYear, startOfYear, endOfYear, eachDayOfInterval } from "date-fns";
+import { format, getMonth, getYear, startOfYear, endOfYear, eachDayOfInterval, getISODay, getISOWeek } from "date-fns";
 import { es } from 'date-fns/locale';
-import { PlusCircle, Trash2 } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -35,27 +21,52 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 import { calendarEvents as initialEvents } from "@/lib/data";
 import type { CalendarEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const eventTypes = {
-  feriado: { label: "Feriado", className: "bg-red-200" },
-  vacaciones: { label: "Vacaciones", className: "bg-blue-200" },
-  mantenimiento: { label: "Mantenimiento", className: "bg-yellow-200" },
-  arranque: { label: "Arranque/Parada", className: "bg-purple-200" },
+const eventTypes: { [key: string]: { label: string, className: string } } = {
+  feriado: { label: "Feriado", className: "bg-red-100 dark:bg-red-900/50" },
+  vacaciones: { label: "Vacaciones", className: "bg-blue-100 dark:bg-blue-900/50" },
+  mantenimiento: { label: "Mantenimiento", className: "bg-yellow-100 dark:bg-yellow-800/50" },
+  arranque: { label: "Arranque/Parada", className: "bg-purple-100 dark:bg-purple-900/50" },
 };
 
-
-const getWeekNumber = (date: Date) => {
-    return getWeek(date, { weekStartsOn: 1, firstWeekContainsDate: 4 });
-}
+const weekendClass = 'bg-muted/50';
 
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>(initialEvents);
   const [year, setYear] = useState(new Date().getFullYear());
+
+  const handleEventTypeChange = (date: Date, type: string) => {
+    const dateString = format(date, 'yyyy-MM-dd');
+    setEvents(prevEvents => {
+      const existingEventIndex = prevEvents.findIndex(e => e.date === dateString);
+      if (type === 'laborable') {
+        if (existingEventIndex !== -1) {
+          return prevEvents.filter((_, index) => index !== existingEventIndex);
+        }
+      } else {
+        const newEvent: CalendarEvent = {
+          id: `evt-${dateString}`,
+          machineId: 'all',
+          date: dateString,
+          type: type as CalendarEvent['type'],
+          description: eventTypes[type].label,
+        };
+        if (existingEventIndex !== -1) {
+          const updatedEvents = [...prevEvents];
+          updatedEvents[existingEventIndex] = newEvent;
+          return updatedEvents;
+        } else {
+          return [...prevEvents, newEvent];
+        }
+      }
+      return prevEvents;
+    });
+  };
 
   const yearStart = startOfYear(new Date(year, 0, 1));
   const yearEnd = endOfYear(new Date(year, 0, 1));
@@ -74,79 +85,83 @@ export default function CalendarPage() {
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Calendario de Disponibilidad</h1>
+          <h1 className="text-3xl font-headline font-bold">Calendario de Disponibilidad {year}</h1>
           <p className="text-muted-foreground">
-            Gestiona los días no productivos para toda la planta.
+            Gestiona los días no productivos para toda la planta. Los fines de semana no son laborables por defecto.
           </p>
         </div>
       </div>
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-            {Object.entries(daysByMonth).map(([monthIndex, days]) => {
-              const monthName = format(days[0], 'MMMM', { locale: es });
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {Object.entries(daysByMonth).map(([monthIndex, days]) => {
+          const monthName = format(days[0], 'MMMM', { locale: es });
+          return (
+            <div key={monthIndex}>
+              <h3 className="text-xl font-semibold text-center mb-2 capitalize">{monthName}</h3>
+              <Table className="border rounded-lg">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[15%] text-center">Sem</TableHead>
+                    <TableHead className="w-[25%] text-center">Fecha</TableHead>
+                    <TableHead className="w-[20%]">Día</TableHead>
+                    <TableHead className="w-[40%]">Estado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {days.map(day => {
+                    const dayOfWeek = getISODay(day); // 1 (Mon) - 7 (Sun)
+                    const isWeekend = dayOfWeek === 6 || dayOfWeek === 7;
+                    const dateString = format(day, 'yyyy-MM-dd');
+                    const dayEvent = events.find(e => e.date === dateString);
 
-              const daysByWeek = days.reduce((acc, day) => {
-                const week = getWeekNumber(day);
-                if (!acc[week]) {
-                  acc[week] = [];
-                }
-                acc[week].push(day);
-                return acc;
-              }, {} as { [key: number]: Date[] });
-
-              return (
-                <div key={monthIndex}>
-                  <h3 className="text-lg font-semibold text-center mb-2 capitalize">{monthName}</h3>
-                  <Table className="border">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[15%]">Sem</TableHead>
-                        <TableHead className="w-[25%]">Fecha</TableHead>
-                        <TableHead className="w-[25%]">Día</TableHead>
-                        <TableHead className="w-[35%] text-center">Tipo</TableHead>
+                    let rowClass = '';
+                    if (dayEvent) {
+                      rowClass = eventTypes[dayEvent.type].className;
+                    } else if (isWeekend) {
+                      rowClass = weekendClass;
+                    }
+                    
+                    return (
+                      <TableRow key={dateString} className={cn(rowClass)}>
+                        <TableCell className="text-center font-mono text-xs">S{getISOWeek(day)}</TableCell>
+                        <TableCell className="text-center font-mono text-xs">{format(day, 'dd/MM')}</TableCell>
+                        <TableCell className="text-sm capitalize">{format(day, 'EEE', { locale: es })}.</TableCell>
+                        <TableCell className="p-1">
+                          {isWeekend ? (
+                            <span className="text-sm text-muted-foreground pl-2">Fin de semana</span>
+                          ) : dayEvent ? (
+                            <div className="flex items-center gap-1">
+                                <span className="text-sm font-semibold flex-grow pl-2">{eventTypes[dayEvent.type].label}</span>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => handleEventTypeChange(day, 'laborable')}
+                                >
+                                    <RotateCcw className="h-3 w-3" />
+                                </Button>
+                            </div>
+                          ) : (
+                            <Select onValueChange={(value) => handleEventTypeChange(day, value)} >
+                              <SelectTrigger className="h-8 text-xs focus:ring-0 focus:ring-offset-0 border-0 bg-transparent">
+                                <SelectValue placeholder="Laborable" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(eventTypes).map(([key, { label }]) => (
+                                  <SelectItem key={key} value={key} className="text-xs">{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {Object.entries(daysByWeek).map(([week, weekDays]) => (
-                        <React.Fragment key={week}>
-                            <TableRow className="bg-muted/50">
-                                <TableCell className="font-bold align-middle row-span-7">S{week.toString().padStart(2,'0')}</TableCell>
-                                <TableCell colSpan={3} className="py-1">
-                                  {/* Placeholder for weekly actions or info */}
-                                </TableCell>
-                            </TableRow>
-                           {weekDays.map(day => {
-                            const dayEvent = events.find(e => format(new Date(`${e.date}T00:00:00`), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'));
-                             const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-                             const eventClass = dayEvent ? eventTypes[dayEvent.type].className : '';
-                             const weekendClass = isWeekend ? 'bg-gray-100' : '';
-
-                            return (
-                                <TableRow key={day.toString()} className={cn(weekendClass, eventClass)}>
-                                <TableCell></TableCell>
-                                <TableCell>{format(day, 'd/M')}</TableCell>
-                                <TableCell>{format(day, 'EEE', { locale: es })}.</TableCell>
-                                <TableCell className="text-center">
-                                    {dayEvent ? (
-                                        <Badge variant="outline" className="border-primary/50 text-xs">
-                                          {eventTypes[dayEvent.type].label}
-                                        </Badge>
-                                    ) : (isWeekend ? 'Fin de semana' : 'Laborable')}
-                                </TableCell>
-                                </TableRow>
-                            )
-                           })}
-                        </React.Fragment>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          );
+        })}
+      </div>
     </main>
   );
 }
