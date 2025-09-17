@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { format, addDays, getWeek, getMonth, getYear, startOfYear, endOfYear, eachDayOfInterval } from "date-fns";
 import { es } from 'date-fns/locale';
 import { PlusCircle, Trash2 } from "lucide-react";
