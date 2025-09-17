@@ -139,9 +139,23 @@ export default function CalendarPage() {
                         <TableCell className="p-1">
                           {isSunday ? (
                             <span className="text-sm text-muted-foreground pl-2">Fin de semana</span>
-                          ) : dayEvent ? (
-                            <div className="flex items-center gap-1">
-                                <span className="text-sm font-semibold flex-grow pl-2">{eventTypes[dayEvent.type].label}</span>
+                          ) : (
+                            <div className="flex items-center">
+                              <Select 
+                                onValueChange={(value) => handleEventTypeChange(day, value)} 
+                                value={dayEvent?.type || 'laborable'}
+                              >
+                                <SelectTrigger className="h-8 text-xs focus:ring-0 focus:ring-offset-0 border-0 bg-transparent flex-grow">
+                                  <SelectValue placeholder="Laborable" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="laborable" className="text-xs">Laborable</SelectItem>
+                                  {Object.entries(eventTypes).map(([key, { label }]) => (
+                                    <SelectItem key={key} value={key} className="text-xs">{label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {dayEvent && (
                                 <Button
                                     variant="ghost"
                                     size="icon"
@@ -150,18 +164,8 @@ export default function CalendarPage() {
                                 >
                                     <RotateCcw className="h-3 w-3" />
                                 </Button>
+                              )}
                             </div>
-                          ) : (
-                            <Select onValueChange={(value) => handleEventTypeChange(day, value)} >
-                              <SelectTrigger className="h-8 text-xs focus:ring-0 focus:ring-offset-0 border-0 bg-transparent">
-                                <SelectValue placeholder="Laborable" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Object.entries(eventTypes).map(([key, { label }]) => (
-                                  <SelectItem key={key} value={key} className="text-xs">{label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
                           )}
                         </TableCell>
                       </TableRow>
