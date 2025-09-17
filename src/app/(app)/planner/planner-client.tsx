@@ -210,93 +210,92 @@ export default function PlannerClient({
           </Button>
         </div>
       </div>
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[150px] sticky left-0 bg-card z-10">
-                    Máquina
+      <Card className="flex flex-col">
+        <CardContent className="p-0 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[150px] sticky left-0 bg-card z-10">
+                  Máquina
+                </TableHead>
+                {weeks.map((week) => (
+                  <TableHead key={week} className="text-center min-w-[200px]">
+                    Semana {week.substring(4)}
                   </TableHead>
-                  {weeks.map((week) => (
-                    <TableHead key={week} className="text-center min-w-[200px]">
-                      Semana {week.substring(4)}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {machines.map((machine) => (
-                  <TableRow key={machine.id}>
-                    <TableCell className="font-medium sticky left-0 bg-card z-10">
-                      {machine.nombre}
-                    </TableCell>
-                    {weeks.map((week) => {
-                      const weekAssignments = assignments.filter(
-                        (a) => a.machineId === machine.id && a.semana === week
-                      );
-
-                      const totalHours = weekAssignments.reduce(
-                        (sum, a) => sum + a.horas,
-                        0
-                      );
-
-                      return (
-                        <TableCell key={week} className="p-1 align-top">
-                          <div className="h-full w-full bg-muted rounded-md p-1 flex flex-col gap-1 relative min-h-[120px]">
-                            {weekAssignments.map((a) => {
-                              const piece = pieces.find(
-                                (p) => p.id === a.pieceId
-                              );
-
-                              const mold = molds.find(
-                                (m) => m.id === a.moldId
-                              );
-                              const widthPercentage =
-                                (a.horas / HOURS_PER_WEEK) * 100;
-                              return (
-                                <Tooltip key={a.id}>
-                                  <TooltipTrigger asChild>
-                                    <div
-                                      className="bg-primary/20 border border-primary text-primary-foreground p-1 rounded-md text-xs hover:bg-primary/40 cursor-pointer"
-                                    >
-                                      <p className="font-bold truncate">
-                                        {piece?.codigo}
-                                      </p>
-                                      <p className="text-xs truncate">
-                                        {mold?.nombre}
-                                      </p>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="font-bold">
-                                      {piece?.codigo} ({mold?.nombre})
-                                    </p>
-                                    <p>
-                                      Producción: {a.prodUnidades.toLocaleString()}{" "}
-                                      unidades
-                                    </p>
-                                    <p>Horas: {a.horas}</p>
-                                    {a.setup && <p>Incluye tiempo de preparación</p>}
-                                  </TooltipContent>
-                                </Tooltip>
-                              );
-                            })}
-                            <div className="absolute bottom-1 right-1 text-xs text-muted-foreground font-mono">
-                                {totalHours.toFixed(0)}h / {HOURS_PER_WEEK}h
-                            </div>
-                          </div>
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {machines.map((machine) => (
+                <TableRow key={machine.id}>
+                  <TableCell className="font-medium sticky left-0 bg-card z-10">
+                    {machine.nombre}
+                  </TableCell>
+                  {weeks.map((week) => {
+                    const weekAssignments = assignments.filter(
+                      (a) => a.machineId === machine.id && a.semana === week
+                    );
+
+                    const totalHours = weekAssignments.reduce(
+                      (sum, a) => sum + a.horas,
+                      0
+                    );
+
+                    return (
+                      <TableCell key={week} className="p-1 align-top">
+                        <div className="h-full w-full bg-muted rounded-md p-1 flex flex-col gap-1 relative min-h-[120px]">
+                          {weekAssignments.map((a) => {
+                            const piece = pieces.find(
+                              (p) => p.id === a.pieceId
+                            );
+
+                            const mold = molds.find(
+                              (m) => m.id === a.moldId
+                            );
+                            
+                            return (
+                              <Tooltip key={a.id}>
+                                <TooltipTrigger asChild>
+                                  <div
+                                    className="bg-primary/20 border border-primary text-primary-foreground p-1 rounded-md text-xs hover:bg-primary/40 cursor-pointer"
+                                  >
+                                    <p className="font-bold truncate">
+                                      {piece?.codigo}
+                                    </p>
+                                    <p className="text-xs truncate">
+                                      {mold?.nombre}
+                                    </p>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="font-bold">
+                                    {piece?.codigo} ({mold?.nombre})
+                                  </p>
+                                  <p>
+                                    Producción: {a.prodUnidades.toLocaleString()}{" "}
+                                    unidades
+                                  </p>
+                                  <p>Horas: {a.horas}</p>
+                                  {a.setup && <p>Incluye tiempo de preparación</p>}
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })}
+                          <div className="absolute bottom-1 right-1 text-xs text-muted-foreground font-mono">
+                              {totalHours.toFixed(0)}h / {HOURS_PER_WEEK}h
+                          </div>
+                        </div>
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </TooltipProvider>
   );
 }
+
+    
