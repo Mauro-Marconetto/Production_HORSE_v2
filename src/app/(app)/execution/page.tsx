@@ -20,7 +20,7 @@ export default function ExecutionPage() {
           <CardDescription>Introduce los datos de un turno de producción u orden completada.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-6">
+          <div className="grid gap-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="machine">Máquina</Label>
@@ -62,7 +62,7 @@ export default function ExecutionPage() {
             <div className="flex justify-end">
                 <Button type="submit">Enviar Registro de Producción</Button>
             </div>
-          </form>
+          </div>
         </CardContent>
       </Card>
     </main>
