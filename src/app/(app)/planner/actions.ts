@@ -1,8 +1,9 @@
+
 "use server";
 
 import { generateProductionPlan, GenerateProductionPlanInput } from "@/ai/flows/generate-production-plan";
 import { refineProductionPlan } from "@/ai/flows/refine-production-plan";
-import { planAssignments, scrap, demands, inventory, machines } from "@/lib/data";
+import { planAssignments, scrap, demands, inventory, machines, calendarEvents } from "@/lib/data";
 
 export async function runGeneratePlan(params: any) {
   console.log("Generating plan with params:", params);
@@ -16,6 +17,7 @@ export async function runGeneratePlan(params: any) {
     machineCapacity: JSON.stringify(machines),
     historicalDowntime: JSON.stringify([]), // Not used in mock
     scrapData: JSON.stringify(scrap),
+    calendarEvents: JSON.stringify(calendarEvents),
     runParams: JSON.stringify(params),
   };
 
@@ -42,5 +44,3 @@ export async function runGeneratePlan(params: any) {
     return { success: false, error: "Failed to generate plan." };
   }
 }
-
-    

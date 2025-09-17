@@ -1,4 +1,5 @@
-import type { Machine, Mold, Piece, Demand, CurrentInventory, Production, Plan, PlanAssignment, PlaceholderImage, ScrapEntry } from './types';
+
+import type { Machine, Mold, Piece, Demand, CurrentInventory, Production, Plan, PlanAssignment, PlaceholderImage, ScrapEntry, CalendarEvent } from './types';
 
 export const placeholderImages: PlaceholderImage[] = [
     {
@@ -75,4 +76,12 @@ export const scrap: ScrapEntry[] = [
     { id: 'scrap-4', periodoYYYYMM: '202406', pieceId: 'P1001', qty: 410, causa: 'Porosidad' },
 ];
 
+export const calendarEvents: CalendarEvent[] = [
+    { id: 'evt-1', machineId: 'M01', date: '2024-07-25', type: 'mantenimiento', description: 'Mantenimiento preventivo semestral' },
+    { id: 'evt-2', machineId: 'M02', date: '2024-07-25', type: 'mantenimiento', description: 'Mantenimiento preventivo semestral' },
+    { id: 'evt-3', machineId: 'M01', date: '2024-08-15', type: 'feriado', description: 'Asunción de la Virgen' },
+    { id: 'evt-4', machineId: 'M02', date: '2024-08-15', type: 'feriado', description: 'Asunción de la Virgen' },
+]
+
     
+

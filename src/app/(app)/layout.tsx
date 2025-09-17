@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -12,6 +13,7 @@ import {
   Cog,
   Truck,
   ShieldCheck,
+  CalendarDays,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -37,6 +39,7 @@ import { Separator } from "@/components/ui/separator";
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Panel" },
   { href: "/planner", icon: GanttChartSquare, label: "Planificador" },
+  { href: "/calendar", icon: CalendarDays, label: "Calendario" },
   { href: "/demand", icon: Truck, label: "Demanda" },
   { href: "/inventory", icon: Warehouse, label: "Inventario" },
   { href: "/execution", icon: LineChart, label: "Ejecución" },

@@ -1,3 +1,4 @@
+
 export interface Piece {
   id: string;
   codigo: string;
@@ -54,13 +55,14 @@ export interface CurrentInventory {
     stock: number;
 }
 
-export interface Calendar {
-  id: string; // composite key {machineId}/{periodoYYYYWW}
+export interface CalendarEvent {
+  id: string;
   machineId: string;
-  periodoYYYYWW: string;
-  mantenimientoPlan: { min: number }[];
-  tryouts: { min: number }[];
+  date: string; // YYYY-MM-DD
+  type: 'feriado' | 'vacaciones' | 'mantenimiento' | 'arranque';
+  description: string;
 }
+
 
 export interface Downtime {
   id: string; // composite key {machineId}/{YYYYMM}
@@ -103,7 +105,7 @@ export interface PlanAssignment {
 }
 
 export interface Production {
-  id: string; // fechaISO
+  id: string; 
   fechaISO: string;
   machineId: string;
   pieceId: string;
