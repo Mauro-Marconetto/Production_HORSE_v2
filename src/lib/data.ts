@@ -33,6 +33,16 @@ export const demands: Demand[] = [
   { id: '202427/P1001', periodoYYYYWW: '202427', pieceId: 'P1001', qty: 4200, prioridad: 1, version: 1, congelado: false },
   { id: '202427/P1002', periodoYYYYWW: '202427', pieceId: 'P1002', qty: 3100, prioridad: 1, version: 1, congelado: false },
   { id: '202427/P2001', periodoYYYYWW: '202427', pieceId: 'P2001', qty: 1100, prioridad: 2, version: 1, congelado: false },
+  { id: '202428/P1001', periodoYYYYWW: '202428', pieceId: 'P1001', qty: 4000, prioridad: 1, version: 1, congelado: false },
+  { id: '202429/P1001', periodoYYYYWW: '202429', pieceId: 'P1001', qty: 4000, prioridad: 1, version: 1, congelado: false },
+  { id: '202430/P1001', periodoYYYYWW: '202430', pieceId: 'P1001', qty: 4000, prioridad: 1, version: 1, congelado: false },
+  { id: '202431/P1001', periodoYYYYWW: '202431', pieceId: 'P1001', qty: 4000, prioridad: 1, version: 1, congelado: false },
+  { id: '202432/P1001', periodoYYYYWW: '202432', pieceId: 'P1001', qty: 4000, prioridad: 1, version: 1, congelado: false },
+  { id: '202433/P1001', periodoYYYYWW: '202433', pieceId: 'P1001', qty: 4000, prioridad: 1, version: 1, congelado: false },
+  { id: '202434/P1001', periodoYYYYWW: '202434', pieceId: 'P1001', qty: 4000, prioridad: 1, version: 1, congelado: false },
+  { id: '202435/P1001', periodoYYYYWW: '202435', pieceId: 'P1001', qty: 4000, prioridad: 1, version: 1, congelado: false },
+  { id: '202436/P1001', periodoYYYYWW: '202436', pieceId: 'P1001', qty: 4000, prioridad: 1, version: 1, congelado: false },
+  { id: '202437/P1001', periodoYYYYWW: '202437', pieceId: 'P1001', qty: 4000, prioridad: 1, version: 1, congelado: false },
 ];
 
 export const inventory: CurrentInventory[] = [
@@ -53,9 +63,9 @@ export const plans: Plan[] = [
 ]
 
 export const planAssignments: PlanAssignment[] = [
-    { id: 'assign-1', planId: 'run-002', pieceId: 'P1001', moldId: 'MOLD-01', machineId: 'M01', semana: '202426', horas: 80, setup: true, prodUnidades: 12800 },
-    { id: 'assign-2', planId: 'run-002', pieceId: 'P1002', moldId: 'MOLD-02', machineId: 'M01', semana: '202426', horas: 36, setup: true, prodUnidades: 4200 },
-    { id: 'assign-3', planId: 'run-002', pieceId: 'P2001', moldId: 'MOLD-03', machineId: 'M02', semana: '202426', horas: 120, setup: true, prodUnidades: 3600 },
+    { id: 'assign-1', planId: 'run-002', pieceId: 'P1001', moldId: 'MOLD-01', machineId: 'M01', semana: '202429', horas: 80, setup: true, prodUnidades: 12800 },
+    { id: 'assign-2', planId: 'run-002', pieceId: 'P1002', moldId: 'MOLD-02', machineId: 'M01', semana: '202429', horas: 36, setup: true, prodUnidades: 4200 },
+    { id: 'assign-3', planId: 'run-002', pieceId: 'P2001', moldId: 'MOLD-03', machineId: 'M02', semana: '202430', horas: 120, setup: true, prodUnidades: 3600 },
 ]
 
 export const scrap: ScrapEntry[] = [
@@ -64,3 +74,5 @@ export const scrap: ScrapEntry[] = [
     { id: 'scrap-3', periodoYYYYMM: '202405', pieceId: 'P2001', qty: 75, causa: 'Marcas de Expulsión' },
     { id: 'scrap-4', periodoYYYYMM: '202406', pieceId: 'P1001', qty: 410, causa: 'Porosidad' },
 ];
+
+    

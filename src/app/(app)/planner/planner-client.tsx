@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import {
   BrainCircuit,
   FileDown,
   Play,
   SlidersHorizontal,
 } from "lucide-react";
+import { format, addWeeks } from "date-fns";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -53,8 +54,12 @@ interface PlannerClientProps {
   pieces: Piece[];
 }
 
-const WEEKS = ["202426", "202427", "202428", "202429"];
 const HOURS_PER_WEEK = 120; // total available hours
+
+// Helper to get week string in YYYYWW format
+const getWeekString = (date: Date) => {
+    return format(date, "yyyy") + format(date, "I").padStart(2, '0');
+};
 
 export default function PlannerClient({
   initialAssignments,
@@ -69,6 +74,13 @@ export default function PlannerClient({
   const [oee, setOee] = useState(80);
   const [scrap, setScrap] = useState(5);
   const [shifts, setShifts] = useState(15);
+  const [planningWeeks, setPlanningWeeks] = useState(4);
+
+  const weeks = useMemo(() => {
+    const today = new Date();
+    return Array.from({ length: planningWeeks }, (_, i) => getWeekString(addWeeks(today, i)));
+  }, [planningWeeks]);
+
 
   const handleGeneratePlan = () => {
     startTransition(async () => {
@@ -76,9 +88,12 @@ export default function PlannerClient({
         oee: oee / 100,
         scrap: scrap / 100,
         shifts,
+        weeks: planningWeeks,
       });
       if (result.success) {
-        setAssignments(result.plan);
+        // Filter assignments to only include the selected weeks
+        const newAssignments = result.plan.filter((a: PlanAssignment) => weeks.includes(a.semana));
+        setAssignments(newAssignments);
         toast({
           title: "Plan Generado",
           description: "El nuevo plan de producción se ha generado correctamente.",
@@ -120,6 +135,21 @@ export default function PlannerClient({
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
+                 <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="weeks" className="text-right">
+                    Semanas
+                  </Label>
+                  <Slider
+                    id="weeks"
+                    value={[planningWeeks]}
+                    onValueChange={(value) => setPlanningWeeks(value[0])}
+                    min={1}
+                    max={12}
+                    step={1}
+                    className="col-span-2"
+                  />
+                  <span className="text-sm font-medium">{planningWeeks} sem.</span>
+                </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="oee" className="text-right">
                     OEE
@@ -188,8 +218,8 @@ export default function PlannerClient({
                   <TableHead className="w-[150px] sticky left-0 bg-card z-10">
                     Máquina
                   </TableHead>
-                  {WEEKS.map((week) => (
-                    <TableHead key={week} className="text-center">
+                  {weeks.map((week) => (
+                    <TableHead key={week} className="text-center min-w-[200px]">
                       Semana {week.substring(4)}
                     </TableHead>
                   ))}
@@ -201,7 +231,7 @@ export default function PlannerClient({
                     <TableCell className="font-medium sticky left-0 bg-card z-10">
                       {machine.nombre}
                     </TableCell>
-                    {WEEKS.map((week) => {
+                    {weeks.map((week) => {
                       const weekAssignments = assignments.filter(
                         (a) => a.machineId === machine.id && a.semana === week
                       );
@@ -272,3 +302,5 @@ export default function PlannerClient({
     </TooltipProvider>
   );
 }
+
+    
