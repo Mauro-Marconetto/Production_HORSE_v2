@@ -1,4 +1,4 @@
-import type { Machine, Mold, Piece, Demand, CurrentInventory, Production, Plan, PlanAssignment, PlaceholderImage } from './types';
+import type { Machine, Mold, Piece, Demand, CurrentInventory, Production, Plan, PlanAssignment, PlaceholderImage, ScrapEntry } from './types';
 
 export const placeholderImages: PlaceholderImage[] = [
     {
@@ -57,3 +57,10 @@ export const planAssignments: PlanAssignment[] = [
     { id: 'assign-2', planId: 'run-002', pieceId: 'P1002', moldId: 'MOLD-02', machineId: 'M01', semana: '202426', horas: 36, setup: true, prodUnidades: 4200 },
     { id: 'assign-3', planId: 'run-002', pieceId: 'P2001', moldId: 'MOLD-03', machineId: 'M02', semana: '202426', horas: 120, setup: true, prodUnidades: 3600 },
 ]
+
+export const scrap: ScrapEntry[] = [
+    { id: 'scrap-1', periodoYYYYMM: '202405', pieceId: 'P1001', qty: 350, causa: 'Porosidad' },
+    { id: 'scrap-2', periodoYYYYMM: '202405', pieceId: 'P1002', qty: 150, causa: 'Rebaba Excesiva' },
+    { id: 'scrap-3', periodoYYYYMM: '202405', pieceId: 'P2001', qty: 75, causa: 'Marcas de Expulsión' },
+    { id: 'scrap-4', periodoYYYYMM: '202406', pieceId: 'P1001', qty: 410, causa: 'Porosidad' },
+];

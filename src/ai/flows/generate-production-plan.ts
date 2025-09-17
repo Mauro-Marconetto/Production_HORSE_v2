@@ -18,6 +18,7 @@ const GenerateProductionPlanInputSchema = z.object({
   stockLevels: z.string().describe('Stock levels in JSON format.'),
   machineCapacity: z.string().describe('Machine capacity data in JSON format.'),
   historicalDowntime: z.string().describe('Historical downtime data in JSON format.'),
+  scrapData: z.string().describe('Historical scrap data in JSON format.'),
   runParams: z.string().describe('Run parameters for the planning algorithm in JSON format.'),
 });
 export type GenerateProductionPlanInput = z.infer<typeof GenerateProductionPlanInputSchema>;
@@ -38,12 +39,13 @@ const productionPlanPrompt = ai.definePrompt({
   name: 'productionPlanPrompt',
   input: {schema: GenerateProductionPlanInputSchema},
   output: {schema: GenerateProductionPlanOutputSchema},
-  prompt: `You are an AI production planner. Generate an optimized production plan based on the following information.
+  prompt: `You are an AI production planner. Generate an optimized production plan based on the following information. Account for historical scrap rates when calculating required production quantities.
 
 Demand Data: {{{demandData}}}
 Stock Levels: {{{stockLevels}}}
 Machine Capacity: {{{machineCapacity}}}
 Historical Downtime: {{{historicalDowntime}}}
+Historical Scrap Data: {{{scrapData}}}
 Run Parameters: {{{runParams}}}
 
 Return the plan in JSON format.

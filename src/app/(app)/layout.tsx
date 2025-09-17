@@ -11,6 +11,7 @@ import {
   Factory,
   Cog,
   Truck,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -40,6 +41,7 @@ const navItems = [
   { href: "/inventory", icon: Warehouse, label: "Inventario" },
   { href: "/execution", icon: LineChart, label: "Ejecución" },
   { href: "/downtime", icon: Wrench, label: "Inactividad" },
+  { href: "/quality", icon: ShieldCheck, label: "Calidad" },
 ];
 
 const adminNavItems = [

@@ -91,7 +91,7 @@ export interface Plan {
 }
 
 export interface PlanAssignment {
-  id: string; // autoId
+  id:string; // autoId
   planId: string;
   pieceId: string;
   moldId: string;
@@ -111,6 +111,14 @@ export interface Production {
   horas: number;
   unidades: number;
   scrapPct: number;
+}
+
+export interface ScrapEntry {
+    id: string;
+    periodoYYYYMM: string;
+    pieceId: string;
+    qty: number;
+    causa: string;
 }
 
 export interface Settings {

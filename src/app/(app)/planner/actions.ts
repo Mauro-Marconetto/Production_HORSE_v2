@@ -2,7 +2,7 @@
 
 import { generateProductionPlan, GenerateProductionPlanInput } from "@/ai/flows/generate-production-plan";
 import { refineProductionPlan } from "@/ai/flows/refine-production-plan";
-import { planAssignments } from "@/lib/data";
+import { planAssignments, scrap } from "@/lib/data";
 
 export async function runGeneratePlan(params: any) {
   console.log("Generating plan with params:", params);
@@ -15,6 +15,7 @@ export async function runGeneratePlan(params: any) {
     stockLevels: JSON.stringify({}),
     machineCapacity: JSON.stringify({}),
     historicalDowntime: JSON.stringify({}),
+    scrapData: JSON.stringify(scrap),
     runParams: JSON.stringify(params),
   };
 
@@ -30,7 +31,8 @@ export async function runGeneratePlan(params: any) {
     const newAssignments = planAssignments.map(a => ({
         ...a,
         horas: a.horas * (params.oee / 0.8),
-        prodUnidades: Math.round(a.prodUnidades * (params.oee / 0.8)),
+        // Increase production to account for simulated scrap rate
+        prodUnidades: Math.round(a.prodUnidades * (params.oee / 0.8) * (1 + params.scrap)),
     }));
     
     return { success: true, plan: newAssignments };
