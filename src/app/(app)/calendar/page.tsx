@@ -2,13 +2,12 @@
 "use client";
 
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, addDays, getWeek, getMonth, getYear, startOfYear, endOfYear, eachDayOfInterval } from "date-fns";
 import { es } from 'date-fns/locale';
-import { Calendar as CalendarIcon, PlusCircle, Trash2 } from "lucide-react";
+import { PlusCircle, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -21,7 +20,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -39,42 +37,38 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 
-import { machines, calendarEvents as initialEvents } from "@/lib/data";
-import type { CalendarEvent, Machine } from "@/lib/types";
+import { calendarEvents as initialEvents } from "@/lib/data";
+import type { CalendarEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const eventTypes = {
-  feriado: { label: "Feriado", className: "bg-red-500 text-white" },
-  vacaciones: { label: "Vacaciones", className: "bg-blue-500 text-white" },
-  mantenimiento: { label: "Mantenimiento", className: "bg-yellow-500 text-black" },
-  arranque: { label: "Arranque/Parada", className: "bg-purple-500 text-white" },
+  feriado: { label: "Feriado", className: "bg-red-200" },
+  vacaciones: { label: "Vacaciones", className: "bg-blue-200" },
+  mantenimiento: { label: "Mantenimiento", className: "bg-yellow-200" },
+  arranque: { label: "Arranque/Parada", className: "bg-purple-200" },
 };
+
+
+const getWeekNumber = (date: Date) => {
+    return getWeek(date, { weekStartsOn: 1, firstWeekContainsDate: 4 });
+}
 
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>(initialEvents);
-  const [selectedMachine, setSelectedMachine] = useState<string>(machines[0].id);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [year, setYear] = useState(new Date().getFullYear());
 
-  const handleAddEvent = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const newEvent: CalendarEvent = {
-      id: `evt-${Date.now()}`,
-      machineId: selectedMachine,
-      date: format(selectedDate!, "yyyy-MM-dd"),
-      type: formData.get("type") as CalendarEvent["type"],
-      description: formData.get("description") as string,
-    };
-    setEvents([...events, newEvent]);
-    setIsDialogOpen(false);
-  };
+  const yearStart = startOfYear(new Date(year, 0, 1));
+  const yearEnd = endOfYear(new Date(year, 0, 1));
+  const daysInYear = eachDayOfInterval({ start: yearStart, end: yearEnd });
 
-  const handleDeleteEvent = (eventId: string) => {
-    setEvents(events.filter((event) => event.id !== eventId));
-  };
-  
-  const filteredEvents = events.filter(e => e.machineId === selectedMachine);
+  const daysByMonth = daysInYear.reduce((acc, day) => {
+    const month = getMonth(day);
+    if (!acc[month]) {
+      acc[month] = [];
+    }
+    acc[month].push(day);
+    return acc;
+  }, {} as { [key: number]: Date[] });
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -82,147 +76,77 @@ export default function CalendarPage() {
         <div>
           <h1 className="text-3xl font-headline font-bold">Calendario de Disponibilidad</h1>
           <p className="text-muted-foreground">
-            Gestiona feriados, vacaciones y paradas de máquina.
+            Gestiona los días no productivos para toda la planta.
           </p>
         </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <div className="flex justify-between items-start">
-                <div>
-                    <CardTitle>Seleccionar Máquina y Fecha</CardTitle>
-                    <CardDescription>
-                        Marca los días no productivos en el calendario.
-                    </CardDescription>
+      <Card>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+            {Object.entries(daysByMonth).map(([monthIndex, days]) => {
+              const monthName = format(days[0], 'MMMM', { locale: es });
+
+              const daysByWeek = days.reduce((acc, day) => {
+                const week = getWeekNumber(day);
+                if (!acc[week]) {
+                  acc[week] = [];
+                }
+                acc[week].push(day);
+                return acc;
+              }, {} as { [key: number]: Date[] });
+
+              return (
+                <div key={monthIndex}>
+                  <h3 className="text-lg font-semibold text-center mb-2 capitalize">{monthName}</h3>
+                  <Table className="border">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[15%]">Sem</TableHead>
+                        <TableHead className="w-[25%]">Fecha</TableHead>
+                        <TableHead className="w-[25%]">Día</TableHead>
+                        <TableHead className="w-[35%] text-center">Tipo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.entries(daysByWeek).map(([week, weekDays]) => (
+                        <React.Fragment key={week}>
+                            <TableRow className="bg-muted/50">
+                                <TableCell className="font-bold align-middle row-span-7">S{week.toString().padStart(2,'0')}</TableCell>
+                                <TableCell colSpan={3} className="py-1">
+                                  {/* Placeholder for weekly actions or info */}
+                                </TableCell>
+                            </TableRow>
+                           {weekDays.map(day => {
+                            const dayEvent = events.find(e => format(new Date(`${e.date}T00:00:00`), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'));
+                             const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                             const eventClass = dayEvent ? eventTypes[dayEvent.type].className : '';
+                             const weekendClass = isWeekend ? 'bg-gray-100' : '';
+
+                            return (
+                                <TableRow key={day.toString()} className={cn(weekendClass, eventClass)}>
+                                <TableCell></TableCell>
+                                <TableCell>{format(day, 'd/M')}</TableCell>
+                                <TableCell>{format(day, 'EEE', { locale: es })}.</TableCell>
+                                <TableCell className="text-center">
+                                    {dayEvent ? (
+                                        <Badge variant="outline" className="border-primary/50 text-xs">
+                                          {eventTypes[dayEvent.type].label}
+                                        </Badge>
+                                    ) : (isWeekend ? 'Fin de semana' : 'Laborable')}
+                                </TableCell>
+                                </TableRow>
+                            )
+                           })}
+                        </React.Fragment>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
-                <Select value={selectedMachine} onValueChange={setSelectedMachine}>
-                    <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Seleccionar máquina" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {machines.map((machine) => (
-                        <SelectItem key={machine.id} value={machine.id}>
-                        {machine.nombre}
-                        </SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-            </div>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              locale={es}
-              className="rounded-md border"
-              components={{
-                DayContent: ({ date }) => {
-                  const dayEvents = filteredEvents.filter(e => format(new Date(`${e.date}T00:00:00`), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
-                  return (
-                    <div className="relative h-full w-full flex items-center justify-center">
-                      <span className="relative z-10">{format(date, "d")}</span>
-                      {dayEvents.length > 0 && (
-                        <div className="absolute bottom-1 w-full flex justify-center gap-0.5">
-                           {dayEvents.map(e => (
-                               <div key={e.id} className={cn('h-1 w-1 rounded-full', eventTypes[e.type].className)}></div>
-                           ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                },
-              }}
-            />
-          </CardContent>
-        </Card>
-        <Card className="lg:col-span-4">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle>Eventos Programados</CardTitle>
-                <CardDescription>
-                  Eventos para la máquina <span className="font-bold">{machines.find(m=>m.id === selectedMachine)?.nombre}</span>.
-                </CardDescription>
-              </div>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button disabled={!selectedDate}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Evento
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Añadir Nuevo Evento</DialogTitle>
-                    <DialogDescription>
-                      {`Añadir evento para el día ${selectedDate ? format(selectedDate, "PPP", {locale: es}) : ''} en la máquina ${machines.find(m => m.id === selectedMachine)?.nombre}`}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleAddEvent}>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="type" className="text-right">
-                          Tipo
-                        </Label>
-                        <Select name="type" required>
-                          <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Seleccionar tipo de evento" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(eventTypes).map(([key, value]) => (
-                                <SelectItem key={key} value={key}>{value.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="description" className="text-right">
-                          Descripción
-                        </Label>
-                        <Textarea id="description" name="description" className="col-span-3" />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button type="submit">Guardar Evento</Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Descripción</TableHead>
-                        <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {filteredEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(event => (
-                        <TableRow key={event.id}>
-                            <TableCell>{format(new Date(`${event.date}T00:00:00`), "PPP", { locale: es })}</TableCell>
-                            <TableCell>
-                                <Badge className={cn('text-xs', eventTypes[event.type].className)}>
-                                    {eventTypes[event.type].label}
-                                </Badge>
-                            </TableCell>
-                            <TableCell>{event.description}</TableCell>
-                            <TableCell className="text-right">
-                                <Button variant="ghost" size="icon" onClick={() => handleDeleteEvent(event.id)}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
     </main>
   );
 }

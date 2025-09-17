@@ -57,7 +57,7 @@ export interface CurrentInventory {
 
 export interface CalendarEvent {
   id: string;
-  machineId: string;
+  machineId: string; // "all" for global events
   date: string; // YYYY-MM-DD
   type: 'feriado' | 'vacaciones' | 'mantenimiento' | 'arranque';
   description: string;
