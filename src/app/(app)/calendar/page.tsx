@@ -119,8 +119,7 @@ export default function CalendarPage() {
               className="rounded-md border"
               components={{
                 DayContent: ({ date }) => {
-                  // This now correctly filters events for the *selected machine*
-                  const dayEvents = filteredEvents.filter(e => format(new Date(e.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
+                  const dayEvents = filteredEvents.filter(e => format(new Date(`${e.date}T00:00:00`), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
                   return (
                     <div className="relative h-full w-full flex items-center justify-center">
                       <span className="relative z-10">{format(date, "d")}</span>
@@ -205,7 +204,7 @@ export default function CalendarPage() {
                 <TableBody>
                     {filteredEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(event => (
                         <TableRow key={event.id}>
-                            <TableCell>{format(new Date(event.date), "PPP", { locale: es })}</TableCell>
+                            <TableCell>{format(new Date(`${event.date}T00:00:00`), "PPP", { locale: es })}</TableCell>
                             <TableCell>
                                 <Badge className={cn('text-xs', eventTypes[event.type].className)}>
                                     {eventTypes[event.type].label}
