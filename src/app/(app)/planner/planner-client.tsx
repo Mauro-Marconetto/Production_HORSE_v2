@@ -210,9 +210,9 @@ export default function PlannerClient({
           </Button>
         </div>
       </div>
-      <Card className="flex-1 flex flex-col">
-        <CardContent className="p-0 flex-1">
-          <div className="overflow-x-auto relative h-full">
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -243,8 +243,8 @@ export default function PlannerClient({
                       );
 
                       return (
-                        <TableCell key={week} className="p-1 align-top h-full">
-                          <div className="h-full w-full bg-muted rounded-md p-1 flex flex-col gap-1 relative">
+                        <TableCell key={week} className="p-1 align-top">
+                          <div className="h-full w-full bg-muted rounded-md p-1 flex flex-col gap-1 relative min-h-[120px]">
                             {weekAssignments.map((a) => {
                               const piece = pieces.find(
                                 (p) => p.id === a.pieceId
@@ -260,10 +260,6 @@ export default function PlannerClient({
                                   <TooltipTrigger asChild>
                                     <div
                                       className="bg-primary/20 border border-primary text-primary-foreground p-1 rounded-md text-xs hover:bg-primary/40 cursor-pointer"
-                                      style={{
-                                        height: `${widthPercentage}%`,
-                                        minHeight: '24px'
-                                      }}
                                     >
                                       <p className="font-bold truncate">
                                         {piece?.codigo}
