@@ -210,9 +210,8 @@ export default function PlannerClient({
           </Button>
         </div>
       </div>
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+      <Card className="flex-1 flex flex-col">
+        <CardContent className="p-0 overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -298,9 +297,10 @@ export default function PlannerClient({
                 ))}
               </TableBody>
             </Table>
-          </div>
         </CardContent>
       </Card>
     </TooltipProvider>
   );
 }
+
+    
