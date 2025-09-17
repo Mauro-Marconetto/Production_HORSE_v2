@@ -94,9 +94,20 @@ export default function CalendarPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {Object.entries(daysByMonth).map(([monthIndex, days]) => {
           const monthName = format(days[0], 'MMMM', { locale: es });
+          
+          const workingDays = days.filter(day => {
+            const dayOfWeek = getISODay(day); // 1 (Mon) - 7 (Sun)
+            const isSunday = dayOfWeek === 7;
+            const dateString = format(day, 'yyyy-MM-dd');
+            const dayEvent = events.find(e => e.date === dateString);
+            return !isSunday && !dayEvent;
+          }).length;
+
           return (
             <div key={monthIndex}>
-              <h3 className="text-xl font-semibold text-center mb-2 capitalize">{monthName}</h3>
+              <h3 className="text-xl font-semibold text-center mb-2 capitalize">
+                {monthName} <span className="text-base font-normal text-muted-foreground">({workingDays} días)</span>
+              </h3>
               <Table className="border rounded-lg">
                 <TableHeader>
                   <TableRow>
@@ -109,14 +120,14 @@ export default function CalendarPage() {
                 <TableBody>
                   {days.map(day => {
                     const dayOfWeek = getISODay(day); // 1 (Mon) - 7 (Sun)
-                    const isWeekend = dayOfWeek === 6 || dayOfWeek === 7;
+                    const isSunday = dayOfWeek === 7;
                     const dateString = format(day, 'yyyy-MM-dd');
                     const dayEvent = events.find(e => e.date === dateString);
 
                     let rowClass = '';
                     if (dayEvent) {
                       rowClass = eventTypes[dayEvent.type].className;
-                    } else if (isWeekend) {
+                    } else if (isSunday) {
                       rowClass = weekendClass;
                     }
                     
@@ -126,7 +137,7 @@ export default function CalendarPage() {
                         <TableCell className="text-center font-mono text-xs">{format(day, 'dd/MM')}</TableCell>
                         <TableCell className="text-sm capitalize">{format(day, 'EEE', { locale: es })}.</TableCell>
                         <TableCell className="p-1">
-                          {isWeekend ? (
+                          {isSunday ? (
                             <span className="text-sm text-muted-foreground pl-2">Fin de semana</span>
                           ) : dayEvent ? (
                             <div className="flex items-center gap-1">
