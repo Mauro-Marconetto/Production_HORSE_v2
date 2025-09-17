@@ -249,6 +249,7 @@ export default function PlannerClient({
                               const piece = pieces.find(
                                 (p) => p.id === a.pieceId
                               );
+
                               const mold = molds.find(
                                 (m) => m.id === a.moldId
                               );
