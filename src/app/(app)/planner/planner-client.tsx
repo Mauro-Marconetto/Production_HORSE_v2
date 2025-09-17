@@ -211,7 +211,8 @@ export default function PlannerClient({
         </div>
       </div>
       <Card className="flex-1 flex flex-col">
-        <CardContent className="p-0 overflow-auto">
+        <CardContent className="p-0 flex-1">
+          <div className="overflow-x-auto relative h-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -242,7 +243,7 @@ export default function PlannerClient({
                       );
 
                       return (
-                        <TableCell key={week} className="p-1 align-top h-32">
+                        <TableCell key={week} className="p-1 align-top h-full">
                           <div className="h-full w-full bg-muted rounded-md p-1 flex flex-col gap-1 relative">
                             {weekAssignments.map((a) => {
                               const piece = pieces.find(
@@ -297,10 +298,9 @@ export default function PlannerClient({
                 ))}
               </TableBody>
             </Table>
+          </div>
         </CardContent>
       </Card>
     </TooltipProvider>
   );
 }
-
-    
