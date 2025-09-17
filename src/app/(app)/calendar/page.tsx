@@ -119,12 +119,13 @@ export default function CalendarPage() {
               className="rounded-md border"
               components={{
                 DayContent: ({ date }) => {
+                  // This now correctly filters events for the *selected machine*
                   const dayEvents = filteredEvents.filter(e => format(new Date(e.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
                   return (
-                    <div className="relative h-full w-full">
+                    <div className="relative h-full w-full flex items-center justify-center">
                       <span className="relative z-10">{format(date, "d")}</span>
                       {dayEvents.length > 0 && (
-                        <div className="absolute bottom-0 left-0 w-full flex justify-center gap-0.5">
+                        <div className="absolute bottom-1 w-full flex justify-center gap-0.5">
                            {dayEvents.map(e => (
                                <div key={e.id} className={cn('h-1 w-1 rounded-full', eventTypes[e.type].className)}></div>
                            ))}
@@ -226,4 +227,3 @@ export default function CalendarPage() {
     </main>
   );
 }
-
