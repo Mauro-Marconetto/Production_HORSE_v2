@@ -69,11 +69,21 @@ export const plans: Plan[] = [
 ]
 
 export const planAssignments: PlanAssignment[] = [
-    { id: 'assign-1', planId: 'run-002', pieceId: 'P1001', moldId: 'MOLD-01', machineId: 'M01', semana: '202427', horas: 80, setup: true, prodUnidades: 12800 },
-    { id: 'assign-2', planId: 'run-002', pieceId: 'P1002', moldId: 'MOLD-02', machineId: 'M01', semana: '202428', horas: 36, setup: true, prodUnidades: 4200 },
-    { id: 'assign-3', planId: 'run-002', pieceId: 'P2001', moldId: 'MOLD-03', machineId: 'M02', semana: '202428', horas: 120, setup: true, prodUnidades: 3600 },
-    { id: 'assign-4', planId: 'run-002', pieceId: 'P1001', moldId: 'MOLD-01', machineId: 'M01', semana: '202429', horas: 80, setup: false, prodUnidades: 13000 },
-    { id: 'assign-5', planId: 'run-002', pieceId: 'P1002', moldId: 'MOLD-02', machineId: 'M01', semana: '202430', horas: 40, setup: true, prodUnidades: 4800 },
+    // Semana 27
+    { id: 'assign-1', planId: 'run-002', pieceId: 'P1001', moldId: 'MOLD-01', machineId: 'M01', semana: '202427', horas: 40, setup: true, prodUnidades: 6400 },
+    { id: 'assign-2', planId: 'run-002', pieceId: 'P1002', moldId: 'MOLD-02', machineId: 'M01', semana: '202427', horas: 40, setup: true, prodUnidades: 5200 },
+    { id: 'assign-3', planId: 'run-002', pieceId: 'P2001', moldId: 'MOLD-03', machineId: 'M02', semana: '202427', horas: 60, setup: true, prodUnidades: 1800 },
+    
+    // Semana 28
+    { id: 'assign-4', planId: 'run-002', pieceId: 'P1001', moldId: 'MOLD-01', machineId: 'M01', semana: '202428', horas: 50, setup: false, prodUnidades: 8000 },
+    { id: 'assign-5', planId: 'run-002', pieceId: 'P2001', moldId: 'MOLD-03', machineId: 'M02', semana: '202428', horas: 60, setup: false, prodUnidades: 1800 },
+    
+    // Semana 29
+    { id: 'assign-6', planId: 'run-002', pieceId: 'P1002', moldId: 'MOLD-02', machineId: 'M01', semana: '202429', horas: 80, setup: true, prodUnidades: 10400 },
+    { id: 'assign-7', planId: 'run-002', pieceId: 'P2001', moldId: 'MOLD-03', machineId: 'M02', semana: '202429', horas: 40, setup: false, prodUnidades: 1200 },
+
+    // Semana 30
+    { id: 'assign-8', planId: 'run-002', pieceId: 'P1001', moldId: 'MOLD-01', machineId: 'M01', semana: '202430', horas: 60, setup: true, prodUnidades: 9600 },
 ]
 
 export const scrap: ScrapEntry[] = [
@@ -87,3 +97,4 @@ export const calendarEvents: CalendarEvent[] = [
     { id: 'evt-1', machineId: "all", date: '2024-07-25', type: 'mantenimiento', description: 'Mantenimiento preventivo semestral' },
     { id: 'evt-3', machineId: "all", date: '2024-08-15', type: 'feriado', description: 'Asunción de la Virgen' },
 ]
+
