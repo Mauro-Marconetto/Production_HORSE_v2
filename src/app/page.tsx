@@ -1,3 +1,4 @@
+
 "use client";
 
 import Image from "next/image";
@@ -14,7 +15,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Logo } from "@/components/logo";
 import { placeholderImages } from "@/lib/data";
 
 export default function LoginPage() {
@@ -29,10 +29,9 @@ export default function LoginPage() {
     <div className="w-full h-screen lg:grid lg:min-h-[600px] lg:grid-cols-2 xl:min-h-[800px]">
       <div className="flex items-center justify-center py-12">
         <div className="mx-auto grid w-[350px] gap-6">
-          <div className="grid gap-2 text-center">
+          <div className="grid gap-4 text-center">
              <div className="flex justify-center items-center gap-2">
-                <Logo className="w-8 h-8" />
-                <h1 className="text-3xl font-bold font-headline">ForgeFlow</h1>
+                <Image src="/logo.png" width={180} height={40} alt="ForgeFlow Logo" />
             </div>
             <p className="text-balance text-muted-foreground">
               Introduce tu email para acceder a tu cuenta

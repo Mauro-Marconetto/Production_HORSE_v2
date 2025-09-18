@@ -1,6 +1,7 @@
 
 "use client";
 
+import Image from "next/image";
 import {
   Package,
   Home,
@@ -32,7 +33,6 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/logo";
 import { UserNav } from "@/components/user-nav";
 import { Separator } from "@/components/ui/separator";
 
@@ -62,8 +62,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar>
         <SidebarHeader>
           <Link href="/dashboard" className="flex items-center gap-2">
-            <Logo className="w-6 h-6" />
-            <span className="font-headline font-semibold text-lg">ForgeFlow</span>
+            <Image src="/logo.png" width={140} height={32} alt="ForgeFlow Logo" />
           </Link>
         </SidebarHeader>
         <SidebarContent>
