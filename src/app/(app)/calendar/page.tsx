@@ -99,7 +99,7 @@ export default function CalendarPage() {
             </Button>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-3 gap-6">
         {Object.entries(daysByMonth).map(([monthIndex, days]) => {
           const monthName = format(days[0], 'MMMM', { locale: es });
           
