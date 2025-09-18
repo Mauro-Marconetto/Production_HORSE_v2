@@ -64,16 +64,7 @@ export default function LoginPage() {
             <Button type="submit" className="w-full">
               Acceder
             </Button>
-            <Button variant="outline" className="w-full">
-              Acceder con Google
-            </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
-            ¿No tienes una cuenta?{" "}
-            <Link href="#" className="underline">
-              Regístrate
-            </Link>
-          </div>
         </div>
       </div>
       <div className="hidden bg-muted lg:block">
