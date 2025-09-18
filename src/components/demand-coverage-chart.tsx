@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { addDays, format, getISOWeek, startOfWeek, eachWeekOfInterval } from "date-fns"
+import { addDays, format, getISOWeek, startOfWeek, eachWeekOfInterval, parse } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import {
@@ -36,9 +36,21 @@ interface DemandCoverageChartProps {
   className?: string;
 }
 
-const getWeekString = (date: Date) => {
-    return format(date, "yyyy") + String(getISOWeek(date)).padStart(2, '0');
+const getWeekString = (date: Date): string => {
+    // getISOWeek returns the ISO week number. String formatting ensures WW format.
+    const year = format(date, 'yyyy');
+    const week = getISOWeek(date);
+    return `${year}${String(week).padStart(2, '0')}`;
 };
+
+// Helper to get a Date object from a 'YYYYWW' string, using the first day of that week.
+const getDateFromWeekString = (weekString: string): Date => {
+    const year = parseInt(weekString.substring(0, 4), 10);
+    const week = parseInt(weekString.substring(4), 10);
+    // `parse` with 'R' for year and 'I' for ISO week is the key.
+    return parse(`${year} ${week}`, 'R I', new Date());
+};
+
 
 export function DemandCoverageChart({
   demands,
@@ -47,9 +59,14 @@ export function DemandCoverageChart({
   planAssignments,
   className,
 }: DemandCoverageChartProps) {
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
-    to: addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 27), // 4 weeks
+  const [date, setDate] = React.useState<DateRange | undefined>(() => {
+    // Find the earliest week with data to set a meaningful default range
+    const firstDemandWeek = demands.map(d => d.periodoYYYYWW).sort()[0] || getWeekString(new Date());
+    const startDate = startOfWeek(getDateFromWeekString(firstDemandWeek), { weekStartsOn: 1 });
+    return {
+      from: startDate,
+      to: addDays(startDate, 27), // Default to 4 weeks
+    };
   });
 
   const chartData = React.useMemo(() => {
@@ -60,7 +77,7 @@ export function DemandCoverageChart({
     
     const weeklyData: { [key: string]: { week: string; demand: number; planned: number } } = {};
 
-    // Initialize weeks in the range
+    // Initialize weeks in the selected date range
     const weeksInInterval = eachWeekOfInterval({
       start: date.from,
       end: date.to,
@@ -178,6 +195,7 @@ export function DemandCoverageChart({
                         background: 'hsl(var(--background))',
                         borderColor: 'hsl(var(--border))',
                     }}
+                    formatter={(value: number) => value.toLocaleString()}
                 />
                 <Legend />
                 <Bar dataKey="coveredByStock" name="Cubierto por Stock" stackId="a" fill="hsl(var(--chart-1))" />
