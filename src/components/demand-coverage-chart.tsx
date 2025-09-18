@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { addDays, format, getISOWeek, startOfWeek } from "date-fns"
+import { addDays, format, getISOWeek, startOfWeek, eachWeekOfInterval } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import {
@@ -57,18 +57,19 @@ export function DemandCoverageChart({
 
     const startWeek = getWeekString(date.from);
     const endWeek = getWeekString(date.to);
-
+    
     const weeklyData: { [key: string]: { week: string; demand: number; planned: number } } = {};
 
-    // Initialize weeks
-    let currentDate = date.from;
-    while(getWeekString(currentDate) <= endWeek) {
-      const weekStr = getWeekString(currentDate);
-      if (!weeklyData[weekStr]) {
-        weeklyData[weekStr] = { week: `S${weekStr.substring(4)}`, demand: 0, planned: 0 };
-      }
-      currentDate = addDays(currentDate, 7);
-    }
+    // Initialize weeks in the range
+    const weeksInInterval = eachWeekOfInterval({
+      start: date.from,
+      end: date.to,
+    }, { weekStartsOn: 1 });
+
+    weeksInInterval.forEach(weekStart => {
+      const weekStr = getWeekString(weekStart);
+      weeklyData[weekStr] = { week: `S${weekStr.substring(4)}`, demand: 0, planned: 0 };
+    });
     
     // Aggregate demand
     demands.forEach(d => {
