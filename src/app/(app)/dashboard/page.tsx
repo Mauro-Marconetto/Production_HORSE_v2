@@ -30,9 +30,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { pieces, inventory, machines } from "@/lib/data";
+import { pieces, inventory, machines, demands, planAssignments } from "@/lib/data";
 import { DashboardCharts } from "@/components/dashboard-charts";
 import { Badge } from "@/components/ui/badge";
+import { DemandCoverageChart } from "@/components/demand-coverage-chart";
 
 export default function DashboardPage() {
   const criticalStockItems = inventory.filter(item => {
@@ -100,6 +101,12 @@ export default function DashboardPage() {
         </Card>
       </div>
       <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
+        <DemandCoverageChart 
+          demands={demands}
+          inventory={inventory}
+          pieces={pieces}
+          planAssignments={planAssignments}
+        />
         <DashboardCharts />
       </div>
       <Card>

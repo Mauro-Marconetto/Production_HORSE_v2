@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -10,6 +11,7 @@ import {
     XAxis,
     YAxis,
     Tooltip,
+    Legend,
   } from "recharts";
 
 import {
@@ -37,7 +39,7 @@ const utilizationData = machines.map(m => ({
 export function DashboardCharts() {
     return (
         <>
-            <Card className="xl:col-span-2">
+            <Card>
             <CardHeader>
                 <CardTitle>Utilización de Máquina (OEE)</CardTitle>
             </CardHeader>
@@ -66,6 +68,7 @@ export function DashboardCharts() {
                         borderColor: 'hsl(var(--border))',
                     }}
                     />
+                    <Legend />
                     <Bar dataKey="utilization" name="Actual" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="goal" name="Objetivo" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -100,7 +103,7 @@ export function DashboardCharts() {
                             borderColor: 'hsl(var(--border))',
                             }}
                         />
-                        <Area type="monotone" dataKey="coverage" stroke="hsl(var(--primary))" fill="url(#colorCoverage)" />
+                        <Area type="monotone" dataKey="coverage" name="Días de Cobertura" stroke="hsl(var(--primary))" fill="url(#colorCoverage)" />
                     </AreaChart>
                 </ResponsiveContainer>
             </CardContent>
