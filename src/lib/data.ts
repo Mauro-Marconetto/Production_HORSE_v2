@@ -6,7 +6,7 @@ export const placeholderImages: PlaceholderImage[] = [
     {
       "id": "login-background",
       "description": "A modern factory floor with machinery.",
-      "imageUrl": "https://picsum.photos/seed/forgeflow-login/1920/1080",
+      "imageUrl": "/login-background.jpg",
       "imageHint": "factory industrial"
     }
   ]
@@ -23,15 +23,15 @@ export const clients: Client[] = [
 ]
 
 export const pieces: Piece[] = [
-  { id: 'P1001', codigo: 'C-55-AX1', clienteId: 'C01', peso: 1.2, familia: 'Soportes', stockMin: 2000, stockMax: 8000 },
-  { id: 'P1002', codigo: 'C-55-AX2', clienteId: 'C01', peso: 1.5, familia: 'Soportes', stockMin: 1500, stockMax: 6000 },
-  { id: 'P2001', codigo: 'H-78-B1', clienteId: 'C02', peso: 3.4, familia: 'Carcasas', stockMin: 500, stockMax: 2500 },
+  { id: 'P1001', codigo: '602', clienteId: 'C01', peso: 1.2, familia: 'Soportes', stockMin: 2000, stockMax: 8000 },
+  { id: 'P1002', codigo: '602', clienteId: 'C01', peso: 1.5, familia: 'Soportes', stockMin: 1500, stockMax: 6000 },
+  { id: 'P2001', codigo: '267', clienteId: 'C02', peso: 3.4, familia: 'Carcasas', stockMin: 500, stockMax: 2500 },
 ];
 
 export const molds: Mold[] = [
-  { id: 'MOLD-01', nombre: 'Soporte V1', pieces: ['P1001'], cavidades: 2, compatibilidad: ['M01'], cicloBase_s: 45, setupMin: 240, vidaMaxTiros: 500000, tiempoRecambioMin: 120, status: 'ok' },
-  { id: 'MOLD-02', nombre: 'Soporte V2', pieces: ['P1002'], cavidades: 2, compatibilidad: ['M01'], cicloBase_s: 55, setupMin: 260, vidaMaxTiros: 500000, tiempoRecambioMin: 130, status: 'ok' },
-  { id: 'MOLD-03', nombre: 'Carcasa Grande', pieces: ['P2001'], cavidades: 1, compatibilidad: ['M02'], cicloBase_s: 120, setupMin: 480, vidaMaxTiros: 300000, tiempoRecambioMin: 240, status: 'mantenimiento' },
+  { id: 'MOLD-01', nombre: '32.2', pieces: ['P1001'], cavidades: 2, compatibilidad: ['M01'], cicloBase_s: 45, setupMin: 240, vidaMaxTiros: 500000, tiempoRecambioMin: 120, status: 'ok' },
+  { id: 'MOLD-02', nombre: '21.2', pieces: ['P1002'], cavidades: 2, compatibilidad: ['M01'], cicloBase_s: 55, setupMin: 260, vidaMaxTiros: 500000, tiempoRecambioMin: 130, status: 'ok' },
+  { id: 'MOLD-03', nombre: '38.2', pieces: ['P2001'], cavidades: 1, compatibilidad: ['M02'], cicloBase_s: 120, setupMin: 480, vidaMaxTiros: 300000, tiempoRecambioMin: 240, status: 'mantenimiento' },
 ];
 
 export const demands: Demand[] = [
@@ -104,3 +104,5 @@ export const calendarEvents: CalendarEvent[] = [
     { id: 'evt-1', machineId: "all", date: '2024-07-25', type: 'mantenimiento', description: 'Mantenimiento preventivo semestral' },
     { id: 'evt-3', machineId: "all", date: '2024-08-15', type: 'feriado', description: 'Asunción de la Virgen' },
 ]
+
+    
