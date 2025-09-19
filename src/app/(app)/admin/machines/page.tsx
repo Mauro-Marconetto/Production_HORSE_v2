@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,6 +13,9 @@ export default function AdminMachinesPage() {
           <h1 className="text-3xl font-headline font-bold">Catálogo de Máquinas</h1>
           <p className="text-muted-foreground">Gestiona las máquinas y sus capacidades de producción.</p>
         </div>
+        <Button>
+          <PlusCircle className="mr-2 h-4 w-4" /> Añadir Máquina
+        </Button>
       </div>
 
       <div className="grid gap-6">
