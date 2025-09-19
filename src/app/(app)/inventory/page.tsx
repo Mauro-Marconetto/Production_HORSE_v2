@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
-import { inventory, pieces as initialPieces, clients } from "@/lib/data";
+import { inventory as allInventory, pieces as initialPieces, clients } from "@/lib/data";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, TrendingUp, PlusCircle } from "lucide-react";
 import type { Piece } from "@/lib/types";
@@ -25,6 +25,16 @@ export default function InventoryPage() {
       )
     );
   };
+
+  const uniquePiecesByCode = useMemo(() => {
+    const pieceMap = new Map<string, Piece>();
+    pieces.forEach(p => {
+        if (!pieceMap.has(p.codigo)) {
+            pieceMap.set(p.codigo, p);
+        }
+    });
+    return Array.from(pieceMap.values());
+  }, [pieces]);
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -55,20 +65,25 @@ export default function InventoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {inventory.map((inv) => {
-                const piece = pieces.find(p => p.id === inv.pieceId);
-                if (!piece) return null;
+              {uniquePiecesByCode.map((piece) => {
                 const client = clients.find(c => c.id === piece.clienteId);
+                
+                // Aggregate stock for all pieces with the same code
+                const piecesWithSameCode = pieces.filter(p => p.codigo === piece.codigo);
+                const pieceIds = piecesWithSameCode.map(p => p.id);
+                const totalStock = allInventory
+                    .filter(inv => pieceIds.includes(inv.pieceId))
+                    .reduce((sum, inv) => sum + inv.stock, 0);
 
-                const stockPercentage = piece.stockMax > piece.stockMin ? Math.round(((inv.stock - piece.stockMin) / (piece.stockMax - piece.stockMin)) * 100) : 100;
+                const stockPercentage = piece.stockMax > piece.stockMin ? Math.round(((totalStock - piece.stockMin) / (piece.stockMax - piece.stockMin)) * 100) : 100;
                 const status = stockPercentage < 10 ? 'critical' : stockPercentage > 90 ? 'high' : 'ok';
                 const statusText = status === 'critical' ? 'Crítico' : status === 'high' ? 'Alto' : 'Ok';
 
                 return (
-                  <TableRow key={inv.pieceId}>
+                  <TableRow key={piece.id}>
                     <TableCell className="font-medium">{piece.codigo}</TableCell>
                     <TableCell>{client?.nombre}</TableCell>
-                    <TableCell className="text-right">{inv.stock.toLocaleString('es-ES')}</TableCell>
+                    <TableCell className="text-right">{totalStock.toLocaleString('es-ES')}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Input
