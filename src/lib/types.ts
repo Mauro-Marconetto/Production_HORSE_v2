@@ -136,6 +136,16 @@ export interface ScrapEntry {
     causa: string;
 }
 
+export interface MachiningEntry {
+  id: string;
+  pieceId: string;
+  qty: number;
+  proveedor: string;
+  fechaEnvio: string;
+  fechaRetorno?: string;
+  status: 'pendiente' | 'validacion' | 'finalizada' | 'segregada';
+}
+
 export interface Settings {
   ventana_meses: number;
   suavizado_alpha: number;

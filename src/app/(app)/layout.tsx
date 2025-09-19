@@ -44,6 +44,7 @@ const navItems = [
   { href: "/calendar", icon: CalendarDays, label: "Calendario" },
   { href: "/demand", icon: Truck, label: "Demanda" },
   { href: "/inventory", icon: Warehouse, label: "Inventario" },
+  { href: "/machining", icon: Factory, label: "Mecanizado" },
   { href: "/execution", icon: LineChart, label: "Ejecución" },
   { href: "/downtime", icon: Wrench, label: "Inactividad" },
   { href: "/quality", icon: ShieldCheck, label: "Calidad" },
