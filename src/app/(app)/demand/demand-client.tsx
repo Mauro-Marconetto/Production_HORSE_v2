@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileUp, CheckCircle, FileDown, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FileUp, CheckCircle, FileDown, X, ChevronDown } from "lucide-react";
 import type { Demand, Piece, Client } from "@/lib/types";
 
 interface DemandClientPageProps {
@@ -17,7 +19,7 @@ interface DemandClientPageProps {
 
 export default function DemandClientPage({ initialDemands, pieces, clients }: DemandClientPageProps) {
   const [demands, setDemands] = useState<Demand[]>(initialDemands);
-  const [filterWeek, setFilterWeek] = useState<string>("");
+  const [filterWeek, setFilterWeek] = useState<string[]>([]);
   const [filterPiece, setFilterPiece] = useState<string>("");
   const [filterClient, setFilterClient] = useState<string>("");
 
@@ -29,22 +31,29 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
   const pieceOptions = useMemo(() => pieces.map(p => ({ value: p.id, label: p.codigo })).sort((a,b) => a.label.localeCompare(b.label)), [pieces]);
   const clientOptions = useMemo(() => clients.map(c => ({ value: c.id, label: c.nombre })).sort((a,b) => a.label.localeCompare(b.label)), [clients]);
 
-
   const filteredDemands = useMemo(() => {
     return demands.filter(demand => {
       const piece = pieces.find(p => p.id === demand.pieceId);
       const clientMatch = !filterClient || (piece && piece.clienteId === filterClient);
-      const weekMatch = !filterWeek || demand.periodoYYYYWW === filterWeek;
+      const weekMatch = filterWeek.length === 0 || filterWeek.includes(demand.periodoYYYYWW);
       const pieceMatch = !filterPiece || demand.pieceId === filterPiece;
       return clientMatch && weekMatch && pieceMatch;
     });
   }, [demands, filterWeek, filterPiece, filterClient, pieces]);
   
   const clearFilters = () => {
-    setFilterWeek("");
+    setFilterWeek([]);
     setFilterPiece("");
     setFilterClient("");
   }
+  
+  const handleWeekChange = (week: string) => {
+    setFilterWeek(prev => 
+      prev.includes(week) 
+        ? prev.filter(w => w !== week) 
+        : [...prev, week]
+    );
+  };
 
   return (
     <>
@@ -70,16 +79,32 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
                     <CardDescription>Unidades previstas por pieza para las próximas semanas.</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Select value={filterWeek} onValueChange={setFilterWeek}>
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Filtrar por Semana" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {weeks.map(week => (
-                                <SelectItem key={week} value={week}>2024-W{week.slice(4)}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-[180px] justify-between">
+                          <span>
+                            {filterWeek.length > 0 ? `${filterWeek.length} semana(s)`: 'Filtrar por Semana'}
+                          </span>
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-[180px]">
+                        {weeks.map(week => (
+                          <DropdownMenuItem key={week} onSelect={(e) => e.preventDefault()}>
+                            <Checkbox
+                              id={`week-${week}`}
+                              checked={filterWeek.includes(week)}
+                              onCheckedChange={() => handleWeekChange(week)}
+                              className="mr-2"
+                            />
+                            <label htmlFor={`week-${week}`} className="w-full cursor-pointer">
+                              2024-W{week.slice(4)}
+                            </label>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
                      <Select value={filterPiece} onValueChange={setFilterPiece}>
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Filtrar por Pieza" />
@@ -100,7 +125,7 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
                             ))}
                         </SelectContent>
                     </Select>
-                    {(filterWeek || filterPiece || filterClient) && (
+                    {(filterWeek.length > 0 || filterPiece || filterClient) && (
                         <Button variant="ghost" onClick={clearFilters} size="icon">
                             <X className="h-4 w-4" />
                         </Button>
