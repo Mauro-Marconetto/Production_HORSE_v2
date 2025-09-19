@@ -1,14 +1,31 @@
 
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import { inventory, pieces, clients } from "@/lib/data";
+import { Input } from "@/components/ui/input";
+import { inventory, pieces as initialPieces, clients } from "@/lib/data";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, TrendingUp, PlusCircle } from "lucide-react";
-
+import type { Piece } from "@/lib/types";
 
 export default function InventoryPage() {
+  const [pieces, setPieces] = useState<Piece[]>(initialPieces);
+
+  const handleStockChange = (pieceId: string, field: 'stockMin' | 'stockMax', value: string) => {
+    const numericValue = parseInt(value, 10);
+    if (isNaN(numericValue)) return;
+
+    setPieces(prevPieces => 
+      prevPieces.map(p => 
+        p.id === pieceId ? { ...p, [field]: numericValue } : p
+      )
+    );
+  };
+
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
@@ -23,16 +40,16 @@ export default function InventoryPage() {
       <Card>
         <CardHeader>
           <CardTitle>Niveles de Stock Actuales</CardTitle>
-          <CardDescription>Resumen de todas las piezas en inventario.</CardDescription>
+          <CardDescription>Resumen de todas las piezas en inventario. Puedes editar los valores de Mín/Máx directamente.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[400px]">Pieza</TableHead>
+                <TableHead className="w-[300px]">Pieza</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead className="text-right">Stock Actual</TableHead>
-                <TableHead className="text-right">Mín/Máx</TableHead>
+                <TableHead className="w-[250px] text-center">Mín / Máx</TableHead>
                 <TableHead className="w-[200px] text-center">Capacidad</TableHead>
                 <TableHead className="text-center">Estado</TableHead>
               </TableRow>
@@ -43,7 +60,7 @@ export default function InventoryPage() {
                 if (!piece) return null;
                 const client = clients.find(c => c.id === piece.clienteId);
 
-                const stockPercentage = Math.round(((inv.stock - piece.stockMin) / (piece.stockMax - piece.stockMin)) * 100);
+                const stockPercentage = piece.stockMax > piece.stockMin ? Math.round(((inv.stock - piece.stockMin) / (piece.stockMax - piece.stockMin)) * 100) : 100;
                 const status = stockPercentage < 10 ? 'critical' : stockPercentage > 90 ? 'high' : 'ok';
                 const statusText = status === 'critical' ? 'Crítico' : status === 'high' ? 'Alto' : 'Ok';
 
@@ -52,7 +69,23 @@ export default function InventoryPage() {
                     <TableCell className="font-medium">{piece.codigo}</TableCell>
                     <TableCell>{client?.nombre}</TableCell>
                     <TableCell className="text-right">{inv.stock.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{piece.stockMin.toLocaleString()} / {piece.stockMax.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={piece.stockMin}
+                          onChange={(e) => handleStockChange(piece.id, 'stockMin', e.target.value)}
+                          className="w-24 h-8 text-right"
+                        />
+                        <span>/</span>
+                        <Input
+                          type="number"
+                          value={piece.stockMax}
+                          onChange={(e) => handleStockChange(piece.id, 'stockMax', e.target.value)}
+                          className="w-24 h-8 text-right"
+                        />
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                          <Progress value={stockPercentage} className="h-2" />
