@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
-import { inventory as allInventory, pieces as initialPieces, clients } from "@/lib/data";
+import { inventory as allInventory, pieces as initialPieces } from "@/lib/data";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, TrendingUp, PlusCircle } from "lucide-react";
 import type { Piece } from "@/lib/types";
@@ -57,7 +57,6 @@ export default function InventoryPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[300px]">Pieza</TableHead>
-                <TableHead>Cliente</TableHead>
                 <TableHead className="text-right">Stock Actual</TableHead>
                 <TableHead className="w-[250px] text-center">Mín / Máx</TableHead>
                 <TableHead className="w-[200px] text-center">Capacidad</TableHead>
@@ -66,8 +65,6 @@ export default function InventoryPage() {
             </TableHeader>
             <TableBody>
               {uniquePiecesByCode.map((piece) => {
-                const client = clients.find(c => c.id === piece.clienteId);
-                
                 // Aggregate stock for all pieces with the same code
                 const piecesWithSameCode = pieces.filter(p => p.codigo === piece.codigo);
                 const pieceIds = piecesWithSameCode.map(p => p.id);
@@ -82,7 +79,6 @@ export default function InventoryPage() {
                 return (
                   <TableRow key={piece.id}>
                     <TableCell className="font-medium">{piece.codigo}</TableCell>
-                    <TableCell>{client?.nombre}</TableCell>
                     <TableCell className="text-right">{totalStock.toLocaleString('es-ES')}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
