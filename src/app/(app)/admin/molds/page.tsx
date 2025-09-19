@@ -1,8 +1,9 @@
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { molds } from "@/lib/data";
+import { molds, pieces as allPieces } from "@/lib/data";
 import { PlusCircle } from "lucide-react";
 
 export default function AdminMoldsPage() {
@@ -22,31 +23,30 @@ export default function AdminMoldsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Piezas</TableHead>
-                <TableHead>Cavidades</TableHead>
-                <TableHead>Ciclo (s)</TableHead>
+                <TableHead>Pieza</TableHead>
+                <TableHead>Molde</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {molds.map((mold) => (
-                <TableRow key={mold.id}>
-                  <TableCell className="font-medium">{mold.nombre}</TableCell>
-                  <TableCell>{mold.pieces.join(', ')}</TableCell>
-                  <TableCell>{mold.cavidades}</TableCell>
-                  <TableCell>{mold.cicloBase_s}</TableCell>
-                  <TableCell>
-                    <Badge variant={mold.status === 'ok' ? 'secondary' : 'destructive'}>
-                      {mold.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">Editar</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {molds.map((mold) => {
+                const pieceInfo = allPieces.find(p => p.id === mold.pieces[0]);
+                return (
+                    <TableRow key={mold.id}>
+                        <TableCell>{pieceInfo?.codigo || mold.pieces[0]}</TableCell>
+                        <TableCell className="font-medium">{mold.nombre}</TableCell>
+                        <TableCell>
+                            <Badge variant={mold.status === 'ok' ? 'secondary' : 'destructive'}>
+                            {mold.status}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                            <Button variant="ghost" size="sm">Editar</Button>
+                        </TableCell>
+                    </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
