@@ -161,7 +161,7 @@ export default function DashboardPage() {
                     </TableRow>
                   )
               })}
-            </Body>
+            </TableBody>
           </Table>
         </CardContent>
       </Card>
