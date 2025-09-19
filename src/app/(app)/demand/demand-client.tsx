@@ -32,7 +32,7 @@ const getCurrentWeekString = () => {
 
 export default function DemandClientPage({ initialDemands, pieces, clients }: DemandClientPageProps) {
   const [demands, setDemands] = useState<Demand[]>(initialDemands);
-  const [filterWeek, setFilterWeek] = useState<string[]>([]);
+  const [filterWeek, setFilterWeek] = useState<string>("all");
   const [filterPiece, setFilterPiece] = useState<string>("all");
   const [filterClient, setFilterClient] = useState<string>("all");
   const [showHistory, setShowHistory] = useState(false);
@@ -54,7 +54,7 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
     return demands.filter(demand => {
       const piece = pieces.find(p => p.id === demand.pieceId);
       const clientMatch = !filterClient || filterClient === 'all' || (piece && piece.clienteId === filterClient);
-      const weekMatch = filterWeek.length === 0 || filterWeek.includes(demand.periodoYYYYWW);
+      const weekMatch = !filterWeek || filterWeek === 'all' || demand.periodoYYYYWW === filterWeek;
       const pieceMatch = !filterPiece || filterPiece === 'all' || demand.pieceId === filterPiece;
       const historyMatch = showHistory || demand.periodoYYYYWW >= currentWeek;
       return clientMatch && weekMatch && pieceMatch && historyMatch;
@@ -62,18 +62,10 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
   }, [demands, filterWeek, filterPiece, filterClient, pieces, showHistory]);
   
   const clearFilters = () => {
-    setFilterWeek([]);
+    setFilterWeek("all");
     setFilterPiece("all");
     setFilterClient("all");
   }
-  
-  const handleWeekChange = (week: string) => {
-    setFilterWeek(prev => 
-      prev.includes(week) 
-        ? prev.filter(w => w !== week) 
-        : [...prev, week]
-    );
-  };
   
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -156,75 +148,59 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
         </div>
       </div>
       <Card>
-        <CardHeader>
-            <div className="flex items-center justify-between">
-                <div>
-                    <CardTitle>Demanda Semanal</CardTitle>
-                    <CardDescription>Unidades previstas por pieza para las próximas semanas.</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant={showHistory ? "secondary" : "outline"}
-                        size="sm"
-                        onClick={() => setShowHistory(!showHistory)}
-                        >
-                        <History className="mr-2 h-4 w-4" />
-                        {showHistory ? "Ocultar Historial" : "Mostrar Historial"}
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="w-[180px] justify-between">
-                          <span>
-                            {filterWeek.length > 0 ? `${filterWeek.length} semana(s)`: 'Filtrar por Semana'}
-                          </span>
-                          <ChevronDown className="h-4 w-4 opacity-50" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-[180px]">
+        <CardHeader className="gap-4">
+            <div>
+                <CardTitle>Demanda Semanal</CardTitle>
+                <CardDescription>Unidades previstas por pieza para las próximas semanas.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+                <Button
+                    variant={showHistory ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => setShowHistory(!showHistory)}
+                    >
+                    <History className="mr-2 h-4 w-4" />
+                    {showHistory ? "Ocultar Historial" : "Mostrar Historial"}
+                </Button>
+                <Select value={filterWeek} onValueChange={setFilterWeek}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filtrar por Semana" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todas las semanas</SelectItem>
                         {weeks.map(week => (
-                          <DropdownMenuItem key={week} onSelect={(e) => e.preventDefault()}>
-                            <Checkbox
-                              id={`week-${week}`}
-                              checked={filterWeek.includes(week)}
-                              onCheckedChange={() => handleWeekChange(week)}
-                              className="mr-2"
-                            />
-                            <label htmlFor={`week-${week}`} className="w-full cursor-pointer">
-                              {week.slice(0, 4)}-W{week.slice(4)}
-                            </label>
-                          </DropdownMenuItem>
+                            <SelectItem key={week} value={week}>{week.slice(0, 4)}-W{week.slice(4)}</SelectItem>
                         ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    </SelectContent>
+                </Select>
 
-                     <Select value={filterPiece} onValueChange={setFilterPiece}>
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Filtrar por Pieza" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todas las piezas</SelectItem>
-                            {pieceOptions.map(option => (
-                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                     <Select value={filterClient} onValueChange={setFilterClient}>
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Filtrar por Cliente" />
-                        </SelectTrigger>
-                        <SelectContent>
-                             <SelectItem value="all">Todos los clientes</SelectItem>
-                            {clientOptions.map(option => (
-                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {(filterWeek.length > 0 || (filterPiece && filterPiece !== 'all') || (filterClient && filterClient !== 'all')) && (
-                        <Button variant="ghost" onClick={clearFilters} size="icon" title="Limpiar filtros">
-                            <X className="h-4 w-4" />
-                        </Button>
-                    )}
-                </div>
+                 <Select value={filterPiece} onValueChange={setFilterPiece}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filtrar por Pieza" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todas las piezas</SelectItem>
+                        {pieceOptions.map(option => (
+                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                 <Select value={filterClient} onValueChange={setFilterClient}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filtrar por Cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                         <SelectItem value="all">Todos los clientes</SelectItem>
+                        {clientOptions.map(option => (
+                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                {(filterWeek !== 'all' || filterPiece !== 'all' || filterClient !== 'all') && (
+                    <Button variant="ghost" onClick={clearFilters} size="icon" title="Limpiar filtros">
+                        <X className="h-4 w-4" />
+                    </Button>
+                )}
             </div>
         </CardHeader>
         <CardContent>
