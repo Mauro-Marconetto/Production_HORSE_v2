@@ -55,30 +55,30 @@ export const molds: Mold[] = [
 ];
 
 export const productionCapacities: ProductionCapacity[] = [
-    // Colosio 2000 (M01)
-    { machineId: 'M01', pieceId: 'P1001', moldId: 'MOLD-01', produccionDia: 750 },
-    { machineId: 'M01', pieceId: 'P1002', moldId: 'MOLD-02', produccionDia: 750 },
-    { machineId: 'M01', pieceId: 'P2001', moldId: 'MOLD-03', produccionDia: 750 }, // Asumiendo, aunque el molde 03 era M02
-    { machineId: 'M01', pieceId: 'P2002', moldId: 'MOLD-04', produccionDia: 750 },
-    { machineId: 'M01', pieceId: 'P2003', moldId: 'MOLD-05', produccionDia: 750 },
-    { machineId: 'M01', pieceId: 'P3001', moldId: 'MOLD-06', produccionDia: 850 },
-    { machineId: 'M01', pieceId: 'P3002', moldId: 'MOLD-07', produccionDia: 850 },
-    { machineId: 'M01', pieceId: 'P3003', moldId: 'MOLD-08', produccionDia: 850 },
-    { machineId: 'M01', pieceId: 'P4001', moldId: 'MOLD-09', produccionDia: 650 },
-    { machineId: 'M01', pieceId: 'P4002', moldId: 'MOLD-10', produccionDia: 650 },
-    { machineId: 'M01', pieceId: 'P5001', moldId: 'MOLD-11', produccionDia: 650 },
-    { machineId: 'M01', pieceId: 'P5002', moldId: 'MOLD-12', produccionDia: 650 },
-    { machineId: 'M01', pieceId: 'P5003', moldId: 'MOLD-13', produccionDia: 650 },
+    // Colosio 2000 (M01) - Assuming 24h operation for calculation from daily
+    { machineId: 'M01', pieceId: 'P1001', moldId: 'MOLD-01', produccionHora: 31 },
+    { machineId: 'M01', pieceId: 'P1002', moldId: 'MOLD-02', produccionHora: 31 },
+    { machineId: 'M01', pieceId: 'P2001', moldId: 'MOLD-03', produccionHora: 31 }, // Asumiendo, aunque el molde 03 era M02
+    { machineId: 'M01', pieceId: 'P2002', moldId: 'MOLD-04', produccionHora: 31 },
+    { machineId: 'M01', pieceId: 'P2003', moldId: 'MOLD-05', produccionHora: 31 },
+    { machineId: 'M01', pieceId: 'P3001', moldId: 'MOLD-06', produccionHora: 35 },
+    { machineId: 'M01', pieceId: 'P3002', moldId: 'MOLD-07', produccionHora: 35 },
+    { machineId: 'M01', pieceId: 'P3003', moldId: 'MOLD-08', produccionHora: 35 },
+    { machineId: 'M01', pieceId: 'P4001', moldId: 'MOLD-09', produccionHora: 27 },
+    { machineId: 'M01', pieceId: 'P4002', moldId: 'MOLD-10', produccionHora: 27 },
+    { machineId: 'M01', pieceId: 'P5001', moldId: 'MOLD-11', produccionHora: 27 },
+    { machineId: 'M01', pieceId: 'P5002', moldId: 'MOLD-12', produccionHora: 27 },
+    { machineId: 'M01', pieceId: 'P5003', moldId: 'MOLD-13', produccionHora: 27 },
 
     // Colosio 1600 (M02)
-    { machineId: 'M02', pieceId: 'P3001', moldId: 'MOLD-06', produccionDia: 850 },
-    { machineId: 'M02', pieceId: 'P3002', moldId: 'MOLD-07', produccionDia: 850 },
-    { machineId: 'M02', pieceId: 'P3003', moldId: 'MOLD-08', produccionDia: 850 },
-    { machineId: 'M02', pieceId: 'P4001', moldId: 'MOLD-09', produccionDia: 650 },
-    { machineId: 'M02', pieceId: 'P4002', moldId: 'MOLD-10', produccionDia: 650 },
-    { machineId: 'M02', pieceId: 'P5001', moldId: 'MOLD-11', produccionDia: 650 },
-    { machineId: 'M02', pieceId: 'P5002', moldId: 'MOLD-12', produccionDia: 650 },
-    { machineId: 'M02', pieceId: 'P5003', moldId: 'MOLD-13', produccionDia: 650 },
+    { machineId: 'M02', pieceId: 'P3001', moldId: 'MOLD-06', produccionHora: 35 },
+    { machineId: 'M02', pieceId: 'P3002', moldId: 'MOLD-07', produccionHora: 35 },
+    { machineId: 'M02', pieceId: 'P3003', moldId: 'MOLD-08', produccionHora: 35 },
+    { machineId: 'M02', pieceId: 'P4001', moldId: 'MOLD-09', produccionHora: 27 },
+    { machineId: 'M02', pieceId: 'P4002', moldId: 'MOLD-10', produccionHora: 27 },
+    { machineId: 'M02', pieceId: 'P5001', moldId: 'MOLD-11', produccionHora: 27 },
+    { machineId: 'M02', pieceId: 'P5002', moldId: 'MOLD-12', produccionHora: 27 },
+    { machineId: 'M02', pieceId: 'P5003', moldId: 'MOLD-13', produccionHora: 27 },
 ];
 
 export const demands: Demand[] = [

@@ -43,7 +43,7 @@ export interface ProductionCapacity {
     machineId: string;
     pieceId: string;
     moldId: string;
-    produccionDia: number;
+    produccionHora: number;
 }
 
 export interface Demand {

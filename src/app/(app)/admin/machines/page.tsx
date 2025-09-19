@@ -39,7 +39,7 @@ export default function AdminMachinesPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Pieza/Molde</TableHead>
-                      <TableHead className="text-right">Producción por Día</TableHead>
+                      <TableHead className="text-right">Producción por Hora</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -50,7 +50,7 @@ export default function AdminMachinesPage() {
                       return (
                         <TableRow key={`${cap.machineId}-${cap.pieceId}-${cap.moldId}`}>
                           <TableCell className="font-mono">{piece?.codigo}/{mold?.nombre}</TableCell>
-                          <TableCell className="text-right font-medium">{cap.produccionDia.toLocaleString()} uds.</TableCell>
+                          <TableCell className="text-right font-medium">{cap.produccionHora.toLocaleString()} uds./hr</TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm">Editar</Button>
                             <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive/80">Eliminar</Button>
