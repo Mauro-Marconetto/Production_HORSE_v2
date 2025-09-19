@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { placeholderImages } from "@/lib/data";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -68,7 +67,7 @@ export default function LoginPage() {
       </div>
       <div className="hidden bg-muted lg:block">
         <Image
-          src={placeholderImages[0].imageUrl}
+          src="/login-background.jpg"
           alt="Factory"
           width="1920"
           height="1080"
