@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileUp, CheckCircle, FileDown, X, ChevronDown, Loader2, History } from "lucide-react";
 
@@ -41,13 +40,36 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const weeks = useMemo(() => {
-    const uniqueWeeks = [...new Set(initialDemands.map(d => d.periodoYYYYWW))];
-    return uniqueWeeks.sort();
-  }, [initialDemands]);
+ const relevantDemands = useMemo(() => {
+    if (showHistory) {
+      return initialDemands;
+    }
+    const currentWeek = getCurrentWeekString();
+    return initialDemands.filter(d => d.periodoYYYYWW >= currentWeek);
+  }, [showHistory, initialDemands]);
 
-  const pieceOptions = useMemo(() => pieces.map(p => ({ value: p.id, label: p.codigo })).sort((a,b) => a.label.localeCompare(b.label)), [pieces]);
-  const clientOptions = useMemo(() => clients.map(c => ({ value: c.id, label: c.nombre })).sort((a,b) => a.label.localeCompare(b.label)), [clients]);
+  const weeks = useMemo(() => {
+    const uniqueWeeks = [...new Set(relevantDemands.map(d => d.periodoYYYYWW))];
+    return uniqueWeeks.sort();
+  }, [relevantDemands]);
+
+  const pieceOptions = useMemo(() => {
+    const relevantPieceIds = new Set(relevantDemands.map(d => d.pieceId));
+    return pieces
+      .filter(p => relevantPieceIds.has(p.id))
+      .map(p => ({ value: p.id, label: p.codigo }))
+      .sort((a,b) => a.label.localeCompare(b.label));
+  }, [relevantDemands, pieces]);
+  
+  const clientOptions = useMemo(() => {
+    const relevantPieceIds = new Set(relevantDemands.map(d => d.pieceId));
+    const relevantClientIds = new Set(pieces.filter(p => relevantPieceIds.has(p.id)).map(p => p.clienteId));
+    return clients
+      .filter(c => relevantClientIds.has(c.id))
+      .map(c => ({ value: c.id, label: c.nombre }))
+      .sort((a,b) => a.label.localeCompare(b.label));
+  }, [relevantDemands, pieces, clients]);
+
 
   const filteredDemands = useMemo(() => {
     const currentWeek = getCurrentWeekString();
@@ -148,7 +170,7 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
         </div>
       </div>
       <Card>
-        <CardHeader className="gap-4">
+        <CardHeader className="flex flex-col gap-4">
             <div>
                 <CardTitle>Demanda Semanal</CardTitle>
                 <CardDescription>Unidades previstas por pieza para las próximas semanas.</CardDescription>
@@ -255,3 +277,5 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
     </>
   );
 }
+
+    
