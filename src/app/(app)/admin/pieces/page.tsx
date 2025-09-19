@@ -1,8 +1,10 @@
 
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { pieces, clients } from "@/lib/data";
+import { molds, pieces as allPieces } from "@/lib/data";
 import { PlusCircle } from "lucide-react";
 
 export default function AdminPiecesPage() {
@@ -11,40 +13,40 @@ export default function AdminPiecesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-headline font-bold">Catálogo de Piezas</h1>
-          <p className="text-muted-foreground">Gestiona todas las piezas fabricadas.</p>
+          <p className="text-muted-foreground">Gestiona las piezas y sus moldes asociados.</p>
         </div>
         <Button>
           <PlusCircle className="mr-2 h-4 w-4" /> Añadir Pieza
         </Button>
       </div>
-       <Card>
+      <Card>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Código</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Familia</TableHead>
-                <TableHead className="text-right">Stock Mín.</TableHead>
-                <TableHead className="text-right">Stock Máx.</TableHead>
+                <TableHead>Pieza</TableHead>
+                <TableHead>Molde</TableHead>
+                <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pieces.map((piece) => {
-                const client = clients.find(c => c.id === piece.clienteId);
+              {molds.map((mold) => {
+                const pieceInfo = allPieces.find(p => p.id === mold.pieces[0]);
                 return (
-                    <TableRow key={piece.id}>
-                    <TableCell className="font-medium">{piece.codigo}</TableCell>
-                    <TableCell>{client?.nombre}</TableCell>
-                    <TableCell>{piece.familia}</TableCell>
-                    <TableCell className="text-right">{piece.stockMin.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{piece.stockMax.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">Editar</Button>
-                    </TableCell>
+                    <TableRow key={mold.id}>
+                        <TableCell>{pieceInfo?.codigo || mold.pieces[0]}</TableCell>
+                        <TableCell className="font-medium">{mold.nombre}</TableCell>
+                        <TableCell>
+                            <Badge variant={mold.status === 'ok' ? 'secondary' : 'destructive'}>
+                            {mold.status}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                            <Button variant="ghost" size="sm">Editar</Button>
+                        </TableCell>
                     </TableRow>
-                )
+                );
               })}
             </TableBody>
           </Table>

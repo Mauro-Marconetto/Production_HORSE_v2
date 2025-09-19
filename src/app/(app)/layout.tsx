@@ -51,7 +51,6 @@ const navItems = [
 
 const adminNavItems = [
   { href: "/admin/pieces", icon: Package, label: "Piezas" },
-  { href: "/admin/molds", icon: Factory, label: "Moldes" },
   { href: "/admin/machines", icon: Cog, label: "Máquinas" },
   { href: "/admin/clients", icon: Building, label: "Clientes" },
   { href: "/admin/users", icon: Users, label: "Usuarios" },
