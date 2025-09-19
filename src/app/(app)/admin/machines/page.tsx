@@ -1,9 +1,10 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { machines, productionCapacities, pieces, molds } from "@/lib/data";
-import { PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle } from "lucide-react";
 
 export default function AdminMachinesPage() {
   return (
@@ -30,9 +31,26 @@ export default function AdminMachinesPage() {
                         Tonelaje: {machine.tonelaje}T | Turnos/Semana: {machine.turnosSemana} | OEE Objetivo: {machine.OEE_obj * 100}%
                     </CardDescription>
                 </div>
-                <Button>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Capacidad
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Abrir menú</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                        <DropdownMenuItem>
+                           <PlusCircle className="mr-2 h-4 w-4" />
+                            Añadir Capacidad
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>Editar Máquina</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                            Eliminar Máquina
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
               </CardHeader>
               <CardContent>
                 <Table>
