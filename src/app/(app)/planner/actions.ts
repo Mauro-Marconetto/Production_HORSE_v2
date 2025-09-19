@@ -11,8 +11,12 @@ export async function runGeneratePlan(params: any) {
   // This is a mock implementation.
   // In a real scenario, you would format the input correctly
   // for the generateProductionPlan Genkit flow.
+
+  // Filter for frozen demands only
+  const frozenDemands = demands.filter(d => d.congelado);
+
   const mockInput: GenerateProductionPlanInput = {
-    demandData: JSON.stringify(demands),
+    demandData: JSON.stringify(frozenDemands),
     stockLevels: JSON.stringify(inventory),
     machineCapacity: JSON.stringify(machines),
     historicalDowntime: JSON.stringify([]), // Not used in mock
