@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -129,7 +130,7 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
                     <TableCell>2024-W{demand.periodoYYYYWW.slice(4)}</TableCell>
                     <TableCell className="font-medium">{piece?.codigo}</TableCell>
                     <TableCell>{client?.nombre}</TableCell>
-                    <TableCell className="text-right">{demand.qty.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{demand.qty.toLocaleString('es-ES')}</TableCell>
                     <TableCell className="text-center">{demand.prioridad}</TableCell>
                     <TableCell className="text-center">
                       {demand.congelado ? (
