@@ -33,8 +33,8 @@ const getCurrentWeekString = () => {
 export default function DemandClientPage({ initialDemands, pieces, clients }: DemandClientPageProps) {
   const [demands, setDemands] = useState<Demand[]>(initialDemands);
   const [filterWeek, setFilterWeek] = useState<string[]>([]);
-  const [filterPiece, setFilterPiece] = useState<string>("");
-  const [filterClient, setFilterClient] = useState<string>("");
+  const [filterPiece, setFilterPiece] = useState<string>("all");
+  const [filterClient, setFilterClient] = useState<string>("all");
   const [showHistory, setShowHistory] = useState(false);
 
   const [isImporting, startImportTransition] = useTransition();
@@ -53,9 +53,9 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
     const currentWeek = getCurrentWeekString();
     return demands.filter(demand => {
       const piece = pieces.find(p => p.id === demand.pieceId);
-      const clientMatch = !filterClient || (piece && piece.clienteId === filterClient);
+      const clientMatch = !filterClient || filterClient === 'all' || (piece && piece.clienteId === filterClient);
       const weekMatch = filterWeek.length === 0 || filterWeek.includes(demand.periodoYYYYWW);
-      const pieceMatch = !filterPiece || demand.pieceId === filterPiece;
+      const pieceMatch = !filterPiece || filterPiece === 'all' || demand.pieceId === filterPiece;
       const historyMatch = showHistory || demand.periodoYYYYWW >= currentWeek;
       return clientMatch && weekMatch && pieceMatch && historyMatch;
     });
@@ -63,8 +63,8 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
   
   const clearFilters = () => {
     setFilterWeek([]);
-    setFilterPiece("");
-    setFilterClient("");
+    setFilterPiece("all");
+    setFilterClient("all");
   }
   
   const handleWeekChange = (week: string) => {
@@ -202,7 +202,7 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
                             <SelectValue placeholder="Filtrar por Pieza" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">Todas las piezas</SelectItem>
+                            <SelectItem value="all">Todas las piezas</SelectItem>
                             {pieceOptions.map(option => (
                                 <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                             ))}
@@ -213,13 +213,13 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
                             <SelectValue placeholder="Filtrar por Cliente" />
                         </SelectTrigger>
                         <SelectContent>
-                             <SelectItem value="">Todos los clientes</SelectItem>
+                             <SelectItem value="all">Todos los clientes</SelectItem>
                             {clientOptions.map(option => (
                                 <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
-                    {(filterWeek.length > 0 || filterPiece || filterClient) && (
+                    {(filterWeek.length > 0 || (filterPiece && filterPiece !== 'all') || (filterClient && filterClient !== 'all')) && (
                         <Button variant="ghost" onClick={clearFilters} size="icon" title="Limpiar filtros">
                             <X className="h-4 w-4" />
                         </Button>
