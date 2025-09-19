@@ -39,6 +39,13 @@ export interface Machine {
   OEE_hist?: number;
 }
 
+export interface ProductionCapacity {
+    machineId: string;
+    pieceId: string;
+    moldId: string;
+    produccionDia: number;
+}
+
 export interface Demand {
   id: string; // composite key {periodoYYYYWW}/{pieceId}
   periodoYYYYWW: string;

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { machines } from "@/lib/data";
+import { machines, productionCapacities, pieces, molds } from "@/lib/data";
 import { PlusCircle } from "lucide-react";
 
 export default function AdminMachinesPage() {
@@ -10,40 +10,64 @@ export default function AdminMachinesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-headline font-bold">Catálogo de Máquinas</h1>
-          <p className="text-muted-foreground">Gestiona las máquinas de producción.</p>
+          <p className="text-muted-foreground">Gestiona las máquinas y sus capacidades de producción.</p>
         </div>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Añadir Máquina
-        </Button>
       </div>
-      <Card>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Tonelaje</TableHead>
-                <TableHead>Turnos/Semana</TableHead>
-                <TableHead>OEE Objetivo</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {machines.map((machine) => (
-                <TableRow key={machine.id}>
-                  <TableCell className="font-medium">{machine.nombre}</TableCell>
-                  <TableCell>{machine.tonelaje}T</TableCell>
-                  <TableCell>{machine.turnosSemana}</TableCell>
-                  <TableCell>{machine.OEE_obj * 100}%</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">Editar</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+
+      <div className="grid gap-6">
+        {machines.map((machine) => {
+          const capacities = productionCapacities.filter(c => c.machineId === machine.id);
+          return (
+            <Card key={machine.id}>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle className="text-2xl">{machine.nombre}</CardTitle>
+                    <CardDescription>
+                        Tonelaje: {machine.tonelaje}T | Turnos/Semana: {machine.turnosSemana} | OEE Objetivo: {machine.OEE_obj * 100}%
+                    </CardDescription>
+                </div>
+                <Button>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Capacidad
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Pieza/Molde</TableHead>
+                      <TableHead className="text-right">Producción por Día</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {capacities.map((cap) => {
+                      const piece = pieces.find(p => p.id === cap.pieceId);
+                      const mold = molds.find(m => m.id === cap.moldId);
+                      return (
+                        <TableRow key={`${cap.machineId}-${cap.pieceId}-${cap.moldId}`}>
+                          <TableCell className="font-mono">{piece?.codigo}/{mold?.nombre}</TableCell>
+                          <TableCell className="text-right font-medium">{cap.produccionDia.toLocaleString()} uds.</TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="sm">Editar</Button>
+                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive/80">Eliminar</Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                     {capacities.length === 0 && (
+                        <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                                No hay capacidades de producción definidas para esta máquina.
+                            </TableCell>
+                        </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
     </main>
   );
 }

@@ -1,6 +1,6 @@
 
 
-import type { Machine, Mold, Piece, Demand, CurrentInventory, Production, Plan, PlanAssignment, PlaceholderImage, ScrapEntry, CalendarEvent, Client } from './types';
+import type { Machine, Mold, Piece, Demand, CurrentInventory, Production, Plan, PlanAssignment, PlaceholderImage, ScrapEntry, CalendarEvent, Client, ProductionCapacity } from './types';
 
 export const placeholderImages: PlaceholderImage[] = [
     {
@@ -12,8 +12,8 @@ export const placeholderImages: PlaceholderImage[] = [
   ]
 
 export const machines: Machine[] = [
-  { id: 'M01', nombre: 'Inyectora 500T', tonelaje: 500, turnosSemana: 15, horasTurno: 8, OEE_obj: 0.85, OEE_hist: 0.82 },
-  { id: 'M02', nombre: 'Inyectora 800T', tonelaje: 800, turnosSemana: 15, horasTurno: 8, OEE_obj: 0.80, OEE_hist: 0.78 },
+  { id: 'M01', nombre: 'Colosio 2000', tonelaje: 2000, turnosSemana: 15, horasTurno: 8, OEE_obj: 0.85, OEE_hist: 0.82 },
+  { id: 'M02', nombre: 'Colosio 1600', tonelaje: 1600, turnosSemana: 15, horasTurno: 8, OEE_obj: 0.80, OEE_hist: 0.78 },
 ];
 
 export const clients: Client[] = [
@@ -26,12 +26,59 @@ export const pieces: Piece[] = [
   { id: 'P1001', codigo: '602', clienteId: 'C01', peso: 1.2, familia: 'Soportes', stockMin: 2000, stockMax: 8000 },
   { id: 'P1002', codigo: '602', clienteId: 'C01', peso: 1.5, familia: 'Soportes', stockMin: 1500, stockMax: 6000 },
   { id: 'P2001', codigo: '267', clienteId: 'C02', peso: 3.4, familia: 'Carcasas', stockMin: 500, stockMax: 2500 },
+  { id: 'P2002', codigo: '267', clienteId: 'C02', peso: 2.1, familia: 'Carcasas', stockMin: 600, stockMax: 3000 },
+  { id: 'P2003', codigo: '267', clienteId: 'C02', peso: 2.3, familia: 'Carcasas', stockMin: 700, stockMax: 3500 },
+  { id: 'P3001', codigo: '729', clienteId: 'C03', peso: 0.8, familia: 'Engranajes', stockMin: 3000, stockMax: 12000 },
+  { id: 'P3002', codigo: '729', clienteId: 'C03', peso: 0.9, familia: 'Engranajes', stockMin: 3000, stockMax: 12000 },
+  { id: 'P3003', codigo: '729', clienteId: 'C03', peso: 1.0, familia: 'Engranajes', stockMin: 3000, stockMax: 12000 },
+  { id: 'P4001', codigo: '243R', clienteId: 'C01', peso: 4.1, familia: 'Componentes Motor', stockMin: 400, stockMax: 1600 },
+  { id: 'P4002', codigo: '243R', clienteId: 'C01', peso: 4.5, familia: 'Componentes Motor', stockMin: 400, stockMax: 1600 },
+  { id: 'P5001', codigo: '774R', clienteId: 'C02', peso: 5.2, familia: 'Estructurales', stockMin: 300, stockMax: 1200 },
+  { id: 'P5002', codigo: '774R', clienteId: 'C02', peso: 5.5, familia: 'Estructurales', stockMin: 300, stockMax: 1200 },
+  { id: 'P5003', codigo: '774R', clienteId: 'C02', peso: 5.8, familia: 'Estructurales', stockMin: 300, stockMax: 1200 },
 ];
 
 export const molds: Mold[] = [
   { id: 'MOLD-01', nombre: '32.2', pieces: ['P1001'], cavidades: 2, compatibilidad: ['M01'], cicloBase_s: 45, setupMin: 240, vidaMaxTiros: 500000, tiempoRecambioMin: 120, status: 'ok' },
   { id: 'MOLD-02', nombre: '21.2', pieces: ['P1002'], cavidades: 2, compatibilidad: ['M01'], cicloBase_s: 55, setupMin: 260, vidaMaxTiros: 500000, tiempoRecambioMin: 130, status: 'ok' },
   { id: 'MOLD-03', nombre: '38.2', pieces: ['P2001'], cavidades: 1, compatibilidad: ['M02'], cicloBase_s: 120, setupMin: 480, vidaMaxTiros: 300000, tiempoRecambioMin: 240, status: 'mantenimiento' },
+  { id: 'MOLD-04', nombre: '45.2', pieces: ['P2002'], cavidades: 1, compatibilidad: ['M01'], cicloBase_s: 110, setupMin: 450, vidaMaxTiros: 300000, tiempoRecambioMin: 220, status: 'ok' },
+  { id: 'MOLD-05', nombre: '51.1', pieces: ['P2003'], cavidades: 1, compatibilidad: ['M01'], cicloBase_s: 130, setupMin: 500, vidaMaxTiros: 300000, tiempoRecambioMin: 260, status: 'ok' },
+  { id: 'MOLD-06', nombre: '42.2', pieces: ['P3001'], cavidades: 2, compatibilidad: ['M01', 'M02'], cicloBase_s: 60, setupMin: 300, vidaMaxTiros: 400000, tiempoRecambioMin: 150, status: 'ok' },
+  { id: 'MOLD-07', nombre: '43.2', pieces: ['P3002'], cavidades: 2, compatibilidad: ['M01', 'M02'], cicloBase_s: 62, setupMin: 310, vidaMaxTiros: 400000, tiempoRecambioMin: 155, status: 'ok' },
+  { id: 'MOLD-08', nombre: '44.1', pieces: ['P3003'], cavidades: 2, compatibilidad: ['M01', 'M02'], cicloBase_s: 65, setupMin: 320, vidaMaxTiros: 400000, tiempoRecambioMin: 160, status: 'ok' },
+  { id: 'MOLD-09', nombre: '53.1', pieces: ['P4001'], cavidades: 1, compatibilidad: ['M01', 'M02'], cicloBase_s: 150, setupMin: 600, vidaMaxTiros: 250000, tiempoRecambioMin: 300, status: 'ok' },
+  { id: 'MOLD-10', nombre: '57.1', pieces: ['P4002'], cavidades: 1, compatibilidad: ['M01', 'M02'], cicloBase_s: 160, setupMin: 620, vidaMaxTiros: 250000, tiempoRecambioMin: 310, status: 'ok' },
+  { id: 'MOLD-11', nombre: '55.1', pieces: ['P5001'], cavidades: 1, compatibilidad: ['M01', 'M02'], cicloBase_s: 180, setupMin: 700, vidaMaxTiros: 200000, tiempoRecambioMin: 350, status: 'ok' },
+  { id: 'MOLD-12', nombre: '59.1', pieces: ['P5002'], cavidades: 1, compatibilidad: ['M01', 'M02'], cicloBase_s: 190, setupMin: 720, vidaMaxTiros: 200000, tiempoRecambioMin: 360, status: 'ok' },
+  { id: 'MOLD-13', nombre: '61.1', pieces: ['P5003'], cavidades: 1, compatibilidad: ['M01', 'M02'], cicloBase_s: 200, setupMin: 750, vidaMaxTiros: 200000, tiempoRecambioMin: 375, status: 'ok' },
+];
+
+export const productionCapacities: ProductionCapacity[] = [
+    // Colosio 2000 (M01)
+    { machineId: 'M01', pieceId: 'P1001', moldId: 'MOLD-01', produccionDia: 750 },
+    { machineId: 'M01', pieceId: 'P1002', moldId: 'MOLD-02', produccionDia: 750 },
+    { machineId: 'M01', pieceId: 'P2001', moldId: 'MOLD-03', produccionDia: 750 }, // Asumiendo, aunque el molde 03 era M02
+    { machineId: 'M01', pieceId: 'P2002', moldId: 'MOLD-04', produccionDia: 750 },
+    { machineId: 'M01', pieceId: 'P2003', moldId: 'MOLD-05', produccionDia: 750 },
+    { machineId: 'M01', pieceId: 'P3001', moldId: 'MOLD-06', produccionDia: 850 },
+    { machineId: 'M01', pieceId: 'P3002', moldId: 'MOLD-07', produccionDia: 850 },
+    { machineId: 'M01', pieceId: 'P3003', moldId: 'MOLD-08', produccionDia: 850 },
+    { machineId: 'M01', pieceId: 'P4001', moldId: 'MOLD-09', produccionDia: 650 },
+    { machineId: 'M01', pieceId: 'P4002', moldId: 'MOLD-10', produccionDia: 650 },
+    { machineId: 'M01', pieceId: 'P5001', moldId: 'MOLD-11', produccionDia: 650 },
+    { machineId: 'M01', pieceId: 'P5002', moldId: 'MOLD-12', produccionDia: 650 },
+    { machineId: 'M01', pieceId: 'P5003', moldId: 'MOLD-13', produccionDia: 650 },
+
+    // Colosio 1600 (M02)
+    { machineId: 'M02', pieceId: 'P3001', moldId: 'MOLD-06', produccionDia: 850 },
+    { machineId: 'M02', pieceId: 'P3002', moldId: 'MOLD-07', produccionDia: 850 },
+    { machineId: 'M02', pieceId: 'P3003', moldId: 'MOLD-08', produccionDia: 850 },
+    { machineId: 'M02', pieceId: 'P4001', moldId: 'MOLD-09', produccionDia: 650 },
+    { machineId: 'M02', pieceId: 'P4002', moldId: 'MOLD-10', produccionDia: 650 },
+    { machineId: 'M02', pieceId: 'P5001', moldId: 'MOLD-11', produccionDia: 650 },
+    { machineId: 'M02', pieceId: 'P5002', moldId: 'MOLD-12', produccionDia: 650 },
+    { machineId: 'M02', pieceId: 'P5003', moldId: 'MOLD-13', produccionDia: 650 },
 ];
 
 export const demands: Demand[] = [
