@@ -40,7 +40,7 @@ export default function AdminMachinesPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem disabled>
                            <PlusCircle className="mr-2 h-4 w-4" />
                             Añadir Capacidad
                         </DropdownMenuItem>
