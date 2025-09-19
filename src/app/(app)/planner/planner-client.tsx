@@ -8,7 +8,7 @@ import {
   Play,
   SlidersHorizontal,
 } from "lucide-react";
-import { format, addWeeks } from "date-fns";
+import { format, addWeeks, getISOWeek, getISODay, eachDayOfInterval, startOfWeek, endOfWeek } from "date-fns";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -44,7 +44,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 
-import type { PlanAssignment, Machine, Mold, Piece } from "@/lib/types";
+import type { PlanAssignment, Machine, Mold, Piece, CalendarEvent } from "@/lib/types";
 import { runGeneratePlan } from "./actions";
 import { useToast } from "@/hooks/use-toast";
 
@@ -53,20 +53,36 @@ interface PlannerClientProps {
   machines: Machine[];
   molds: Mold[];
   pieces: Piece[];
+  calendarEvents: CalendarEvent[];
 }
 
-const HOURS_PER_WEEK = 120; // total available hours
 
 // Helper to get week string in YYYYWW format
-const getWeekString = (date: Date) => {
-    return format(date, "yyyy") + format(date, "I").padStart(2, '0');
+const getWeekString = (date: Date): string => {
+    const year = date.getFullYear();
+    const week = getISOWeek(date);
+    return `${year}${String(week).padStart(2, '0')}`;
 };
+
+// Helper to get Date from YYYYWW string
+const getDateFromWeekString = (weekString: string): Date => {
+    const year = parseInt(weekString.substring(0, 4), 10);
+    const week = parseInt(weekString.substring(4), 10);
+    const d = new Date(year, 0, 1 + (week - 1) * 7);
+    if (getISODay(d) > 4) {
+        d.setDate(d.getDate() - (getISODay(d) - 1));
+    } else {
+        d.setDate(d.getDate() + (1 - getISODay(d)));
+    }
+    return d;
+}
 
 export default function PlannerClient({
   initialAssignments,
   machines,
   molds,
   pieces,
+  calendarEvents,
 }: PlannerClientProps) {
   const [assignments, setAssignments] = useState(initialAssignments);
   const [isPending, startTransition] = useTransition();
@@ -82,6 +98,35 @@ export default function PlannerClient({
     return Array.from({ length: planningWeeks }, (_, i) => getWeekString(addWeeks(today, i)));
   }, [planningWeeks]);
 
+  const weeklyHours = useMemo(() => {
+    const hours: { [machineId: string]: { [week: string]: number } } = {};
+    
+    machines.forEach(machine => {
+      hours[machine.id] = {};
+      const shiftsPerDay = machine.turnosSemana / 5; // Assuming 5-day base week for shift calculation
+      
+      weeks.forEach(week => {
+        const weekDate = getDateFromWeekString(week);
+        const weekStart = startOfWeek(weekDate, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(weekDate, { weekStartsOn: 1 });
+        const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+        
+        let workingDays = 0;
+        for (const day of daysInWeek) {
+            const dayOfWeek = getISODay(day); // Monday = 1, Sunday = 7
+            const dateString = format(day, 'yyyy-MM-dd');
+            const isNonWorkingEvent = calendarEvents.some(e => e.date === dateString && (e.type === 'feriado' || e.type === 'vacaciones' || e.type === 'mantenimiento'));
+
+            if (dayOfWeek !== 7 && !isNonWorkingEvent) {
+                workingDays++;
+            }
+        }
+        hours[machine.id][week] = workingDays * shiftsPerDay * machine.horasTurno;
+      });
+    });
+
+    return hours;
+  }, [weeks, machines, calendarEvents]);
 
   const handleGeneratePlan = () => {
     startTransition(async () => {
@@ -242,6 +287,8 @@ export default function PlannerClient({
                         0
                       );
 
+                      const availableHours = weeklyHours[machine.id]?.[week] || 0;
+
                       return (
                         <TableCell key={week} className="p-1 align-top">
                           <div className="h-full w-full bg-muted rounded-md p-1 flex flex-col gap-1 relative min-h-[120px]">
@@ -283,7 +330,7 @@ export default function PlannerClient({
                               );
                             })}
                             <div className="absolute bottom-1 right-1 text-xs text-muted-foreground font-mono">
-                                {totalHours.toFixed(0)}h / {HOURS_PER_WEEK}h
+                                {totalHours.toFixed(0)}h / {availableHours}h
                             </div>
                           </div>
                         </TableCell>

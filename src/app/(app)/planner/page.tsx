@@ -1,5 +1,5 @@
 import PlannerClient from './planner-client';
-import { machines, molds, pieces, planAssignments } from '@/lib/data';
+import { machines, molds, pieces, planAssignments, calendarEvents } from '@/lib/data';
 
 export default function PlannerPage() {
   return (
@@ -9,6 +9,7 @@ export default function PlannerPage() {
         machines={machines}
         molds={molds}
         pieces={pieces}
+        calendarEvents={calendarEvents}
       />
     </main>
   );
