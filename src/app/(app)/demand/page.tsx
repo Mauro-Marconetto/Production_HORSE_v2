@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { demands, pieces, clients } from "@/lib/data";
-import { FileUp, CheckCircle } from "lucide-react";
+import { FileUp, CheckCircle, FileDown } from "lucide-react";
 
 export default function DemandPage() {
   return (
@@ -13,9 +13,14 @@ export default function DemandPage() {
           <h1 className="text-3xl font-headline font-bold">Gestión de Demanda</h1>
           <p className="text-muted-foreground">Importar y ver la demanda de los clientes.</p>
         </div>
-        <Button>
-          <FileUp className="mr-2 h-4 w-4" /> Importar CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline">
+            <FileDown className="mr-2 h-4 w-4" /> Descargar Plantilla
+          </Button>
+          <Button>
+            <FileUp className="mr-2 h-4 w-4" /> Importar CSV
+          </Button>
+        </div>
       </div>
       <Card>
         <CardHeader>
