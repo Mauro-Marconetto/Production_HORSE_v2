@@ -1,15 +1,20 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition, useRef } from "react";
+import Papa from "papaparse";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileUp, CheckCircle, FileDown, X, ChevronDown } from "lucide-react";
+import { FileUp, CheckCircle, FileDown, X, ChevronDown, Loader2 } from "lucide-react";
+
+import { useToast } from "@/hooks/use-toast";
 import type { Demand, Piece, Client } from "@/lib/types";
+import { importDemand } from "./actions";
+
 
 interface DemandClientPageProps {
     initialDemands: Demand[];
@@ -23,10 +28,14 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
   const [filterPiece, setFilterPiece] = useState<string>("");
   const [filterClient, setFilterClient] = useState<string>("");
 
+  const [isImporting, startImportTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
   const weeks = useMemo(() => {
-    const uniqueWeeks = [...new Set(demands.map(d => d.periodoYYYYWW))];
+    const uniqueWeeks = [...new Set(initialDemands.map(d => d.periodoYYYYWW))];
     return uniqueWeeks.sort();
-  }, [demands]);
+  }, [initialDemands]);
 
   const pieceOptions = useMemo(() => pieces.map(p => ({ value: p.id, label: p.codigo })).sort((a,b) => a.label.localeCompare(b.label)), [pieces]);
   const clientOptions = useMemo(() => clients.map(c => ({ value: c.id, label: c.nombre })).sort((a,b) => a.label.localeCompare(b.label)), [clients]);
@@ -54,6 +63,62 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
         : [...prev, week]
     );
   };
+  
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    startImportTransition(() => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+          try {
+            // Basic validation
+            const parsedData = results.data.map((row: any) => ({
+              id: `${row.periodoYYYYWW}/${row.pieceId}`,
+              periodoYYYYWW: row.periodoYYYYWW,
+              pieceId: row.pieceId,
+              qty: parseInt(row.qty, 10),
+              prioridad: parseInt(row.prioridad, 10) as Demand['prioridad'],
+              version: 1, // Default version
+              congelado: false, // Imported demands are always drafts initially
+            }));
+
+            const mergedDemands = await importDemand(parsedData, demands);
+            setDemands(mergedDemands);
+            
+            toast({
+              title: "Importación Exitosa",
+              description: `Se procesaron ${parsedData.length} registros. Las demandas en borrador fueron actualizadas.`,
+            });
+          } catch (error) {
+             toast({
+              title: "Error en la Importación",
+              description: "El formato del archivo es incorrecto o los datos no son válidos.",
+              variant: "destructive"
+            });
+            console.error("Error parsing or importing CSV:", error);
+          }
+        },
+        error: (error: any) => {
+          toast({
+            title: "Error al leer el archivo",
+            description: error.message,
+            variant: "destructive"
+          });
+          console.error("Error parsing CSV:", error);
+        }
+      });
+    });
+
+    // Reset file input
+    event.target.value = '';
+  };
 
   return (
     <>
@@ -66,8 +131,16 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
           <Button variant="outline">
             <FileDown className="mr-2 h-4 w-4" /> Descargar Plantilla
           </Button>
-          <Button>
-            <FileUp className="mr-2 h-4 w-4" /> Importar CSV
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+            accept=".csv"
+          />
+          <Button onClick={handleImportClick} disabled={isImporting}>
+            {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+            {isImporting ? 'Importando...' : 'Importar CSV'}
           </Button>
         </div>
       </div>
