@@ -3,13 +3,14 @@
 
 import { useState, useMemo, useTransition, useRef } from "react";
 import Papa from "papaparse";
+import { getISOWeek, format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileUp, CheckCircle, FileDown, X, ChevronDown, Loader2 } from "lucide-react";
+import { FileUp, CheckCircle, FileDown, X, ChevronDown, Loader2, History } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import type { Demand, Piece, Client } from "@/lib/types";
@@ -22,11 +23,19 @@ interface DemandClientPageProps {
     clients: Client[];
 }
 
+const getCurrentWeekString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const week = getISOWeek(now);
+    return `${year}${String(week).padStart(2, '0')}`;
+};
+
 export default function DemandClientPage({ initialDemands, pieces, clients }: DemandClientPageProps) {
   const [demands, setDemands] = useState<Demand[]>(initialDemands);
   const [filterWeek, setFilterWeek] = useState<string[]>([]);
   const [filterPiece, setFilterPiece] = useState<string>("");
   const [filterClient, setFilterClient] = useState<string>("");
+  const [showHistory, setShowHistory] = useState(false);
 
   const [isImporting, startImportTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -41,14 +50,16 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
   const clientOptions = useMemo(() => clients.map(c => ({ value: c.id, label: c.nombre })).sort((a,b) => a.label.localeCompare(b.label)), [clients]);
 
   const filteredDemands = useMemo(() => {
+    const currentWeek = getCurrentWeekString();
     return demands.filter(demand => {
       const piece = pieces.find(p => p.id === demand.pieceId);
       const clientMatch = !filterClient || (piece && piece.clienteId === filterClient);
       const weekMatch = filterWeek.length === 0 || filterWeek.includes(demand.periodoYYYYWW);
       const pieceMatch = !filterPiece || demand.pieceId === filterPiece;
-      return clientMatch && weekMatch && pieceMatch;
+      const historyMatch = showHistory || demand.periodoYYYYWW >= currentWeek;
+      return clientMatch && weekMatch && pieceMatch && historyMatch;
     });
-  }, [demands, filterWeek, filterPiece, filterClient, pieces]);
+  }, [demands, filterWeek, filterPiece, filterClient, pieces, showHistory]);
   
   const clearFilters = () => {
     setFilterWeek([]);
@@ -72,7 +83,7 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
     const file = event.target.files?.[0];
     if (!file) return;
 
-    startImportTransition(() => {
+    startImportTransition(async () => {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
@@ -152,6 +163,14 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
                     <CardDescription>Unidades previstas por pieza para las próximas semanas.</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button
+                        variant={showHistory ? "secondary" : "outline"}
+                        size="sm"
+                        onClick={() => setShowHistory(!showHistory)}
+                        >
+                        <History className="mr-2 h-4 w-4" />
+                        {showHistory ? "Ocultar Historial" : "Mostrar Historial"}
+                    </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-[180px] justify-between">
@@ -171,7 +190,7 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
                               className="mr-2"
                             />
                             <label htmlFor={`week-${week}`} className="w-full cursor-pointer">
-                              2024-W{week.slice(4)}
+                              {week.slice(0, 4)}-W{week.slice(4)}
                             </label>
                           </DropdownMenuItem>
                         ))}
@@ -183,6 +202,7 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
                             <SelectValue placeholder="Filtrar por Pieza" />
                         </SelectTrigger>
                         <SelectContent>
+                            <SelectItem value="">Todas las piezas</SelectItem>
                             {pieceOptions.map(option => (
                                 <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                             ))}
@@ -193,13 +213,14 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
                             <SelectValue placeholder="Filtrar por Cliente" />
                         </SelectTrigger>
                         <SelectContent>
+                             <SelectItem value="">Todos los clientes</SelectItem>
                             {clientOptions.map(option => (
                                 <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
                     {(filterWeek.length > 0 || filterPiece || filterClient) && (
-                        <Button variant="ghost" onClick={clearFilters} size="icon">
+                        <Button variant="ghost" onClick={clearFilters} size="icon" title="Limpiar filtros">
                             <X className="h-4 w-4" />
                         </Button>
                     )}
@@ -225,7 +246,7 @@ export default function DemandClientPage({ initialDemands, pieces, clients }: De
                 const client = clients.find(c => c.id === piece?.clienteId);
                 return (
                   <TableRow key={demand.id}>
-                    <TableCell>2024-W{demand.periodoYYYYWW.slice(4)}</TableCell>
+                    <TableCell>{demand.periodoYYYYWW.slice(0, 4)}-W{demand.periodoYYYYWW.slice(4)}</TableCell>
                     <TableCell className="font-medium">{piece?.codigo}</TableCell>
                     <TableCell>{client?.nombre}</TableCell>
                     <TableCell className="text-right">{demand.qty.toLocaleString('es-ES')}</TableCell>
