@@ -68,7 +68,7 @@ export default function InventoryPage() {
                   <TableRow key={inv.pieceId}>
                     <TableCell className="font-medium">{piece.codigo}</TableCell>
                     <TableCell>{client?.nombre}</TableCell>
-                    <TableCell className="text-right">{inv.stock.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{inv.stock.toLocaleString('es-ES')}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Input
