@@ -1,7 +1,8 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { pieces, scrap } from "@/lib/data";
+import { pieces, scrap, clients } from "@/lib/data";
 import { FileUp, PlusCircle } from "lucide-react";
 
 export default function QualityPage() {
@@ -42,11 +43,12 @@ export default function QualityPage() {
             <TableBody>
               {scrap.sort((a,b) => b.periodoYYYYMM.localeCompare(a.periodoYYYYMM)).map((entry) => {
                 const piece = pieces.find(p => p.id === entry.pieceId);
+                const client = clients.find(c => c.id === piece?.clienteId);
                 return (
                   <TableRow key={entry.id}>
                     <TableCell>{entry.periodoYYYYMM.slice(0,4)}-{entry.periodoYYYYMM.slice(4)}</TableCell>
                     <TableCell className="font-medium">{piece?.codigo}</TableCell>
-                    <TableCell>{piece?.cliente}</TableCell>
+                    <TableCell>{client?.nombre}</TableCell>
                     <TableCell>{entry.causa}</TableCell>
                     <TableCell className="text-right">{entry.qty.toLocaleString()}</TableCell>
                   </TableRow>

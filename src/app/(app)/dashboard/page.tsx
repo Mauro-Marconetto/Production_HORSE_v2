@@ -1,3 +1,4 @@
+
 import {
   Activity,
   ArrowUpRight,
@@ -30,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { pieces, inventory, machines, demands, planAssignments } from "@/lib/data";
+import { pieces, inventory, machines, demands, planAssignments, clients } from "@/lib/data";
 import { DashboardCharts } from "@/components/dashboard-charts";
 import { Badge } from "@/components/ui/badge";
 import { DemandCoverageChart } from "@/components/demand-coverage-chart";
@@ -132,6 +133,7 @@ export default function DashboardPage() {
               {pieces.map(piece => {
                   const inv = inventory.find(i => i.pieceId === piece.id);
                   if (!inv) return null;
+                  const client = clients.find(c => c.id === piece.clienteId);
                   const stockPercentage = (inv.stock - piece.stockMin) / (piece.stockMax - piece.stockMin);
                   const status = stockPercentage < 0.1 ? 'critical' : stockPercentage > 0.9 ? 'high' : 'ok';
                   const statusText = status === 'critical' ? 'Crítico' : status === 'high' ? 'Alto' : 'Ok';
@@ -144,7 +146,7 @@ export default function DashboardPage() {
                           {piece.familia}
                         </div>
                       </TableCell>
-                      <TableCell>{piece.cliente}</TableCell>
+                      <TableCell>{client?.nombre}</TableCell>
                       <TableCell className="text-right">{inv.stock.toLocaleString()}</TableCell>
                       <TableCell className="text-right">{piece.stockMin.toLocaleString()}</TableCell>
                       <TableCell className="text-right">{piece.stockMax.toLocaleString()}</TableCell>
@@ -159,7 +161,7 @@ export default function DashboardPage() {
                     </TableRow>
                   )
               })}
-            </TableBody>
+            </Body>
           </Table>
         </CardContent>
       </Card>

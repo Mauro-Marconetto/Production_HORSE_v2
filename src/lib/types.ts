@@ -1,8 +1,14 @@
 
+
+export interface Client {
+  id: string;
+  nombre: string;
+}
+
 export interface Piece {
   id: string;
   codigo: string;
-  cliente: string;
+  clienteId: string;
   peso: number;
   familia: string;
   stockMin: number;

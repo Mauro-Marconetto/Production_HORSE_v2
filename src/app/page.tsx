@@ -67,7 +67,7 @@ export default function LoginPage() {
       </div>
       <div className="hidden bg-muted lg:block">
         <Image
-          src="/login-background.jpg"
+          src="/login-background.png"
           alt="Factory"
           width="1920"
           height="1080"

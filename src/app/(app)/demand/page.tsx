@@ -1,7 +1,8 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { demands, pieces } from "@/lib/data";
+import { demands, pieces, clients } from "@/lib/data";
 import { FileUp, CheckCircle } from "lucide-react";
 
 export default function DemandPage() {
@@ -37,11 +38,12 @@ export default function DemandPage() {
             <TableBody>
               {demands.map((demand) => {
                 const piece = pieces.find(p => p.id === demand.pieceId);
+                const client = clients.find(c => c.id === piece?.clienteId);
                 return (
                   <TableRow key={demand.id}>
                     <TableCell>2024-W{demand.periodoYYYYWW.slice(4)}</TableCell>
                     <TableCell className="font-medium">{piece?.codigo}</TableCell>
-                    <TableCell>{piece?.cliente}</TableCell>
+                    <TableCell>{client?.nombre}</TableCell>
                     <TableCell className="text-right">{demand.qty.toLocaleString()}</TableCell>
                     <TableCell className="text-center">{demand.prioridad}</TableCell>
                     <TableCell className="text-center">

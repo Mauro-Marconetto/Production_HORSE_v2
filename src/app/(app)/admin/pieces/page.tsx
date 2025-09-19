@@ -1,7 +1,8 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { pieces } from "@/lib/data";
+import { pieces, clients } from "@/lib/data";
 import { PlusCircle } from "lucide-react";
 
 export default function AdminPiecesPage() {
@@ -30,18 +31,21 @@ export default function AdminPiecesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pieces.map((piece) => (
-                <TableRow key={piece.id}>
-                  <TableCell className="font-medium">{piece.codigo}</TableCell>
-                  <TableCell>{piece.cliente}</TableCell>
-                  <TableCell>{piece.familia}</TableCell>
-                  <TableCell className="text-right">{piece.stockMin.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">{piece.stockMax.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">Editar</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {pieces.map((piece) => {
+                const client = clients.find(c => c.id === piece.clienteId);
+                return (
+                    <TableRow key={piece.id}>
+                    <TableCell className="font-medium">{piece.codigo}</TableCell>
+                    <TableCell>{client?.nombre}</TableCell>
+                    <TableCell>{piece.familia}</TableCell>
+                    <TableCell className="text-right">{piece.stockMin.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{piece.stockMax.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                        <Button variant="ghost" size="sm">Editar</Button>
+                    </TableCell>
+                    </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </CardContent>

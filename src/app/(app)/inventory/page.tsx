@@ -1,8 +1,9 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import { inventory, pieces } from "@/lib/data";
+import { inventory, pieces, clients } from "@/lib/data";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, TrendingUp, PlusCircle } from "lucide-react";
 
@@ -40,6 +41,7 @@ export default function InventoryPage() {
               {inventory.map((inv) => {
                 const piece = pieces.find(p => p.id === inv.pieceId);
                 if (!piece) return null;
+                const client = clients.find(c => c.id === piece.clienteId);
 
                 const stockPercentage = Math.round(((inv.stock - piece.stockMin) / (piece.stockMax - piece.stockMin)) * 100);
                 const status = stockPercentage < 10 ? 'critical' : stockPercentage > 90 ? 'high' : 'ok';
@@ -48,7 +50,7 @@ export default function InventoryPage() {
                 return (
                   <TableRow key={inv.pieceId}>
                     <TableCell className="font-medium">{piece.codigo}</TableCell>
-                    <TableCell>{piece.cliente}</TableCell>
+                    <TableCell>{client?.nombre}</TableCell>
                     <TableCell className="text-right">{inv.stock.toLocaleString()}</TableCell>
                     <TableCell className="text-right">{piece.stockMin.toLocaleString()} / {piece.stockMax.toLocaleString()}</TableCell>
                     <TableCell>

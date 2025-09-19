@@ -1,5 +1,6 @@
 
-import type { Machine, Mold, Piece, Demand, CurrentInventory, Production, Plan, PlanAssignment, PlaceholderImage, ScrapEntry, CalendarEvent } from './types';
+
+import type { Machine, Mold, Piece, Demand, CurrentInventory, Production, Plan, PlanAssignment, PlaceholderImage, ScrapEntry, CalendarEvent, Client } from './types';
 
 export const placeholderImages: PlaceholderImage[] = [
     {
@@ -15,10 +16,16 @@ export const machines: Machine[] = [
   { id: 'M02', nombre: 'Inyectora 800T', tonelaje: 800, turnosSemana: 15, horasTurno: 8, OEE_obj: 0.80, OEE_hist: 0.78 },
 ];
 
+export const clients: Client[] = [
+    { id: 'C01', nombre: 'AutoCorp' },
+    { id: 'C02', nombre: 'HeavyDuty' },
+    { id: 'C03', nombre: 'InduGeneral' },
+]
+
 export const pieces: Piece[] = [
-  { id: 'P1001', codigo: 'C-55-AX1', cliente: 'AutoCorp', peso: 1.2, familia: 'Soportes', stockMin: 2000, stockMax: 8000 },
-  { id: 'P1002', codigo: 'C-55-AX2', cliente: 'AutoCorp', peso: 1.5, familia: 'Soportes', stockMin: 1500, stockMax: 6000 },
-  { id: 'P2001', codigo: 'H-78-B1', cliente: 'HeavyDuty', peso: 3.4, familia: 'Carcasas', stockMin: 500, stockMax: 2500 },
+  { id: 'P1001', codigo: 'C-55-AX1', clienteId: 'C01', peso: 1.2, familia: 'Soportes', stockMin: 2000, stockMax: 8000 },
+  { id: 'P1002', codigo: 'C-55-AX2', clienteId: 'C01', peso: 1.5, familia: 'Soportes', stockMin: 1500, stockMax: 6000 },
+  { id: 'P2001', codigo: 'H-78-B1', clienteId: 'C02', peso: 3.4, familia: 'Carcasas', stockMin: 500, stockMax: 2500 },
 ];
 
 export const molds: Mold[] = [
@@ -97,4 +104,3 @@ export const calendarEvents: CalendarEvent[] = [
     { id: 'evt-1', machineId: "all", date: '2024-07-25', type: 'mantenimiento', description: 'Mantenimiento preventivo semestral' },
     { id: 'evt-3', machineId: "all", date: '2024-08-15', type: 'feriado', description: 'Asunción de la Virgen' },
 ]
-

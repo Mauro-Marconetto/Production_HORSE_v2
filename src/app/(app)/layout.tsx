@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import Image from "next/image";
@@ -15,6 +16,7 @@ import {
   Truck,
   ShieldCheck,
   CalendarDays,
+  Building,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -51,6 +53,7 @@ const adminNavItems = [
   { href: "/admin/pieces", icon: Package, label: "Piezas" },
   { href: "/admin/molds", icon: Factory, label: "Moldes" },
   { href: "/admin/machines", icon: Cog, label: "Máquinas" },
+  { href: "/admin/clients", icon: Building, label: "Clientes" },
   { href: "/admin/users", icon: Users, label: "Usuarios" },
 ];
 
