@@ -9,7 +9,7 @@ import {
   updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
-import { useCollection, useFirestore, useUser, type WithId } from '@/firebase';
+import { useCollection, useFirestore, useUser, type WithId, useMemoFirebase } from '@/firebase';
 import {
   Table,
   TableBody,
@@ -152,7 +152,7 @@ function UserForm({
 
 export default function AdminUsersPage() {
   const firestore = useFirestore();
-  const usersRef = collection(firestore, 'users');
+  const usersRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: users, isLoading } = useCollection<UserProfile>(usersRef);
   const { user: currentUser } = useUser();
   const { toast } = useToast();
@@ -187,7 +187,7 @@ export default function AdminUsersPage() {
         await updateDoc(userDoc, data);
         toast({ title: 'Usuario actualizado', description: 'Los cambios se guardaron correctamente.' });
       } else {
-        await addDoc(usersRef, data);
+        await addDoc(collection(firestore, 'users'), data);
         toast({ title: 'Usuario creado', description: 'El nuevo usuario se ha añadido.' });
       }
       handleCloseForm();
@@ -326,4 +326,3 @@ export default function AdminUsersPage() {
     </main>
   );
 }
-
