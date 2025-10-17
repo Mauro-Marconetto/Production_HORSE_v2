@@ -88,7 +88,6 @@ export default function LoginPage() {
                 type="email"
                 placeholder="m@example.com"
                 required
-                defaultValue="planner@forgeflow.com"
               />
             </div>
             <div className="grid gap-2">
