@@ -1,30 +1,43 @@
 /**
- * @fileoverview Firestore Security Rules for ForgeFlow application.
+ * @file Firestore Security Rules
+ * @version 2
  *
- * Core Philosophy:
- * This ruleset enforces a primarily public-read, owner-only-write model, supplemented by role-based access where applicable.
+ * @description This ruleset enforces a strict data access model for the ForgeFlow application.
+ *   It prioritizes authorization independence by avoiding the need for complex data joins during authorization checks.
  *
- * Data Structure:
- * The Firestore database contains collections for pieces, molds, machines, demand, inventory, calendars, downtime, aggregated downtime, plans, assignments, production, and global settings.
- * - Global data (pieces, molds, machines, production, global settings) resides in top-level collections and is generally readable by all users.
- * - Plan and Assignments are nested collections.
+ * @dataStructure
+ * - /pieces/{pieceId}: Stores details of manufactured pieces. Public read, no writes allowed by default.
+ * - /molds/{moldId}: Stores information about molds. Public read, no writes allowed by default.
+ * - /machines/{machineId}: Stores details about machines. Public read, no writes allowed by default.
+ * - /demand/{periodoYYYYWW}/{pieceId}: Stores demand data for specific pieces. Public read, no writes allowed by default.
+ * - /inventory/{pieceId}/{fechaISO}: Stores inventory levels. Public read, no writes allowed by default.
+ * - /inventory/current/{pieceId}: Stores current inventory levels. Public read, no writes allowed by default.
+ * - /calendars/{machineId}/{periodoYYYYWW}: Stores calendar events for machines. Public read, no writes allowed by default.
+ * - /downtime/{machineId}/{YYYYMM}: Stores downtime events for machines. Public read, no writes allowed by default.
+ * - /downtime_agg/{machineId}/{YYYYMM}: Stores aggregated downtime data. Public read, no writes allowed by default.
+ * - /plans/{planId}: Stores production plans. Public read, no writes allowed by default.
+ * - /plans/{planId}/assignments/{assignmentId}: Stores assignments within a plan. Public read, no writes allowed by default.
+ * - /production/{fechaISO}: Stores production data. Public read, no writes allowed by default.
+ * - /settings/global: Stores global settings. Public read, no writes allowed by default.
  *
- * Key Security Decisions:
- * - Public Read, Restricted Write: Most top-level collections allow public read access but restrict write access based on ownership or roles.
- * - No User Listing: User listing is not supported or necessary in this application.
+ * @keySecurityDecisions
+ * - Public Read: All collections are readable by any user. This is suitable for prototype environments.
+ * - No Writes by Default: All write operations (create, update, delete) are disabled by default.
+ * - No User Listing: There are no user-specific rules.
+ *
+ * @denormalizationForAuthorization N/A (Prototype with public read, writes denied)
+ * @structuralSegregation N/A (Prototype with public read, writes denied)
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows read access to piece documents, but restricts write access.
+     * @description Allows anyone to read Piece data.  No write access is granted by default.
      * @path /pieces/{pieceId}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read piece data.
+     * @deny (create, update, delete): No user can create, update, or delete piece data by default.
+     * @principle Public read access with no write access.
      */
     match /pieces/{pieceId} {
       allow get, list: if true;
@@ -32,13 +45,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows read access to mold documents, but restricts write access.
+     * @description Allows anyone to read Mold data. No write access is granted by default.
      * @path /molds/{moldId}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read mold data.
+     * @deny (create, update, delete): No user can create, update, or delete mold data by default.
+     * @principle Public read access with no write access.
      */
     match /molds/{moldId} {
       allow get, list: if true;
@@ -46,13 +57,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows read access to machine documents, but restricts write access.
+     * @description Allows anyone to read Machine data. No write access is granted by default.
      * @path /machines/{machineId}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read machine data.
+     * @deny (create, update, delete): No user can create, update, or delete machine data by default.
+     * @principle Public read access with no write access.
      */
     match /machines/{machineId} {
       allow get, list: if true;
@@ -60,13 +69,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows read access to demand documents, but restricts write access.
+     * @description Allows anyone to read Demand data. No write access is granted by default.
      * @path /demand/{periodoYYYYWW}/{pieceId}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read demand data.
+     * @deny (create, update, delete): No user can create, update, or delete demand data by default.
+     * @principle Public read access with no write access.
      */
     match /demand/{periodoYYYYWW}/{pieceId} {
       allow get, list: if true;
@@ -74,41 +81,35 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows read access to inventory documents, but restricts write access.
+     * @description Allows anyone to read Inventory data. No write access is granted by default.
      * @path /inventory/{pieceId}/{fechaISO}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read inventory data.
+     * @deny (create, update, delete): No user can create, update, or delete inventory data by default.
+     * @principle Public read access with no write access.
      */
     match /inventory/{pieceId}/{fechaISO} {
       allow get, list: if true;
       allow create, update, delete: if false;
     }
 
-     /**
-      * @description Allows read access to current inventory documents, but restricts write access.
-      * @path /inventory/current/{pieceId}
-      * @allow get, list: if true;
-      * @allow create: if false;
-      * @allow update: if false;
-      * @allow delete: if false;
-      * @principle Public read, restricted write.
-      */
+    /**
+     * @description Allows anyone to read current Inventory data. No write access is granted by default.
+     * @path /inventory/current/{pieceId}
+     * @allow (get, list): Any user can read inventory data.
+     * @deny (create, update, delete): No user can create, update, or delete inventory data by default.
+     * @principle Public read access with no write access.
+     */
     match /inventory/current/{pieceId} {
-        allow get, list: if true;
-        allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows read access to calendar documents, but restricts write access.
+     * @description Allows anyone to read Calendar data. No write access is granted by default.
      * @path /calendars/{machineId}/{periodoYYYYWW}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read calendar data.
+     * @deny (create, update, delete): No user can create, update, or delete calendar data by default.
+     * @principle Public read access with no write access.
      */
     match /calendars/{machineId}/{periodoYYYYWW} {
       allow get, list: if true;
@@ -116,13 +117,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows read access to downtime documents, but restricts write access.
+     * @description Allows anyone to read Downtime data. No write access is granted by default.
      * @path /downtime/{machineId}/{YYYYMM}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read downtime data.
+     * @deny (create, update, delete): No user can create, update, or delete downtime data by default.
+     * @principle Public read access with no write access.
      */
     match /downtime/{machineId}/{YYYYMM} {
       allow get, list: if true;
@@ -130,13 +129,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows read access to aggregated downtime documents, but restricts write access.
+     * @description Allows anyone to read aggregated Downtime data. No write access is granted by default.
      * @path /downtime_agg/{machineId}/{YYYYMM}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read downtime aggregation data.
+     * @deny (create, update, delete): No user can create, update, or delete downtime aggregation data by default.
+     * @principle Public read access with no write access.
      */
     match /downtime_agg/{machineId}/{YYYYMM} {
       allow get, list: if true;
@@ -144,13 +141,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows read access to plan documents, but restricts write access.
+     * @description Allows anyone to read Plan data. No write access is granted by default.
      * @path /plans/{planId}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read plan data.
+     * @deny (create, update, delete): No user can create, update, or delete plan data by default.
+     * @principle Public read access with no write access.
      */
     match /plans/{planId} {
       allow get, list: if true;
@@ -158,13 +153,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows read access to assignment documents within a plan, but restricts write access.
+     * @description Allows anyone to read Assignment data. No write access is granted by default.
      * @path /plans/{planId}/assignments/{assignmentId}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read assignment data.
+     * @deny (create, update, delete): No user can create, update, or delete assignment data by default.
+     * @principle Public read access with no write access.
      */
     match /plans/{planId}/assignments/{assignmentId} {
       allow get, list: if true;
@@ -172,13 +165,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows read access to production documents, but restricts write access.
+     * @description Allows anyone to read Production data. No write access is granted by default.
      * @path /production/{fechaISO}
-     * @allow get, list: if true;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read production data.
+     * @deny (create, update, delete): No user can create, update, or delete production data by default.
+     * @principle Public read access with no write access.
      */
     match /production/{fechaISO} {
       allow get, list: if true;
@@ -186,18 +177,14 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows read access to global settings, but restricts write access.
+     * @description Allows anyone to read global Setting data. No write access is granted by default.
      * @path /settings/global
-     * @allow get: if true;
-     * @allow list: if false;
-     * @allow create: if false;
-     * @allow update: if false;
-     * @allow delete: if false;
-     * @principle Public read, restricted write.
+     * @allow (get, list): Any user can read setting data.
+     * @deny (create, update, delete): No user can create, update, or delete setting data by default.
+     * @principle Public read access with no write access.
      */
     match /settings/global {
-      allow get: if true;
-      allow list: if false;
+      allow get, list: if true;
       allow create, update, delete: if false;
     }
   }
