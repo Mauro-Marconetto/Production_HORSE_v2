@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { initiateEmailSignIn, useAuth, useUser } from "@/firebase";
+import { useAuth, useUser } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,12 +17,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const router = useRouter();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!isUserLoading && user) {
@@ -30,21 +33,32 @@ export default function LoginPage() {
     }
   }, [user, isUserLoading, router]);
 
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoggingIn(true);
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    initiateEmailSignIn(auth, email, password);
-    // The useEffect will handle the redirect on successful login.
-    // We'll set a timeout to handle login errors.
-    setTimeout(() => {
-        setIsLoggingIn(false);
-        // We can add more specific error handling here if needed,
-        // for now, we just stop the loading indicator.
-    }, 5000); // 5 second timeout
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // The useEffect will handle the redirect on successful login.
+    } catch (error: any) {
+      if (error.code === 'auth/invalid-credential') {
+         toast({
+            title: "Error de acceso",
+            description: "El usuario o la contraseña son incorrectos.",
+            variant: "destructive",
+         });
+      } else {
+        toast({
+            title: "Error",
+            description: "Ha ocurrido un error inesperado al iniciar sesión.",
+            variant: "destructive",
+        });
+      }
+      setIsLoggingIn(false);
+    }
   };
 
   if (isUserLoading || user) {
