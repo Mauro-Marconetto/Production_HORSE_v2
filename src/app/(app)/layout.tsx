@@ -78,6 +78,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+  
+  // A user is an admin if the custom claim exists and is true
+  const isAdmin = (user as any)?.customClaims?.admin === true;
+
 
   return (
     <SidebarProvider>
@@ -104,26 +108,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
+          
+          {isAdmin && (
+            <SidebarGroup className="mt-auto">
+                <SidebarGroupLabel>Administración</SidebarGroupLabel>
+                <SidebarMenu>
+                {adminNavItems.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                        asChild
+                        isActive={pathname.startsWith(item.href)}
+                        tooltip={item.label}
+                    >
+                        <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                        </Link>
+                    </SidebarMenuButton>
+                    </SidebarMenuItem>
+                ))}
+                </SidebarMenu>
+            </SidebarGroup>
+          )}
 
-          <SidebarGroup className="mt-auto">
-            <SidebarGroupLabel>Administración</SidebarGroupLabel>
-            <SidebarMenu>
-              {adminNavItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={item.label}
-                  >
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
           <UserNav />
