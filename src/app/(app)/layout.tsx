@@ -74,6 +74,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, isUserLoading, router]);
 
+  // A user is an admin if their email is in the ADMIN_EMAILS list.
+  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
+
   if (isUserLoading || !user) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -82,10 +85,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
   
-  // A user is an admin if their email is in the ADMIN_EMAILS list.
-  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
-
-
   return (
     <SidebarProvider>
       <Sidebar>
