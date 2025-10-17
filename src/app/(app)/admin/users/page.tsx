@@ -34,23 +34,57 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, PlusCircle, Trash2, Edit } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, Edit, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { UserProfile } from '@/lib/types';
-import { ADMIN_EMAILS } from '@/app/(app)/layout';
+import { ADMIN_EMAILS } from '@/lib/config';
 
 
 function AdminUsersPageClient() {
+  const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const usersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
   const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersCollection);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const currentUserProfileExists = useMemo(() => {
+    return users?.some(u => u.id === user?.uid);
+  }, [users, user]);
+
+  const handleSyncProfile = async () => {
+    if (!user) {
+        toast({ title: "Error", description: "No has iniciado sesión.", variant: "destructive" });
+        return;
+    }
+    setIsSyncing(true);
+    try {
+        const userDocRef = doc(firestore, 'users', user.uid);
+        await setDoc(userDocRef, {
+            id: user.uid,
+            name: user.displayName || user.email,
+            email: user.email,
+            role: 'Admin'
+        }, { merge: true });
+
+        toast({
+            title: "Éxito",
+            description: "Tu perfil ha sido sincronizado correctamente."
+        });
+
+    } catch (error: any) {
+        console.error("Error syncing profile:", error);
+        toast({ title: "Error", description: "No se pudo sincronizar el perfil.", variant: "destructive" });
+    } finally {
+        setIsSyncing(false);
+    }
+  }
 
   const openNewUserDialog = () => {
     setSelectedUser(null);
@@ -72,10 +106,6 @@ function AdminUsersPageClient() {
     const password = formData.get('password') as string;
 
     try {
-      const auth = getAuth();
-      // For new users, we need to create them in Firebase Auth first.
-      // We can't create a user without a password in the client SDK.
-      // For editing, we are not changing auth properties, just Firestore data.
       if (!selectedUser) {
          if (!password) {
             toast({
@@ -86,14 +116,14 @@ function AdminUsersPageClient() {
             setIsSaving(false);
             return;
         }
-        // This is a simplified approach. In a real app, you'd use a backend function
-        // to create a user without sending a password from the client, or handle password reset flows.
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // This is a temporary auth instance for user creation.
+        // In a real-world scenario, this should be a cloud function.
+        const tempAuth = getAuth(getAuth().app);
+        const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
         const uid = userCredential.user.uid;
         const userDocRef = doc(firestore, 'users', uid);
         await setDoc(userDocRef, { name, email, role, id: uid });
       } else {
-        // Update existing user in Firestore
         const userDocRef = doc(firestore, 'users', selectedUser.id);
         await setDoc(userDocRef, { name, email, role, id: selectedUser.id }, { merge: true });
       }
@@ -103,13 +133,23 @@ function AdminUsersPageClient() {
         description: `Usuario ${selectedUser ? 'actualizado' : 'creado'} correctamente.`,
       });
       setIsDialogOpen(false);
-    } catch (error: any) {
+    } catch (error: any)
+      {
       console.error('Error saving user:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'No se pudo guardar el usuario.',
-        variant: 'destructive',
-      });
+      // More specific error for email-already-in-use
+      if (error.code === 'auth/email-already-in-use') {
+        toast({
+            title: 'Error al crear usuario',
+            description: 'El correo electrónico ya está en uso. Por favor, utiliza otro.',
+            variant: 'destructive',
+        });
+      } else {
+         toast({
+          title: 'Error',
+          description: error.message || 'No se pudo guardar el usuario.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsSaving(false);
     }
@@ -121,8 +161,6 @@ function AdminUsersPageClient() {
     }
     setIsDeleting(true);
     try {
-        // Note: This only deletes the Firestore document, not the Firebase Auth user.
-        // Deleting auth users requires admin privileges, typically from a backend.
         await deleteDoc(doc(firestore, 'users', userId));
         toast({
             title: 'Usuario Eliminado',
@@ -140,15 +178,6 @@ function AdminUsersPageClient() {
     }
   };
 
-
-  if (isLoadingUsers) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <>
       <div className="flex items-center justify-between">
@@ -158,9 +187,17 @@ function AdminUsersPageClient() {
             Crear, editar y gestionar los usuarios de la aplicación.
           </p>
         </div>
-        <Button onClick={openNewUserDialog}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Añadir Usuario
-        </Button>
+        <div className='flex items-center gap-2'>
+            {!currentUserProfileExists && !isLoadingUsers && (
+                <Button onClick={handleSyncProfile} disabled={isSyncing} variant="outline">
+                    {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    Sincronizar Mi Perfil
+                </Button>
+            )}
+            <Button onClick={openNewUserDialog}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Añadir Usuario
+            </Button>
+        </div>
       </div>
 
       <Card>
@@ -181,7 +218,14 @@ function AdminUsersPageClient() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users && users.length > 0 ? (
+              {isLoadingUsers && (
+                 <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+                    </TableCell>
+                </TableRow>
+              )}
+              {!isLoadingUsers && users && users.length > 0 ? (
                 users.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.name}</TableCell>
@@ -197,7 +241,8 @@ function AdminUsersPageClient() {
                     </TableCell>
                   </TableRow>
                 ))
-              ) : (
+              ) : null}
+              {!isLoadingUsers && (!users || users.length === 0) && (
                 <TableRow>
                   <TableCell colSpan={4} className="h-24 text-center">
                     No se encontraron usuarios.
@@ -235,7 +280,7 @@ function AdminUsersPageClient() {
                     <Label htmlFor="password" className="text-right">
                         Contraseña
                     </Label>
-                    <Input id="password" name="password" type="password" className="col-span-3" placeholder="Dejar en blanco para no cambiar"/>
+                    <Input id="password" name="password" type="password" className="col-span-3" placeholder="Mínimo 6 caracteres"/>
                 </div>
             )}
             <div className="grid grid-cols-4 items-center gap-4">
@@ -273,7 +318,6 @@ function AdminUsersPageClient() {
 export default function AdminUsersPage() {
     const { user, isUserLoading } = useUser();
 
-    // Wait until user is loaded
     if (isUserLoading) {
         return (
             <div className="flex h-screen w-full items-center justify-center">
@@ -282,7 +326,6 @@ export default function AdminUsersPage() {
         );
     }
 
-    // Check if the loaded user is an admin
     const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
 
     if (!isAdmin) {
@@ -293,16 +336,17 @@ export default function AdminUsersPage() {
                         <CardTitle>Acceso Denegado</CardTitle>
                         <CardDescription>No tienes permisos para acceder a esta sección.</CardDescription>
                     </CardHeader>
+                    <CardContent>
+                      <p>Si crees que esto es un error, por favor contacta al administrador del sistema.</p>
+                    </CardContent>
                 </Card>
             </main>
         );
     }
     
-    // Render the client component only if user is an admin
     return (
         <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
             <AdminUsersPageClient />
         </main>
     );
 }
-

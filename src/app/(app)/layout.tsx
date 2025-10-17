@@ -40,6 +40,7 @@ import { UserNav } from "@/components/user-nav";
 import { Separator } from "@/components/ui/separator";
 import { useUser } from "@/firebase";
 import { useEffect } from "react";
+import { ADMIN_EMAILS } from "@/lib/config";
 
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Panel" },
@@ -57,10 +58,8 @@ const adminNavItems = [
   { href: "/admin/pieces", icon: Package, label: "Piezas" },
   { href: "/admin/machines", icon: Cog, label: "Máquinas" },
   { href: "/admin/clients", icon: Building, label: "Clientes" },
+  { href: "/admin/users", icon: Users, label: "Usuarios" },
 ];
-
-// Hardcoded admin emails for robust access control
-const ADMIN_EMAILS = ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
