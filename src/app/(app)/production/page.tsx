@@ -1,4 +1,5 @@
 
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -27,7 +28,7 @@ export default function ProductionPage() {
                 <TableHead>Máquina</TableHead>
                 <TableHead>Pieza</TableHead>
                 <TableHead>Molde</TableHead>
-                <TableHead className="text-right">Horas</TableHead>
+                <TableHead>Turno</TableHead>
                 <TableHead className="text-right">Unidades Producidas</TableHead>
                 <TableHead className="text-right">Scrap (%)</TableHead>
                 <TableHead className="text-center">Estado</TableHead>
@@ -46,7 +47,7 @@ export default function ProductionPage() {
                     <TableCell className="font-medium">{machine?.nombre}</TableCell>
                     <TableCell>{piece?.codigo}</TableCell>
                     <TableCell>{mold?.nombre}</TableCell>
-                    <TableCell className="text-right">{p.horas}</TableCell>
+                    <TableCell className="capitalize">{p.turno}</TableCell>
                     <TableCell className="text-right">{p.unidades.toLocaleString()}</TableCell>
                     <TableCell className={`text-right ${isScrapHigh ? 'text-destructive' : ''}`}>
                       {(p.scrapPct * 100).toFixed(1)}%

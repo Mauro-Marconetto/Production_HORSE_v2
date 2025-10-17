@@ -123,7 +123,7 @@ export interface Production {
   machineId: string;
   pieceId: string;
   moldId: string;
-  horas: number;
+  turno: 'mañana' | 'tarde' | 'noche';
   unidades: number;
   scrapPct: number;
 }

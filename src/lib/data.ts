@@ -111,10 +111,10 @@ export const inventory: CurrentInventory[] = [
 ]
 
 export const production: Production[] = [
-    { id: 'prod-1', fechaISO: '2024-06-24T08:00:00Z', machineId: 'M01', pieceId: 'P1001', moldId: 'MOLD-01', horas: 8, unidades: 1200, scrapPct: 0.03 },
-    { id: 'prod-2', fechaISO: '2024-06-24T16:00:00Z', machineId: 'M01', pieceId: 'P1001', moldId: 'MOLD-01', horas: 8, unidades: 1180, scrapPct: 0.04 },
-    { id: 'prod-3', fechaISO: '2024-06-25T08:00:00Z', machineId: 'M02', pieceId: 'P2001', moldId: 'MOLD-03', horas: 8, unidades: 230, scrapPct: 0.05 },
-    { id: 'prod-4', fechaISO: '2024-06-25T16:00:00Z', machineId: 'M02', pieceId: 'P2001', moldId: 'MOLD-03', horas: 8, unidades: 235, scrapPct: 0.02 },
+    { id: 'prod-1', fechaISO: '2024-06-24T08:00:00Z', machineId: 'M01', pieceId: 'P1001', moldId: 'MOLD-01', turno: 'mañana', unidades: 1200, scrapPct: 0.03 },
+    { id: 'prod-2', fechaISO: '2024-06-24T16:00:00Z', machineId: 'M01', pieceId: 'P1001', moldId: 'MOLD-01', turno: 'tarde', unidades: 1180, scrapPct: 0.04 },
+    { id: 'prod-3', fechaISO: '2024-06-25T08:00:00Z', machineId: 'M02', pieceId: 'P2001', moldId: 'MOLD-03', turno: 'mañana', unidades: 230, scrapPct: 0.05 },
+    { id: 'prod-4', fechaISO: '2024-06-25T16:00:00Z', machineId: 'M02', pieceId: 'P2001', moldId: 'MOLD-03', turno: 'tarde', unidades: 235, scrapPct: 0.02 },
 ]
 
 export const plans: Plan[] = [
