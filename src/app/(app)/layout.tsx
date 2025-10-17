@@ -54,6 +54,7 @@ const navItems = [
 ];
 
 const adminNavItems = [
+  { href: "/admin/users", icon: Users, label: "Usuarios" },
   { href: "/admin/pieces", icon: Package, label: "Piezas" },
   { href: "/admin/machines", icon: Cog, label: "Máquinas" },
   { href: "/admin/clients", icon: Building, label: "Clientes" },
@@ -141,3 +142,4 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
