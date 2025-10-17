@@ -57,8 +57,10 @@ const adminNavItems = [
   { href: "/admin/pieces", icon: Package, label: "Piezas" },
   { href: "/admin/machines", icon: Cog, label: "Máquinas" },
   { href: "/admin/clients", icon: Building, label: "Clientes" },
-  { href: "/admin/users", icon: Users, label: "Usuarios" },
 ];
+
+// Hardcoded admin emails for robust access control
+const ADMIN_EMAILS = ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -79,8 +81,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
   
-  // A user is an admin if the custom claim exists and is true
-  const isAdmin = (user as any)?.customClaims?.admin === true;
+  // A user is an admin if their email is in the ADMIN_EMAILS list.
+  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
 
 
   return (
