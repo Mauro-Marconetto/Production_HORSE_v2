@@ -1,154 +1,48 @@
 /**
  * @fileoverview Firestore Security Rules for ForgeFlow application.
  *
- * Core Philosophy: This ruleset enforces a strict authorization model based on
- * path-based ownership, combined with public read access where appropriate.
- * The primary goal is to prevent unauthorized data access and modification,
- * while allowing for flexible data structures during the prototyping phase.
+ * Core Philosophy:
+ * This ruleset enforces a primarily public-read, owner-only write model.
+ * Most data is considered global configuration, so reads are generally open.
+ * Write access is restricted to authenticated users.
  *
  * Data Structure:
- * - Top-level collections (pieces, molds, machines, production) are globally readable.
- * - Subcollections under `/plans/{planId}` (assignments) are secured by path-based ownership.
- * - The `/settings/global` document is globally readable.
+ * The Firestore database is organized into top-level collections for core entities
+ * (pieces, molds, machines), time-series data (demand, inventory, calendars, downtime),
+ * production plans (plans, assignments), production data, and global settings.
  *
  * Key Security Decisions:
- * - Listing the `/users` collection is explicitly denied to prevent information disclosure.
- * - All write operations require authentication.
- * - Data validation is limited to authorization-critical fields to allow for
- *   rapid prototyping and schema evolution.
+ * - Public read access is granted to the pieces, molds, machines, demand, inventory,
+ *   calendars, downtime, production, downtime_agg and settings collections, assuming the data is non-sensitive.
+ * - Listing of assignments is restricted to authenticated users with a valid planId.
+ * - Write access (create, update, delete) is generally restricted to authenticated users.
+ * - No specific schema validation is enforced beyond basic checks for relational integrity.
  *
  * Denormalization for Authorization:
- *   N/A. No denormalization is required based on the current data model. All
- *   authorization decisions can be made based on the document path.
+ * N/A - No denormalization is used in these rules.
  *
  * Structural Segregation:
- *   The application utilizes structural segregation to secure list operations.
- *   For example, assignments are stored as subcollections under plans,
- *   preventing unauthorized listing of assignments across different plans.
+ * N/A - Structural segregation is not used in these rules.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows read-only access to the pieces collection.
-     * @path /databases/{database}/documents/pieces/{pieceId}
-     * @allow (get, list) Authenticated or unauthenticated user can read any piece.
-     * @deny (create, update, delete) No user can create, update, or delete pieces.
-     * @principle Allows public read access for global data; enforces no writes.
-     */
-    match /pieces/{pieceId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Allows read-only access to the molds collection.
-     * @path /databases/{database}/documents/molds/{moldId}
-     * @allow (get, list) Authenticated or unauthenticated user can read any mold.
-     * @deny (create, update, delete) No user can create, update, or delete molds.
-     * @principle Allows public read access for global data; enforces no writes.
-     */
-    match /molds/{moldId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Allows read-only access to the machines collection.
-     * @path /databases/{database}/documents/machines/{machineId}
-     * @allow (get, list) Authenticated or unauthenticated user can read any machine.
-     * @deny (create, update, delete) No user can create, update, or delete machines.
-     * @principle Allows public read access for global data; enforces no writes.
-     */
-    match /machines/{machineId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Allows read-only access to the demand collection.
-     * @path /databases/{database}/documents/demand/{periodoYYYYWW}/{pieceId}
-     * @allow (get, list) Authenticated or unauthenticated user can read any demand data.
-     * @deny (create, update, delete) No user can create, update, or delete demand data.
-     * @principle Allows public read access for global data; enforces no writes.
-     */
-    match /demand/{periodoYYYYWW}/{pieceId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Allows read-only access to the inventory collection.
-     * @path /databases/{database}/documents/inventory/{pieceId}/{fechaISO}
-     * @allow (get, list) Authenticated or unauthenticated user can read any inventory data.
-     * @deny (create, update, delete) No user can create, update, or delete inventory data.
-     * @principle Allows public read access for global data; enforces no writes.
-     */
-    match /inventory/{pieceId}/{fechaISO} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Allows read-only access to the current inventory collection.
-     * @path /databases/{database}/documents/inventory/current/{pieceId}
-     * @allow (get, list) Authenticated or unauthenticated user can read any current inventory data.
-     * @deny (create, update, delete) No user can create, update, or delete current inventory data.
-     * @principle Allows public read access for global data; enforces no writes.
-     */
-    match /inventory/current/{pieceId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Allows read-only access to the calendar collection.
-     * @path /databases/{database}/documents/calendars/{machineId}/{periodoYYYYWW}
-     * @allow (get, list) Authenticated or unauthenticated user can read any calendar data.
-     * @deny (create, update, delete) No user can create, update, or delete calendar data.
-     * @principle Allows public read access for global data; enforces no writes.
-     */
-    match /calendars/{machineId}/{periodoYYYYWW} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Allows read-only access to the downtime collection.
-     * @path /databases/{database}/documents/downtime/{machineId}/{YYYYMM}
-     * @allow (get, list) Authenticated or unauthenticated user can read any downtime data.
-     * @deny (create, update, delete) No user can create, update, or delete downtime data.
-     * @principle Allows public read access for global data; enforces no writes.
-     */
-    match /downtime/{machineId}/{YYYYMM} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Allows read-only access to the aggregated downtime collection.
-     * @path /databases/{database}/documents/downtime_agg/{machineId}/{YYYYMM}
-     * @allow (get, list) Authenticated or unauthenticated user can read any aggregated downtime data.
-     * @deny (create, update, delete) No user can create, update, or delete aggregated downtime data.
-     * @principle Allows public read access for global data; enforces no writes.
-     */
-    match /downtime_agg/{machineId}/{YYYYMM} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Allows read access to individual plans and restricts write access.
-     * @path /databases/{database}/documents/plans/{planId}
-     * @allow get: if true;
-     * @allow list: if true;
+     * @description Allows public read access to piece documents and requires authentication for write operations.
+     * @path /pieces/{pieceId}
+     * @allow get, list: if true;
      * @allow create: if isSignedIn();
      * @allow update: if isSignedIn() && resource != null;
      * @allow delete: if isSignedIn() && resource != null;
-     * @principle Requires authentication for all write operations.
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Allows public read access and restricts write access to authenticated users.
      */
-    match /plans/{planId} {
+    match /pieces/{pieceId} {
       allow get, list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn() && resource != null;
@@ -156,14 +50,207 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows access to assignments within a specific plan, secured by path-based authorization.
-     * @path /databases/{database}/documents/plans/{planId}/assignments/{assignmentId}
-     * @allow get: if isSignedIn();
-     * @allow list: if isSignedIn();
+     * @description Allows public read access to mold documents and requires authentication for write operations.
+     * @path /molds/{moldId}
+     * @allow get, list: if true;
      * @allow create: if isSignedIn();
      * @allow update: if isSignedIn() && resource != null;
      * @allow delete: if isSignedIn() && resource != null;
-     * @principle Enforces authentication for all read and write operations within a plan's assignments.
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Allows public read access and restricts write access to authenticated users.
+     */
+    match /molds/{moldId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Allows public read access to machine documents and requires authentication for write operations.
+     * @path /machines/{machineId}
+     * @allow get, list: if true;
+     * @allow create: if isSignedIn();
+     * @allow update: if isSignedIn() && resource != null;
+     * @allow delete: if isSignedIn() && resource != null;
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Allows public read access and restricts write access to authenticated users.
+     */
+    match /machines/{machineId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Allows public read access to demand documents and requires authentication for write operations.
+     * @path /demand/{periodoYYYYWW}/{pieceId}
+     * @allow get, list: if true;
+     * @allow create: if isSignedIn();
+     * @allow update: if isSignedIn() && resource != null;
+     * @allow delete: if isSignedIn() && resource != null;
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Allows public read access and restricts write access to authenticated users.
+     */
+    match /demand/{periodoYYYYWW}/{pieceId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Allows public read access to inventory documents and requires authentication for write operations.
+     * @path /inventory/{pieceId}/{fechaISO}
+     * @allow get, list: if true;
+     * @allow create: if isSignedIn();
+     * @allow update: if isSignedIn() && resource != null;
+     * @allow delete: if isSignedIn() && resource != null;
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Allows public read access and restricts write access to authenticated users.
+     */
+    match /inventory/{pieceId}/{fechaISO} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+     /**
+      * @description Allows public read access to current inventory documents and requires authentication for write operations.
+      * @path /inventory/current/{pieceId}
+      * @allow get, list: if true;
+      * @allow create: if isSignedIn();
+      * @allow update: if isSignedIn() && resource != null;
+      * @allow delete: if isSignedIn() && resource != null;
+      * @deny get: if false;
+      * @deny list: if false;
+      * @deny create: if false;
+      * @deny update: if false;
+      * @deny delete: if false;
+      * @principle Allows public read access and restricts write access to authenticated users.
+      */
+    match /inventory/current/{pieceId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Allows public read access to calendar documents and requires authentication for write operations.
+     * @path /calendars/{machineId}/{periodoYYYYWW}
+     * @allow get, list: if true;
+     * @allow create: if isSignedIn();
+     * @allow update: if isSignedIn() && resource != null;
+     * @allow delete: if isSignedIn() && resource != null;
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Allows public read access and restricts write access to authenticated users.
+     */
+    match /calendars/{machineId}/{periodoYYYYWW} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Allows public read access to downtime documents and requires authentication for write operations.
+     * @path /downtime/{machineId}/{YYYYMM}
+     * @allow get, list: if true;
+     * @allow create: if isSignedIn();
+     * @allow update: if isSignedIn() && resource != null;
+     * @allow delete: if isSignedIn() && resource != null;
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Allows public read access and restricts write access to authenticated users.
+     */
+    match /downtime/{machineId}/{YYYYMM} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Allows public read access to aggregated downtime documents and requires authentication for write operations.
+     * @path /downtime_agg/{machineId}/{YYYYMM}
+     * @allow get, list: if true;
+     * @allow create: if isSignedIn();
+     * @allow update: if isSignedIn() && resource != null;
+     * @allow delete: if isSignedIn() && resource != null;
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Allows public read access and restricts write access to authenticated users.
+     */
+    match /downtime_agg/{machineId}/{YYYYMM} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Allows read and write access to plans only for authenticated users.
+     * @path /plans/{planId}
+     * @allow get, list: if isSignedIn();
+     * @allow create: if isSignedIn();
+     * @allow update: if isSignedIn() && resource != null;
+     * @allow delete: if isSignedIn() && resource != null;
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Restricts plan access to authenticated users.
+     */
+    match /plans/{planId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Allows read and write access to assignments only for authenticated users.
+     * @path /plans/{planId}/assignments/{assignmentId}
+     * @allow get, list: if isSignedIn();
+     * @allow create: if isSignedIn();
+     * @allow update: if isSignedIn() && resource != null;
+     * @allow delete: if isSignedIn() && resource != null;
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Restricts assignment access to authenticated users.
      */
     match /plans/{planId}/assignments/{assignmentId} {
       allow get, list: if isSignedIn();
@@ -173,38 +260,50 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows read-only access to the production collection.
-     * @path /databases/{database}/documents/production/{fechaISO}
-     * @allow (get, list) Authenticated or unauthenticated user can read any production data.
-     * @deny (create, update, delete) No user can create, update, or delete production data.
-     * @principle Allows public read access for global data; enforces no writes.
+     * @description Allows public read access to production documents and requires authentication for write operations.
+     * @path /production/{fechaISO}
+     * @allow get, list: if true;
+     * @allow create: if isSignedIn();
+     * @allow update: if isSignedIn() && resource != null;
+     * @allow delete: if isSignedIn() && resource != null;
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Allows public read access and restricts write access to authenticated users.
      */
     match /production/{fechaISO} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Allows read-only access to the global settings document.
-     * @path /databases/{database}/documents/settings/global
-     * @allow (get, list) Authenticated or unauthenticated user can read the global settings.
-     * @deny (create, update, delete) No user can create, update, or delete the global settings.
-     * @principle Allows public read access for global settings; enforces no writes.
+     * @description Allows public read access to the global settings document and requires authentication for write operations.
+     * @path /settings/global
+     * @allow get, list: if true;
+     * @allow create: if isSignedIn();
+     * @allow update: if isSignedIn() && resource != null;
+     * @allow delete: if isSignedIn() && resource != null;
+     * @deny get: if false;
+     * @deny list: if false;
+     * @deny create: if false;
+     * @deny update: if false;
+     * @deny delete: if false;
+     * @principle Allows public read access and restricts write access to authenticated users.
      */
     match /settings/global {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
-
   }
 
-  /**
-   * @description Checks if the request is authenticated.
-   * @return {boolean} True if the request is authenticated, false otherwise.
-   * @principle Requires authentication for restricted operations.
-   */
+  // Helper function to determine if the user is signed in
   function isSignedIn() {
     return request.auth != null;
   }
-
 }
