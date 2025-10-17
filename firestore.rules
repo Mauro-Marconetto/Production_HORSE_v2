@@ -1,39 +1,33 @@
 /**
- * @fileoverview Firestore Security Rules for the ForgeFlow application.
+ * @file Firestore Security Rules for ForgeFlow application.
  *
  * Core Philosophy:
- * This ruleset enforces a combination of ownership-based and role-based access control.
- * User profiles are private and only accessible to the owning user. Most other data
- * (pieces, molds, machines) is publicly readable but only writable by authenticated users.
- * Global settings are readable by all but only writable by authenticated users.
+ * This ruleset enforces a combination of public read access for core data and owner-based write access for user-specific data.
+ * Global settings are secured with strict authentication requirements.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile information; owner-only access.
- * - /pieces/{pieceId}: Stores piece data; publicly readable, only authenticated users can create, update and delete
- * - /molds/{moldId}: Stores mold data; publicly readable, only authenticated users can create, update and delete
- * - /machines/{machineId}: Stores machine data; publicly readable, only authenticated users can create, update and delete
- * - /demand/{periodoYYYYWW}/{pieceId}: Stores demand data; publicly readable, only authenticated users can create, update and delete
- * - /inventory/{pieceId}/{fechaISO}: Stores inventory data; publicly readable, only authenticated users can create, update and delete
- * - /inventory_current/{pieceId}: Stores current inventory data; publicly readable, only authenticated users can create, update and delete
- * - /calendars/{machineId}/{periodoYYYYWW}: Stores calendar data; publicly readable, only authenticated users can create, update and delete
- * - /downtime/{machineId}/{YYYYMM}: Stores downtime data; publicly readable, only authenticated users can create, update and delete
- * - /downtime_agg/{machineId}/{YYYYMM}: Stores aggregated downtime data; publicly readable, only authenticated users can create, update and delete
- * - /plans/{planId}: Stores plan data; publicly readable, only authenticated users can create, update and delete
- * - /plans/{planId}/assignments/{assignmentId}: Stores assignment data; publicly readable, only authenticated users can create, update and delete
- * - /production/{fechaISO}: Stores production data; publicly readable, only authenticated users can create, update and delete
- * - /settings/global: Stores global settings; publicly readable, only authenticated users can create, update and delete
+ * - /users/{userId}: Stores user profiles, accessible only to the owner.
+ * - /pieces/{pieceId}, /molds/{moldId}, /machines/{machineId}: Publicly readable collections for core manufacturing data.
+ * - /demand/{periodoYYYYWW}/{pieceId}, /inventory/{pieceId}/{fechaISO}, /inventory_current/{pieceId},
+ *   /calendars/{machineId}/{periodoYYYYWW}, /downtime/{machineId}/{YYYYMM}, /downtime_agg/{machineId}/{YYYYMM}:
+ *   Publicly readable collections for core manufacturing data.
+ * - /plans/{planId}/assignments/{assignmentId}: Nested structure for production plans and their assignments,
+ *   potentially secured with a plan ownership model.
+ * - /production/{fechaISO}: Publicly readable collection for production data.
+ * - /settings/global: Singleton document for global settings, write-protected.
  *
  * Key Security Decisions:
- * - User listing is disallowed.
- * - Read-only access is granted to public collections (pieces, molds, machines).
- * - Strict ownership is enforced for user profiles.
+ * - User listing is disabled.
+ * - Data validation is relaxed in prototyping mode, focusing on authorization and relational integrity.
+ * - Public read access is granted only to collections explicitly intended for it.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is made by a signed-in user.
+     * @description Checks if the user is signed in.
+     * @return {boolean} True if the user is signed in, false otherwise.
      */
     function isSignedIn() {
       return request.auth != null;
@@ -41,247 +35,245 @@ service cloud.firestore {
 
     /**
      * @description Checks if the authenticated user ID matches the provided user ID.
+     * @param {string} userId The user ID to compare against.
+     * @return {boolean} True if the user is the owner, false otherwise.
      */
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the authenticated user is the owner of an existing document.
+     * @description Checks if the authenticated user is the existing owner of the document.
+     * @param {string} userId The user ID to compare against.
+     * @return {boolean} True if the user is the existing owner, false otherwise.
      */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
-
-    /******************** User Profile Rules ********************/
-
+    
     /**
-     * @description Allows a user to read and write their own profile data.
-     * @path /databases/{database}/documents/users/{userId}
-     * @allow (get, create, update, delete) if request.auth.uid == userId
-     * @deny (get, create, update, delete) if request.auth.uid != userId
-     * @principle Enforces document ownership for writes.
+     * @description
+     * Rules for user profile data.
+     * Only the authenticated user can read or write their own profile.
+     * @path /users/{userId}
+     * @allow (get, create, update, delete) User with ID 'user123' can access /users/user123
+     * @deny (get, create, update, delete) User with ID 'user123' cannot access /users/anotherUser
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.email == request.auth.token.email;
-      allow update: if isExistingOwner(userId) && request.resource.data.email == resource.data.email;
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
-    /******************** Piece Rules ********************/
-
     /**
-     * @description Allows anyone to read piece data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/pieces/{pieceId}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
-     * @principle Public read access with owner-only writes enforced.
+     * @description
+     * Rules for manufactured piece data.
+     * Allows public read access but restricts write access.
+     * @path /pieces/{pieceId}
+     * @allow (get, list) Any user (signed in or not) can read piece data.
+     * @deny (create, update, delete) No user can create, update, or delete piece data without specific authorization.
+     * @principle Allows public read with restricted write access.
      */
     match /pieces/{pieceId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /******************** Mold Rules ********************/
-
     /**
-     * @description Allows anyone to read mold data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/molds/{moldId}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
-     * @principle Public read access with owner-only writes enforced.
+     * @description
+     * Rules for mold data used in the aluminum injection process.
+     * Allows public read access but restricts write access.
+     * @path /molds/{moldId}
+     * @allow (get, list) Any user (signed in or not) can read mold data.
+     * @deny (create, update, delete) No user can create, update, or delete mold data without specific authorization.
+     * @principle Allows public read with restricted write access.
      */
     match /molds/{moldId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /******************** Machine Rules ********************/
-
     /**
-     * @description Allows anyone to read machine data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/machines/{machineId}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
-     * @principle Public read access with owner-only writes enforced.
+     * @description
+     * Rules for machine data used in the aluminum injection process.
+     * Allows public read access but restricts write access.
+     * @path /machines/{machineId}
+     * @allow (get, list) Any user (signed in or not) can read machine data.
+     * @deny (create, update, delete) No user can create, update, or delete machine data without specific authorization.
+     * @principle Allows public read with restricted write access.
      */
     match /machines/{machineId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /******************** Demand Rules ********************/
-
     /**
-     * @description Allows anyone to read demand data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/demand/{periodoYYYYWW}/{pieceId}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
-     * @principle Public read access with owner-only writes enforced.
+     * @description
+     * Rules for demand data for a specific piece in a given period.
+     * Allows public read access but restricts write access.
+     * @path /demand/{periodoYYYYWW}/{pieceId}
+     * @allow (get, list) Any user (signed in or not) can read demand data.
+     * @deny (create, update, delete) No user can create, update, or delete demand data without specific authorization.
+     * @principle Allows public read with restricted write access.
      */
     match /demand/{periodoYYYYWW}/{pieceId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /******************** Inventory Rules ********************/
-
     /**
-     * @description Allows anyone to read inventory data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/inventory/{pieceId}/{fechaISO}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
-     * @principle Public read access with owner-only writes enforced.
+     * @description
+     * Rules for inventory levels for a specific piece at a given date.
+     * Allows public read access but restricts write access.
+     * @path /inventory/{pieceId}/{fechaISO}
+     * @allow (get, list) Any user (signed in or not) can read inventory data.
+     * @deny (create, update, delete) No user can create, update, or delete inventory data without specific authorization.
+     * @principle Allows public read with restricted write access.
      */
     match /inventory/{pieceId}/{fechaISO} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /******************** Inventory Current Rules ********************/
-
-    /**
-     * @description Allows anyone to read current inventory data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/inventory_current/{pieceId}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
+      /**
+     * @description
+     * Rules for current inventory level for a specific piece.
+     * Allows public read access but restricts write access.
+     * @path /inventory_current/{pieceId}
+     * @allow (get, list) Any user (signed in or not) can read inventory data.
+     * @deny (create, update, delete) No user can create, update, or delete inventory data without specific authorization.
      */
     match /inventory_current/{pieceId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /******************** Calendar Rules ********************/
-
     /**
-     * @description Allows anyone to read calendar data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/calendars/{machineId}/{periodoYYYYWW}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
+     * @description
+     * Rules for planned maintenance and tryouts for a machine in a given period.
+     * Allows public read access but restricts write access.
+     * @path /calendars/{machineId}/{periodoYYYYWW}
+     * @allow (get, list) Any user (signed in or not) can read calendar data.
+     * @deny (create, update, delete) No user can create, update, or delete calendar data without specific authorization.
+     * @principle Allows public read with restricted write access.
      */
     match /calendars/{machineId}/{periodoYYYYWW} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /******************** Downtime Rules ********************/
-
     /**
-     * @description Allows anyone to read downtime data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/downtime/{machineId}/{YYYYMM}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
+     * @description
+     * Rules for downtime events for a machine in a specific month.
+     * Allows public read access but restricts write access.
+     * @path /downtime/{machineId}/{YYYYMM}
+     * @allow (get, list) Any user (signed in or not) can read downtime data.
+     * @deny (create, update, delete) No user can create, update, or delete downtime data without specific authorization.
+     * @principle Allows public read with restricted write access.
      */
     match /downtime/{machineId}/{YYYYMM} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /******************** Downtime Aggregation Rules ********************/
-
     /**
-     * @description Allows anyone to read aggregated downtime data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/downtime_agg/{machineId}/{YYYYMM}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
+     * @description
+     * Rules for aggregated downtime data for a machine in a specific month.
+     * Allows public read access but restricts write access.
+     * @path /downtime_agg/{machineId}/{YYYYMM}
+     * @allow (get, list) Any user (signed in or not) can read downtime aggregation data.
+     * @deny (create, update, delete) No user can create, update, or delete downtime aggregation data without specific authorization.
      */
     match /downtime_agg/{machineId}/{YYYYMM} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /******************** Plan Rules ********************/
-
     /**
-     * @description Allows anyone to read plan data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/plans/{planId}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
+     * @description
+     * Rules for production plans.
+     * Allows read access but restricts write access.
+     * @path /plans/{planId}
+     * @allow (get, list) Any user (signed in or not) can read production plan data.
+     * @deny (create, update, delete) No user can create, update, or delete production plan data without specific authorization.
+     * @principle Allows public read with restricted write access.
      */
     match /plans/{planId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+
+      /**
+       * @description
+       * Rules for assignments of pieces to molds on machines for a specific week within a plan.
+       * Only the plan owner can create, update, or delete assignments.
+       * @path /plans/{planId}/assignments/{assignmentId}
+       * @allow (get, list) Any user can read assignments.
+       * @deny (create, update, delete) Only plan owners can create assignments.
+       * @principle Enforces document ownership for write operations within the plan's assignments subcollection.
+       */
+      match /assignments/{assignmentId} {
+        allow get, list: if true;
+        allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+        allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+        allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      }
     }
 
-    /******************** Assignment Rules ********************/
-
     /**
-     * @description Allows anyone to read assignment data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/plans/{planId}/assignments/{assignmentId}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
-     */
-    match /plans/{planId}/assignments/{assignmentId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-
-    /******************** Production Rules ********************/
-
-    /**
-     * @description Allows anyone to read production data, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/production/{fechaISO}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
+     * @description
+     * Rules for actual production data for a specific date.
+     * Allows public read access but restricts write access.
+     * @path /production/{fechaISO}
+     * @allow (get, list) Any user (signed in or not) can read production data.
+     * @deny (create, update, delete) No user can create, update, or delete production data without specific authorization.
+     * @principle Allows public read with restricted write access.
      */
     match /production/{fechaISO} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /******************** Setting Rules ********************/
-
     /**
-     * @description Allows anyone to read global settings, but only authenticated users can create, update, or delete.
-     * @path /databases/{database}/documents/settings/global
-     * @allow (get) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
+     * @description
+     * Rules for global settings for the application.
+     * Only authenticated users can read settings.
+     * Write access is denied to everyone.
+     * @path /settings/global
+     * @allow (get) Any authenticated user can read global settings.
+     * @deny (create, update, delete) No user can create, update, or delete global settings.
+     * @principle Restricts write access to global settings.
      */
     match /settings/global {
-      allow get: if true;
+      allow get: if isSignedIn();
       allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }
