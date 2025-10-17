@@ -100,7 +100,6 @@ export default function LoginPage() {
                   name="password" 
                   type={showPassword ? "text" : "password"} 
                   required 
-                  defaultValue="password" 
                 />
                 <Button
                   type="button"
