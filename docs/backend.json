@@ -12,11 +12,11 @@
         },
         "codigo": {
           "type": "string",
-          "description": "The unique code assigned to the piece."
+          "description": "The piece's unique code."
         },
         "cliente": {
           "type": "string",
-          "description": "The client associated with this piece."
+          "description": "The client associated with the piece."
         },
         "peso": {
           "type": "number",
@@ -24,19 +24,19 @@
         },
         "familia": {
           "type": "string",
-          "description": "The family or category to which the piece belongs."
+          "description": "The family the piece belongs to."
         },
         "stockMin": {
           "type": "number",
-          "description": "The minimum stock level for this piece."
+          "description": "The minimum stock level for the piece."
         },
         "stockMax": {
           "type": "number",
-          "description": "The maximum stock level for this piece."
+          "description": "The maximum stock level for the piece."
         },
         "taktObjetivo": {
           "type": "number",
-          "description": "The target takt time for producing this piece (optional)."
+          "description": "The target takt time for the piece (optional)."
         }
       },
       "required": [
@@ -65,7 +65,7 @@
         },
         "pieces": {
           "type": "array",
-          "description": "References to Pieces this mold can produce. (Relationship: Mold 1:N Piece)",
+          "description": "References to Pieces produced by this mold. (Relationship: Mold 1:N Piece)",
           "items": {
             "type": "string"
           }
@@ -76,26 +76,26 @@
         },
         "compatibilidad": {
           "type": "array",
-          "description": "Machines with which the mold is compatible.",
+          "description": "The machines compatible with the mold.",
           "items": {
             "type": "string"
           }
         },
         "cicloBase_s": {
           "type": "number",
-          "description": "The base cycle time (in seconds) for the mold."
+          "description": "The base cycle time in seconds for the mold."
         },
         "setupMin": {
           "type": "number",
-          "description": "The minimum setup time (in minutes) for the mold."
+          "description": "The minimum setup time for the mold."
         },
         "vidaMaxTiros": {
           "type": "number",
-          "description": "The maximum number of shots the mold can handle before maintenance."
+          "description": "The maximum number of shots allowed for the mold before maintenance."
         },
         "tiempoRecambioMin": {
           "type": "number",
-          "description": "The time required to change the mold (in minutes)."
+          "description": "The minimum changeover time for the mold."
         },
         "status": {
           "type": "string",
@@ -131,7 +131,7 @@
         },
         "tonelaje": {
           "type": "number",
-          "description": "The tonnage capacity of the machine."
+          "description": "The tonnage of the machine."
         },
         "turnosSemana": {
           "type": "number",
@@ -163,11 +163,11 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Demand",
       "type": "object",
-      "description": "Represents the demand for a specific piece in a given period.",
+      "description": "Represents the demand for a specific piece in a specific period.",
       "properties": {
         "periodoYYYYWW": {
           "type": "string",
-          "description": "The period in YYYYWW format (year and week number)."
+          "description": "The period in YYYYWW format."
         },
         "pieceId": {
           "type": "string",
@@ -175,7 +175,7 @@
         },
         "qty": {
           "type": "number",
-          "description": "The quantity demanded."
+          "description": "The quantity of demand."
         },
         "prioridad": {
           "type": "number",
@@ -183,11 +183,11 @@
         },
         "version": {
           "type": "number",
-          "description": "The version of the demand record."
+          "description": "The version of the demand."
         },
         "congelado": {
           "type": "boolean",
-          "description": "Indicates whether the demand is frozen or not."
+          "description": "Indicates whether the demand is frozen."
         }
       },
       "required": [
@@ -203,7 +203,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Inventory",
       "type": "object",
-      "description": "Represents the inventory level for a specific piece at a given date.",
+      "description": "Represents the inventory level for a specific piece on a specific date.",
       "properties": {
         "pieceId": {
           "type": "string",
@@ -211,7 +211,7 @@
         },
         "fechaISO": {
           "type": "string",
-          "description": "The date of the inventory record in ISO format."
+          "description": "The date in ISO format."
         },
         "stock": {
           "type": "number",
@@ -228,7 +228,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Calendar",
       "type": "object",
-      "description": "Represents planned maintenance and tryouts for a machine in a given period.",
+      "description": "Represents the calendar events for a specific machine in a specific period.",
       "properties": {
         "machineId": {
           "type": "string",
@@ -236,18 +236,18 @@
         },
         "periodoYYYYWW": {
           "type": "string",
-          "description": "The period in YYYYWW format (year and week number)."
+          "description": "The period in YYYYWW format."
         },
         "mantenimientoPlan": {
           "type": "array",
-          "description": "Array of planned maintenance periods (in minutes).",
+          "description": "Planned maintenance events.",
           "items": {
             "type": "number"
           }
         },
         "tryouts": {
           "type": "array",
-          "description": "Array of tryout periods (in minutes).",
+          "description": "Tryout events.",
           "items": {
             "type": "number"
           }
@@ -264,7 +264,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Downtime",
       "type": "object",
-      "description": "Represents downtime events for a machine in a specific month.",
+      "description": "Represents the downtime events for a specific machine in a specific month.",
       "properties": {
         "machineId": {
           "type": "string",
@@ -272,27 +272,27 @@
         },
         "YYYYMM": {
           "type": "string",
-          "description": "The month in YYYYMM format (year and month)."
+          "description": "The month in YYYYMM format."
         },
         "minutos": {
           "type": "number",
-          "description": "The duration of the downtime event (in minutes)."
+          "description": "The number of minutes of downtime."
         },
         "categoria": {
           "type": "string",
-          "description": "The category of the downtime event."
+          "description": "The category of downtime."
         },
         "causa": {
           "type": "string",
-          "description": "The cause of the downtime event (optional)."
+          "description": "The cause of downtime (optional)."
         },
         "plan": {
           "type": "boolean",
-          "description": "Indicates whether the downtime was planned or not."
+          "description": "Indicates whether the downtime was planned."
         },
         "tryout": {
           "type": "boolean",
-          "description": "Indicates whether the downtime was due to a tryout or not."
+          "description": "Indicates whether the downtime was due to a tryout."
         }
       },
       "required": [
@@ -308,7 +308,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "DowntimeAgg",
       "type": "object",
-      "description": "Represents aggregated downtime data for a machine in a specific month.",
+      "description": "Represents the aggregated downtime data for a specific machine in a specific month.",
       "properties": {
         "machineId": {
           "type": "string",
@@ -316,23 +316,23 @@
         },
         "YYYYMM": {
           "type": "string",
-          "description": "The month in YYYYMM format (year and month)."
+          "description": "The month in YYYYMM format."
         },
         "min_totales": {
           "type": "number",
-          "description": "The total downtime (in minutes)."
+          "description": "The total minutes of downtime."
         },
         "min_planificados": {
           "type": "number",
-          "description": "The total planned downtime (in minutes)."
+          "description": "The total minutes of planned downtime."
         },
         "min_no_plan": {
           "type": "number",
-          "description": "The total unplanned downtime (in minutes)."
+          "description": "The total minutes of unplanned downtime."
         },
         "min_tryout": {
           "type": "number",
-          "description": "The total downtime due to tryouts (in minutes)."
+          "description": "The total minutes of downtime due to tryouts."
         }
       },
       "required": [
@@ -378,11 +378,11 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Assignment",
       "type": "object",
-      "description": "Represents an assignment of a piece to a mold on a machine for a specific week.",
+      "description": "Represents an assignment of a piece and mold to a machine for a specific week within a production plan.",
       "properties": {
         "planId": {
           "type": "string",
-          "description": "Reference to Plan. (Relationship: Assignment 1:N Plan)"
+          "description": "Reference to Plan. (Relationship: Plan 1:N Assignment)"
         },
         "pieceId": {
           "type": "string",
@@ -398,7 +398,7 @@
         },
         "semana": {
           "type": "string",
-          "description": "The week in YYYYWW format (year and week number)."
+          "description": "The week in YYYYWW format."
         },
         "horas": {
           "type": "number",
@@ -432,7 +432,7 @@
       "properties": {
         "fechaISO": {
           "type": "string",
-          "description": "The date of the production record in ISO format."
+          "description": "The date in ISO format."
         },
         "machineId": {
           "type": "string",
@@ -477,11 +477,11 @@
       "properties": {
         "ventana_meses": {
           "type": "number",
-          "description": "The number of months for the rolling window."
+          "description": "The window of months for downtime aggregation."
         },
         "suavizado_alpha": {
           "type": "number",
-          "description": "The alpha value for exponential smoothing."
+          "description": "The smoothing alpha value."
         },
         "cap_pct": {
           "type": "number",
@@ -489,11 +489,11 @@
         },
         "minAvail": {
           "type": "number",
-          "description": "The minimum availability percentage."
+          "description": "The minimum availability."
         },
         "maxAvail": {
           "type": "number",
-          "description": "The maximum availability percentage."
+          "description": "The maximum availability."
         }
       },
       "required": [
@@ -502,42 +502,6 @@
         "cap_pct",
         "minAvail",
         "maxAvail"
-      ]
-    },
-    "UserProfile": {
-      "title": "User Profile",
-      "description": "Represents a user's profile information.",
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "The user's full name."
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "The user's email address."
-        },
-        "role": {
-          "type": "string",
-          "description": "The user's role in the application.",
-          "enum": [
-            "Admin",
-            "Planner",
-            "Shop Floor",
-            "Viewer"
-          ]
-        },
-        "avatar": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL of the user's avatar image."
-        }
-      },
-      "required": [
-        "name",
-        "email",
-        "role"
       ]
     }
   },
@@ -550,29 +514,13 @@
   "firestore": {
     "structure": [
       {
-        "path": "users/{userId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "Stores individual user profile data.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique ID of the user."
-            }
-          ]
-        }
-      },
-      {
         "path": "pieces/{pieceId}",
         "definition": {
           "entityName": "Piece",
           "schema": {
             "$ref": "#/backend/entities/Piece"
           },
-          "description": "Stores manufactured piece details.",
+          "description": "Stores details of manufactured pieces.",
           "params": [
             {
               "name": "pieceId",
@@ -588,7 +536,7 @@
           "schema": {
             "$ref": "#/backend/entities/Mold"
           },
-          "description": "Stores mold details for the aluminum injection process.",
+          "description": "Stores information about molds used in the aluminum injection process.",
           "params": [
             {
               "name": "moldId",
@@ -604,7 +552,7 @@
           "schema": {
             "$ref": "#/backend/entities/Machine"
           },
-          "description": "Stores machine details for the aluminum injection process.",
+          "description": "Stores details about machines used in production.",
           "params": [
             {
               "name": "machineId",
@@ -620,7 +568,7 @@
           "schema": {
             "$ref": "#/backend/entities/Demand"
           },
-          "description": "Stores demand data for a specific piece in a given period.",
+          "description": "Stores demand data for a specific piece in a specific period.",
           "params": [
             {
               "name": "periodoYYYYWW",
@@ -628,7 +576,7 @@
             },
             {
               "name": "pieceId",
-              "description": "Reference to the piece."
+              "description": "Reference to Piece."
             }
           ]
         }
@@ -640,31 +588,31 @@
           "schema": {
             "$ref": "#/backend/entities/Inventory"
           },
-          "description": "Stores inventory levels for a specific piece at a given date.",
+          "description": "Stores inventory levels for a specific piece on a specific date.",
           "params": [
             {
               "name": "pieceId",
-              "description": "Reference to the piece."
+              "description": "Reference to Piece."
             },
             {
               "name": "fechaISO",
-              "description": "The date of the inventory record in ISO format."
+              "description": "The date in ISO format."
             }
           ]
         }
       },
       {
-        "path": "inventory_current/{pieceId}",
+        "path": "inventory/current/{pieceId}",
         "definition": {
           "entityName": "Inventory",
           "schema": {
             "$ref": "#/backend/entities/Inventory"
           },
-          "description": "Stores current inventory level for specific piece.",
+          "description": "Stores the current inventory level for a specific piece.",
           "params": [
             {
               "name": "pieceId",
-              "description": "Reference to the piece."
+              "description": "Reference to Piece."
             }
           ]
         }
@@ -676,11 +624,11 @@
           "schema": {
             "$ref": "#/backend/entities/Calendar"
           },
-          "description": "Stores planned maintenance and tryouts for a machine in a given period.",
+          "description": "Stores calendar events for a specific machine in a specific period.",
           "params": [
             {
               "name": "machineId",
-              "description": "Reference to the machine."
+              "description": "Reference to Machine."
             },
             {
               "name": "periodoYYYYWW",
@@ -696,11 +644,11 @@
           "schema": {
             "$ref": "#/backend/entities/Downtime"
           },
-          "description": "Stores downtime events for a machine in a specific month.",
+          "description": "Stores downtime events for a specific machine in a specific month.",
           "params": [
             {
               "name": "machineId",
-              "description": "Reference to the machine."
+              "description": "Reference to Machine."
             },
             {
               "name": "YYYYMM",
@@ -716,11 +664,11 @@
           "schema": {
             "$ref": "#/backend/entities/DowntimeAgg"
           },
-          "description": "Stores aggregated downtime data for a machine in a specific month.",
+          "description": "Stores aggregated downtime data for a specific machine in a specific month.",
           "params": [
             {
               "name": "machineId",
-              "description": "Reference to the machine."
+              "description": "Reference to Machine."
             },
             {
               "name": "YYYYMM",
@@ -752,11 +700,11 @@
           "schema": {
             "$ref": "#/backend/entities/Assignment"
           },
-          "description": "Stores assignments of pieces to molds on machines for a specific week.",
+          "description": "Stores assignments of pieces and molds to machines for a specific week within a production plan.",
           "params": [
             {
               "name": "planId",
-              "description": "Reference to the plan."
+              "description": "Reference to Plan."
             },
             {
               "name": "assignmentId",
@@ -776,7 +724,7 @@
           "params": [
             {
               "name": "fechaISO",
-              "description": "The date of the production record in ISO format."
+              "description": "The date in ISO format."
             }
           ]
         }
@@ -792,6 +740,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to support the ForgeFlow application's production planning and aluminum injection process management features. It emphasizes authorization independence, clarity, and scalability.  \n\n**Authorization Independence and QAPs:**\n\n*   The design prioritizes path-based ownership where applicable, such as for user-specific data or hierarchical data structures (e.g., plans and assignments). This simplifies security rules and eliminates the need for complex `get()` calls. \n*   For collaborative data or global settings, dedicated collections like `settings/global` are used, ensuring that rules are straightforward and efficient.\n*   QAPs (Rules are not Filters): Segregation of data into collections based on access control needs is enforced. For example, admin-related data resides in separate collections, allowing for simple rules based on document existence.\n\n**Denormalization Strategy:**\n\n*   No explicit denormalization is needed since user-based permissions are not required, simplifying security rules significantly.\n\n**Structural Segregation:**\n\n*   The design follows structural segregation principles by using dedicated collections for different data types. For instance, 'pieces', 'molds', 'machines' are stored in separate collections because they have distinct security requirements and access patterns.\n\n**Access Modeling:**\n\n*   Path-based ownership is used for entities like 'assignments' and 'production' where a parent document's (plan, machine) context is important.\n*   Global settings are stored in a singleton document (`settings/global`) since there's only one set of settings for the entire application.\n\n**Data Clarity and Predictability:**\n\n*   Explicit State Modeling: The 'Plan' entity uses a `status` field to explicitly represent the state of the plan (`draft` or `published`).\n*   Predictable Schema: Consistent naming conventions are used for fields across all entities (e.g., 'id' for unique identifiers, 'createdAt' for timestamps).\n\n**Security Rules Implications:**\n\nThe structure facilitates simple and robust security rules. For example, read access to the `pieces` collection can be granted to 'viewer', 'shopfloor', 'planner', and 'admin' roles, while write access is restricted to 'admin'. Similar patterns can be applied to other collections based on their access requirements."
+    "reasoning": "The Firestore data structure is designed to support the ForgeFlow application's production planning and execution features. It prioritizes authorization independence and QAPs by denormalizing data where necessary and using structural segregation. Path-based ownership is used for user-specific data, and membership maps are avoided since there's no collaborative data in the application. The structure enables secure list operations by ensuring that each collection has a homogeneous security posture.\n\n**Authorization Independence:** Data such as the Machines, Molds and Pieces collections are global, so they don't need any explicit authorization besides roles. User-specific collections like Assignments are secured via path-based ownership.\n\n**QAPs:** List operations are secured by structural segregation. For instance, listing assignments is only allowed within a specific plan (plans/{planId}/assignments/{assignmentId}).  This prevents unauthorized listing of assignments across different plans."
   }
 }
