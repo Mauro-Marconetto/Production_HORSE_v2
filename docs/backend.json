@@ -503,6 +503,42 @@
         "minAvail",
         "maxAvail"
       ]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Represents a user's profile information.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The user's full name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "role": {
+          "type": "string",
+          "description": "The user's role in the application.",
+          "enum": [
+            "Admin",
+            "Planner",
+            "Shop Floor",
+            "Viewer"
+          ]
+        },
+        "avatar": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the user's avatar image."
+        }
+      },
+      "required": [
+        "name",
+        "email",
+        "role"
+      ]
     }
   },
   "auth": {
@@ -513,6 +549,22 @@
   },
   "firestore": {
     "structure": [
+      {
+        "path": "users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores individual user profile data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user."
+            }
+          ]
+        }
+      },
       {
         "path": "pieces/{pieceId}",
         "definition": {

@@ -160,3 +160,11 @@ export type PlaceholderImage = {
   imageUrl: string;
   imageHint: string;
 }
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: 'Admin' | 'Planner' | 'Shop Floor' | 'Viewer';
+  avatar?: string;
+}
