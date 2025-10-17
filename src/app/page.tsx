@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useAuth, useUser } from "@/firebase";
+import { useUser } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,12 +17,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Eye, EyeOff } from "lucide-react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const router = useRouter();
-  const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -40,6 +39,7 @@ export default function LoginPage() {
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
+    const auth = getAuth();
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -78,9 +78,6 @@ export default function LoginPage() {
              <div className="flex justify-center items-center gap-2">
                 <Image src="/logo.png" width={180} height={40} alt="ForgeFlow Logo" />
             </div>
-            <p className="text-balance text-muted-foreground">
-              Introduce tu email para acceder a tu cuenta
-            </p>
           </div>
           <form onSubmit={handleLogin} className="grid gap-4">
             <div className="grid gap-2">
