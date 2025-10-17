@@ -1,0 +1,745 @@
+{
+  "entities": {
+    "Piece": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Piece",
+      "type": "object",
+      "description": "Represents a manufactured piece with its associated details.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Piece entity."
+        },
+        "codigo": {
+          "type": "string",
+          "description": "The unique code assigned to the piece."
+        },
+        "cliente": {
+          "type": "string",
+          "description": "The client associated with this piece."
+        },
+        "peso": {
+          "type": "number",
+          "description": "The weight of the piece."
+        },
+        "familia": {
+          "type": "string",
+          "description": "The family or category to which the piece belongs."
+        },
+        "stockMin": {
+          "type": "number",
+          "description": "The minimum stock level for this piece."
+        },
+        "stockMax": {
+          "type": "number",
+          "description": "The maximum stock level for this piece."
+        },
+        "taktObjetivo": {
+          "type": "number",
+          "description": "The target takt time for producing this piece (optional)."
+        }
+      },
+      "required": [
+        "id",
+        "codigo",
+        "cliente",
+        "peso",
+        "familia",
+        "stockMin",
+        "stockMax"
+      ]
+    },
+    "Mold": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Mold",
+      "type": "object",
+      "description": "Represents a mold used in the aluminum injection process.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Mold entity."
+        },
+        "nombre": {
+          "type": "string",
+          "description": "The name of the mold."
+        },
+        "pieces": {
+          "type": "array",
+          "description": "References to Pieces this mold can produce. (Relationship: Mold 1:N Piece)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cavidades": {
+          "type": "number",
+          "description": "The number of cavities in the mold."
+        },
+        "compatibilidad": {
+          "type": "array",
+          "description": "Machines with which the mold is compatible.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cicloBase_s": {
+          "type": "number",
+          "description": "The base cycle time (in seconds) for the mold."
+        },
+        "setupMin": {
+          "type": "number",
+          "description": "The minimum setup time (in minutes) for the mold."
+        },
+        "vidaMaxTiros": {
+          "type": "number",
+          "description": "The maximum number of shots the mold can handle before maintenance."
+        },
+        "tiempoRecambioMin": {
+          "type": "number",
+          "description": "The time required to change the mold (in minutes)."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the mold (ok or mantenimiento)."
+        }
+      },
+      "required": [
+        "id",
+        "nombre",
+        "pieces",
+        "cavidades",
+        "compatibilidad",
+        "cicloBase_s",
+        "setupMin",
+        "vidaMaxTiros",
+        "tiempoRecambioMin",
+        "status"
+      ]
+    },
+    "Machine": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Machine",
+      "type": "object",
+      "description": "Represents a machine used in the aluminum injection process.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Machine entity."
+        },
+        "nombre": {
+          "type": "string",
+          "description": "The name of the machine."
+        },
+        "tonelaje": {
+          "type": "number",
+          "description": "The tonnage capacity of the machine."
+        },
+        "turnosSemana": {
+          "type": "number",
+          "description": "The number of shifts per week for the machine."
+        },
+        "horasTurno": {
+          "type": "number",
+          "description": "The number of hours per shift for the machine."
+        },
+        "OEE_obj": {
+          "type": "number",
+          "description": "The target Overall Equipment Effectiveness (OEE) for the machine."
+        },
+        "OEE_hist": {
+          "type": "number",
+          "description": "The historical Overall Equipment Effectiveness (OEE) for the machine (optional)."
+        }
+      },
+      "required": [
+        "id",
+        "nombre",
+        "tonelaje",
+        "turnosSemana",
+        "horasTurno",
+        "OEE_obj"
+      ]
+    },
+    "Demand": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Demand",
+      "type": "object",
+      "description": "Represents the demand for a specific piece in a given period.",
+      "properties": {
+        "periodoYYYYWW": {
+          "type": "string",
+          "description": "The period in YYYYWW format (year and week number)."
+        },
+        "pieceId": {
+          "type": "string",
+          "description": "Reference to Piece. (Relationship: Demand 1:N Piece)"
+        },
+        "qty": {
+          "type": "number",
+          "description": "The quantity demanded."
+        },
+        "prioridad": {
+          "type": "number",
+          "description": "The priority of the demand (1, 2, or 3)."
+        },
+        "version": {
+          "type": "number",
+          "description": "The version of the demand record."
+        },
+        "congelado": {
+          "type": "boolean",
+          "description": "Indicates whether the demand is frozen or not."
+        }
+      },
+      "required": [
+        "periodoYYYYWW",
+        "pieceId",
+        "qty",
+        "prioridad",
+        "version",
+        "congelado"
+      ]
+    },
+    "Inventory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Inventory",
+      "type": "object",
+      "description": "Represents the inventory level for a specific piece at a given date.",
+      "properties": {
+        "pieceId": {
+          "type": "string",
+          "description": "Reference to Piece. (Relationship: Inventory 1:N Piece)"
+        },
+        "fechaISO": {
+          "type": "string",
+          "description": "The date of the inventory record in ISO format."
+        },
+        "stock": {
+          "type": "number",
+          "description": "The stock level."
+        }
+      },
+      "required": [
+        "pieceId",
+        "fechaISO",
+        "stock"
+      ]
+    },
+    "Calendar": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Calendar",
+      "type": "object",
+      "description": "Represents planned maintenance and tryouts for a machine in a given period.",
+      "properties": {
+        "machineId": {
+          "type": "string",
+          "description": "Reference to Machine. (Relationship: Calendar 1:N Machine)"
+        },
+        "periodoYYYYWW": {
+          "type": "string",
+          "description": "The period in YYYYWW format (year and week number)."
+        },
+        "mantenimientoPlan": {
+          "type": "array",
+          "description": "Array of planned maintenance periods (in minutes).",
+          "items": {
+            "type": "number"
+          }
+        },
+        "tryouts": {
+          "type": "array",
+          "description": "Array of tryout periods (in minutes).",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "required": [
+        "machineId",
+        "periodoYYYYWW",
+        "mantenimientoPlan",
+        "tryouts"
+      ]
+    },
+    "Downtime": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Downtime",
+      "type": "object",
+      "description": "Represents downtime events for a machine in a specific month.",
+      "properties": {
+        "machineId": {
+          "type": "string",
+          "description": "Reference to Machine. (Relationship: Downtime 1:N Machine)"
+        },
+        "YYYYMM": {
+          "type": "string",
+          "description": "The month in YYYYMM format (year and month)."
+        },
+        "minutos": {
+          "type": "number",
+          "description": "The duration of the downtime event (in minutes)."
+        },
+        "categoria": {
+          "type": "string",
+          "description": "The category of the downtime event."
+        },
+        "causa": {
+          "type": "string",
+          "description": "The cause of the downtime event (optional)."
+        },
+        "plan": {
+          "type": "boolean",
+          "description": "Indicates whether the downtime was planned or not."
+        },
+        "tryout": {
+          "type": "boolean",
+          "description": "Indicates whether the downtime was due to a tryout or not."
+        }
+      },
+      "required": [
+        "machineId",
+        "YYYYMM",
+        "minutos",
+        "categoria",
+        "plan",
+        "tryout"
+      ]
+    },
+    "DowntimeAgg": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DowntimeAgg",
+      "type": "object",
+      "description": "Represents aggregated downtime data for a machine in a specific month.",
+      "properties": {
+        "machineId": {
+          "type": "string",
+          "description": "Reference to Machine. (Relationship: DowntimeAgg 1:N Machine)"
+        },
+        "YYYYMM": {
+          "type": "string",
+          "description": "The month in YYYYMM format (year and month)."
+        },
+        "min_totales": {
+          "type": "number",
+          "description": "The total downtime (in minutes)."
+        },
+        "min_planificados": {
+          "type": "number",
+          "description": "The total planned downtime (in minutes)."
+        },
+        "min_no_plan": {
+          "type": "number",
+          "description": "The total unplanned downtime (in minutes)."
+        },
+        "min_tryout": {
+          "type": "number",
+          "description": "The total downtime due to tryouts (in minutes)."
+        }
+      },
+      "required": [
+        "machineId",
+        "YYYYMM",
+        "min_totales",
+        "min_planificados",
+        "min_no_plan",
+        "min_tryout"
+      ]
+    },
+    "Plan": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Plan",
+      "type": "object",
+      "description": "Represents a production plan.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Plan entity."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The creation timestamp of the plan."
+        },
+        "params": {
+          "type": "string",
+          "description": "The parameters used to generate the plan."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the plan (draft or published)."
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "params",
+        "status"
+      ]
+    },
+    "Assignment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Assignment",
+      "type": "object",
+      "description": "Represents an assignment of a piece to a mold on a machine for a specific week.",
+      "properties": {
+        "planId": {
+          "type": "string",
+          "description": "Reference to Plan. (Relationship: Assignment 1:N Plan)"
+        },
+        "pieceId": {
+          "type": "string",
+          "description": "Reference to Piece. (Relationship: Assignment 1:N Piece)"
+        },
+        "moldId": {
+          "type": "string",
+          "description": "Reference to Mold. (Relationship: Assignment 1:N Mold)"
+        },
+        "machineId": {
+          "type": "string",
+          "description": "Reference to Machine. (Relationship: Assignment 1:N Machine)"
+        },
+        "semana": {
+          "type": "string",
+          "description": "The week in YYYYWW format (year and week number)."
+        },
+        "horas": {
+          "type": "number",
+          "description": "The number of hours assigned."
+        },
+        "setup": {
+          "type": "boolean",
+          "description": "Indicates whether a setup is required."
+        },
+        "prodUnidades": {
+          "type": "number",
+          "description": "The number of units produced."
+        }
+      },
+      "required": [
+        "planId",
+        "pieceId",
+        "moldId",
+        "machineId",
+        "semana",
+        "horas",
+        "setup",
+        "prodUnidades"
+      ]
+    },
+    "Production": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Production",
+      "type": "object",
+      "description": "Represents the actual production data for a specific date.",
+      "properties": {
+        "fechaISO": {
+          "type": "string",
+          "description": "The date of the production record in ISO format."
+        },
+        "machineId": {
+          "type": "string",
+          "description": "Reference to Machine. (Relationship: Production 1:N Machine)"
+        },
+        "pieceId": {
+          "type": "string",
+          "description": "Reference to Piece. (Relationship: Production 1:N Piece)"
+        },
+        "moldId": {
+          "type": "string",
+          "description": "Reference to Mold. (Relationship: Production 1:N Mold)"
+        },
+        "horas": {
+          "type": "number",
+          "description": "The number of hours of production."
+        },
+        "unidades": {
+          "type": "number",
+          "description": "The number of units produced."
+        },
+        "scrapPct": {
+          "type": "number",
+          "description": "The scrap percentage."
+        }
+      },
+      "required": [
+        "fechaISO",
+        "machineId",
+        "pieceId",
+        "moldId",
+        "horas",
+        "unidades",
+        "scrapPct"
+      ]
+    },
+    "Setting": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Setting",
+      "type": "object",
+      "description": "Represents global settings for the application.",
+      "properties": {
+        "ventana_meses": {
+          "type": "number",
+          "description": "The number of months for the rolling window."
+        },
+        "suavizado_alpha": {
+          "type": "number",
+          "description": "The alpha value for exponential smoothing."
+        },
+        "cap_pct": {
+          "type": "number",
+          "description": "The cap percentage."
+        },
+        "minAvail": {
+          "type": "number",
+          "description": "The minimum availability percentage."
+        },
+        "maxAvail": {
+          "type": "number",
+          "description": "The maximum availability percentage."
+        }
+      },
+      "required": [
+        "ventana_meses",
+        "suavizado_alpha",
+        "cap_pct",
+        "minAvail",
+        "maxAvail"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "pieces/{pieceId}",
+        "definition": {
+          "entityName": "Piece",
+          "schema": {
+            "$ref": "#/backend/entities/Piece"
+          },
+          "description": "Stores manufactured piece details.",
+          "params": [
+            {
+              "name": "pieceId",
+              "description": "Unique identifier for the piece."
+            }
+          ]
+        }
+      },
+      {
+        "path": "molds/{moldId}",
+        "definition": {
+          "entityName": "Mold",
+          "schema": {
+            "$ref": "#/backend/entities/Mold"
+          },
+          "description": "Stores mold details for the aluminum injection process.",
+          "params": [
+            {
+              "name": "moldId",
+              "description": "Unique identifier for the mold."
+            }
+          ]
+        }
+      },
+      {
+        "path": "machines/{machineId}",
+        "definition": {
+          "entityName": "Machine",
+          "schema": {
+            "$ref": "#/backend/entities/Machine"
+          },
+          "description": "Stores machine details for the aluminum injection process.",
+          "params": [
+            {
+              "name": "machineId",
+              "description": "Unique identifier for the machine."
+            }
+          ]
+        }
+      },
+      {
+        "path": "demand/{periodoYYYYWW}/{pieceId}",
+        "definition": {
+          "entityName": "Demand",
+          "schema": {
+            "$ref": "#/backend/entities/Demand"
+          },
+          "description": "Stores demand data for a specific piece in a given period.",
+          "params": [
+            {
+              "name": "periodoYYYYWW",
+              "description": "The period in YYYYWW format."
+            },
+            {
+              "name": "pieceId",
+              "description": "Reference to the piece."
+            }
+          ]
+        }
+      },
+      {
+        "path": "inventory/{pieceId}/{fechaISO}",
+        "definition": {
+          "entityName": "Inventory",
+          "schema": {
+            "$ref": "#/backend/entities/Inventory"
+          },
+          "description": "Stores inventory levels for a specific piece at a given date.",
+          "params": [
+            {
+              "name": "pieceId",
+              "description": "Reference to the piece."
+            },
+            {
+              "name": "fechaISO",
+              "description": "The date of the inventory record in ISO format."
+            }
+          ]
+        }
+      },
+      {
+        "path": "inventory_current/{pieceId}",
+        "definition": {
+          "entityName": "Inventory",
+          "schema": {
+            "$ref": "#/backend/entities/Inventory"
+          },
+          "description": "Stores current inventory level for specific piece.",
+          "params": [
+            {
+              "name": "pieceId",
+              "description": "Reference to the piece."
+            }
+          ]
+        }
+      },
+      {
+        "path": "calendars/{machineId}/{periodoYYYYWW}",
+        "definition": {
+          "entityName": "Calendar",
+          "schema": {
+            "$ref": "#/backend/entities/Calendar"
+          },
+          "description": "Stores planned maintenance and tryouts for a machine in a given period.",
+          "params": [
+            {
+              "name": "machineId",
+              "description": "Reference to the machine."
+            },
+            {
+              "name": "periodoYYYYWW",
+              "description": "The period in YYYYWW format."
+            }
+          ]
+        }
+      },
+      {
+        "path": "downtime/{machineId}/{YYYYMM}",
+        "definition": {
+          "entityName": "Downtime",
+          "schema": {
+            "$ref": "#/backend/entities/Downtime"
+          },
+          "description": "Stores downtime events for a machine in a specific month.",
+          "params": [
+            {
+              "name": "machineId",
+              "description": "Reference to the machine."
+            },
+            {
+              "name": "YYYYMM",
+              "description": "The month in YYYYMM format."
+            }
+          ]
+        }
+      },
+      {
+        "path": "downtime_agg/{machineId}/{YYYYMM}",
+        "definition": {
+          "entityName": "DowntimeAgg",
+          "schema": {
+            "$ref": "#/backend/entities/DowntimeAgg"
+          },
+          "description": "Stores aggregated downtime data for a machine in a specific month.",
+          "params": [
+            {
+              "name": "machineId",
+              "description": "Reference to the machine."
+            },
+            {
+              "name": "YYYYMM",
+              "description": "The month in YYYYMM format."
+            }
+          ]
+        }
+      },
+      {
+        "path": "plans/{planId}",
+        "definition": {
+          "entityName": "Plan",
+          "schema": {
+            "$ref": "#/backend/entities/Plan"
+          },
+          "description": "Stores production plans.",
+          "params": [
+            {
+              "name": "planId",
+              "description": "Unique identifier for the plan."
+            }
+          ]
+        }
+      },
+      {
+        "path": "plans/{planId}/assignments/{assignmentId}",
+        "definition": {
+          "entityName": "Assignment",
+          "schema": {
+            "$ref": "#/backend/entities/Assignment"
+          },
+          "description": "Stores assignments of pieces to molds on machines for a specific week.",
+          "params": [
+            {
+              "name": "planId",
+              "description": "Reference to the plan."
+            },
+            {
+              "name": "assignmentId",
+              "description": "Unique identifier for the assignment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "production/{fechaISO}",
+        "definition": {
+          "entityName": "Production",
+          "schema": {
+            "$ref": "#/backend/entities/Production"
+          },
+          "description": "Stores actual production data for a specific date.",
+          "params": [
+            {
+              "name": "fechaISO",
+              "description": "The date of the production record in ISO format."
+            }
+          ]
+        }
+      },
+      {
+        "path": "settings/global",
+        "definition": {
+          "entityName": "Setting",
+          "schema": {
+            "$ref": "#/backend/entities/Setting"
+          },
+          "description": "Stores global settings for the application."
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the ForgeFlow application's production planning and aluminum injection process management features. It emphasizes authorization independence, clarity, and scalability.  \n\n**Authorization Independence and QAPs:**\n\n*   The design prioritizes path-based ownership where applicable, such as for user-specific data or hierarchical data structures (e.g., plans and assignments). This simplifies security rules and eliminates the need for complex `get()` calls. \n*   For collaborative data or global settings, dedicated collections like `settings/global` are used, ensuring that rules are straightforward and efficient.\n*   QAPs (Rules are not Filters): Segregation of data into collections based on access control needs is enforced. For example, admin-related data resides in separate collections, allowing for simple rules based on document existence.\n\n**Denormalization Strategy:**\n\n*   No explicit denormalization is needed since user-based permissions are not required, simplifying security rules significantly.\n\n**Structural Segregation:**\n\n*   The design follows structural segregation principles by using dedicated collections for different data types. For instance, 'pieces', 'molds', 'machines' are stored in separate collections because they have distinct security requirements and access patterns.\n\n**Access Modeling:**\n\n*   Path-based ownership is used for entities like 'assignments' and 'production' where a parent document's (plan, machine) context is important.\n*   Global settings are stored in a singleton document (`settings/global`) since there's only one set of settings for the entire application.\n\n**Data Clarity and Predictability:**\n\n*   Explicit State Modeling: The 'Plan' entity uses a `status` field to explicitly represent the state of the plan (`draft` or `published`).\n*   Predictable Schema: Consistent naming conventions are used for fields across all entities (e.g., 'id' for unique identifiers, 'createdAt' for timestamps).\n\n**Security Rules Implications:**\n\nThe structure facilitates simple and robust security rules. For example, read access to the `pieces` collection can be granted to 'viewer', 'shopfloor', 'planner', and 'admin' roles, while write access is restricted to 'admin'. Similar patterns can be applied to other collections based on their access requirements."
+  }
+}

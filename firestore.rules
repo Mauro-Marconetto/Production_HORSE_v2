@@ -1,0 +1,233 @@
+/**
+ * @fileoverview Firestore Security Rules for ForgeFlow application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a data-centric security model where access is broadly open, but MUST be restricted in a production environment.
+ *
+ * Data Structure:
+ * The database consists of several top-level collections representing core entities: pieces, molds, machines, demand, inventory, calendars, downtime, plans, assignments, production, and settings. Data is generally not nested except for subcollections under plans (assignments).
+ *
+ * Key Security Decisions:
+ *  - In this prototype version, all collections are readable by all authenticated users.
+ *  - Write access is restricted to authenticated users, but without granular role-based controls.
+ *  - The settings collection allows read and write access for authenticated users to facilitate initial configuration.
+ *
+ *  Important: This is a PROTOTYPE ruleset. In a production environment, you MUST implement granular role-based access control and data validation.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Grants read access to all authenticated users for Piece documents, restricts write access to only authenticated users.
+     * @path /pieces/{pieceId}
+     * @allow (get, list) - Any authenticated user can read piece data.
+     * @allow (create, update, delete) - Any authenticated user can modify piece data.
+     * @deny (create, update, delete) - Unauthenticated users cannot modify piece data.
+     * @principle Allows any authenticated user to read and write pieces, but should be restricted to specific roles in production.
+     */
+    match /pieces/{pieceId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Grants read access to all authenticated users for Mold documents, restricts write access to only authenticated users.
+     * @path /molds/{moldId}
+     * @allow (get, list) - Any authenticated user can read mold data.
+     * @allow (create, update, delete) - Any authenticated user can modify mold data.
+     * @deny (create, update, delete) - Unauthenticated users cannot modify mold data.
+     * @principle Allows any authenticated user to read and write molds, but should be restricted to specific roles in production.
+     */
+    match /molds/{moldId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Grants read access to all authenticated users for Machine documents, restricts write access to only authenticated users.
+     * @path /machines/{machineId}
+     * @allow (get, list) - Any authenticated user can read machine data.
+     * @allow (create, update, delete) - Any authenticated user can modify machine data.
+     * @deny (create, update, delete) - Unauthenticated users cannot modify machine data.
+     * @principle Allows any authenticated user to read and write machines, but should be restricted to specific roles in production.
+     */
+    match /machines/{machineId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Grants read access to all authenticated users for Demand documents, restricts write access to only authenticated users.
+     * @path /demand/{periodoYYYYWW}/{pieceId}
+     * @allow (get, list) - Any authenticated user can read demand data.
+     * @allow (create, update, delete) - Any authenticated user can modify demand data.
+     * @deny (create, update, delete) - Unauthenticated users cannot modify demand data.
+     * @principle Allows any authenticated user to read and write demand, but should be restricted to specific roles in production.
+     */
+    match /demand/{periodoYYYYWW}/{pieceId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Grants read access to all authenticated users for Inventory documents, restricts write access to only authenticated users.
+     * @path /inventory/{pieceId}/{fechaISO}
+     * @allow (get, list) - Any authenticated user can read inventory data.
+     * @allow (create, update, delete) - Any authenticated user can modify inventory data.
+     * @deny (create, update, delete) - Unauthenticated users cannot modify inventory data.
+     * @principle Allows any authenticated user to read and write inventory, but should be restricted to specific roles in production.
+     */
+    match /inventory/{pieceId}/{fechaISO} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+    
+    /**
+     * @description Grants read access to all authenticated users for current Inventory documents, restricts write access to only authenticated users.
+     * @path /inventory_current/{pieceId}
+     */
+    match /inventory_current/{pieceId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Grants read access to all authenticated users for Calendar documents, restricts write access to only authenticated users.
+     * @path /calendars/{machineId}/{periodoYYYYWW}
+     * @allow (get, list) - Any authenticated user can read calendar data.
+     * @allow (create, update, delete) - Any authenticated user can modify calendar data.
+     * @deny (create, update, delete) - Unauthenticated users cannot modify calendar data.
+     * @principle Allows any authenticated user to read and write calendars, but should be restricted to specific roles in production.
+     */
+    match /calendars/{machineId}/{periodoYYYYWW} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Grants read access to all authenticated users for Downtime documents, restricts write access to only authenticated users.
+     * @path /downtime/{machineId}/{YYYYMM}
+     * @allow (get, list) - Any authenticated user can read downtime data.
+     * @allow (create, update, delete) - Any authenticated user can modify downtime data.
+     * @deny (create, update, delete) - Unauthenticated users cannot modify downtime data.
+     * @principle Allows any authenticated user to read and write downtime, but should be restricted to specific roles in production.
+     */
+    match /downtime/{machineId}/{YYYYMM} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Grants read access to all authenticated users for aggregated Downtime documents, restricts write access to only authenticated users.
+     * @path /downtime_agg/{machineId}/{YYYYMM}
+     * @allow (get, list) - Any authenticated user can read downtime aggregation data.
+     * @allow (create, update, delete) - Any authenticated user can modify downtime aggregation data.
+     * @deny (create, update, delete) - Unauthenticated users cannot modify downtime aggregation data.
+     * @principle Allows any authenticated user to read and write downtime aggregations, but should be restricted to specific roles in production.
+     */
+    match /downtime_agg/{machineId}/{YYYYMM} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Grants read access to all authenticated users for Plan documents, restricts write access to only authenticated users.
+     * @path /plans/{planId}
+     * @allow (get, list) - Any authenticated user can read plan data.
+     * @allow (create, update, delete) - Any authenticated user can modify plan data.
+     * @deny (create, update, delete) - Unauthenticated users cannot modify plan data.
+     * @principle Allows any authenticated user to read and write plans, but should be restricted to specific roles in production.
+     */
+    match /plans/{planId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Grants read access to all authenticated users for Assignment documents, restricts write access to only authenticated users.
+     * @path /plans/{planId}/assignments/{assignmentId}
+     * @allow (get, list) - Any authenticated user can read assignment data.
+     * @allow (create, update, delete) - Any authenticated user can modify assignment data.
+     * @deny (create, update, delete) - Unauthenticated users cannot modify assignment data.
+     * @principle Allows any authenticated user to read and write assignments, but should be restricted to specific roles in production.
+     */
+    match /plans/{planId}/assignments/{assignmentId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Grants read access to all authenticated users for Production documents, restricts write access to only authenticated users.
+     * @path /production/{fechaISO}
+     * @allow (get, list) - Any authenticated user can read production data.
+     * @allow (create, update, delete) - Any authenticated user can modify production data.
+     * @deny (create, update, delete) - Unauthenticated users cannot modify production data.
+     * @principle Allows any authenticated user to read and write production, but should be restricted to specific roles in production.
+     */
+    match /production/{fechaISO} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Grants read and write access to all authenticated users for the global settings document.
+     * @path /settings/global
+     * @allow get, list, create, update, delete: if isSignedIn(); - Any authenticated user can read, write, and delete settings data.
+     * @deny create, update, delete: if !isSignedIn(); - Unauthenticated users cannot modify settings data.
+     * @principle Allows modification of global settings for rapid prototyping and initial configuration. Should be restricted in production.
+     */
+    match /settings/global {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+  }
+
+  /**
+   * @description Checks if the user is signed in.
+   * @return {bool} True if the user is signed in, false otherwise.
+   * @principle Ensures all access is limited to authenticated users.
+   */
+  function isSignedIn() {
+    return request.auth != null;
+  }
+}
