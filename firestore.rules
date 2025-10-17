@@ -1,191 +1,223 @@
 /**
- * @file Firestore Security Rules
- * @version 2
+ * @fileoverview Firestore Security Rules for ForgeFlow application.
  *
- * @description This ruleset enforces a strict data access model for the ForgeFlow application.
- *   It prioritizes authorization independence by avoiding the need for complex data joins during authorization checks.
+ * Core Philosophy:
+ * This ruleset enforces a global-access security model, with no ownership-based restrictions.
+ * All documents are accessible by any authenticated user.
  *
- * @dataStructure
- * - /pieces/{pieceId}: Stores details of manufactured pieces. Public read, no writes allowed by default.
- * - /molds/{moldId}: Stores information about molds. Public read, no writes allowed by default.
- * - /machines/{machineId}: Stores details about machines. Public read, no writes allowed by default.
- * - /demand/{periodoYYYYWW}/{pieceId}: Stores demand data for specific pieces. Public read, no writes allowed by default.
- * - /inventory/{pieceId}/{fechaISO}: Stores inventory levels. Public read, no writes allowed by default.
- * - /inventory/current/{pieceId}: Stores current inventory levels. Public read, no writes allowed by default.
- * - /calendars/{machineId}/{periodoYYYYWW}: Stores calendar events for machines. Public read, no writes allowed by default.
- * - /downtime/{machineId}/{YYYYMM}: Stores downtime events for machines. Public read, no writes allowed by default.
- * - /downtime_agg/{machineId}/{YYYYMM}: Stores aggregated downtime data. Public read, no writes allowed by default.
- * - /plans/{planId}: Stores production plans. Public read, no writes allowed by default.
- * - /plans/{planId}/assignments/{assignmentId}: Stores assignments within a plan. Public read, no writes allowed by default.
- * - /production/{fechaISO}: Stores production data. Public read, no writes allowed by default.
- * - /settings/global: Stores global settings. Public read, no writes allowed by default.
+ * Data Structure:
+ * The Firestore database consists of top-level collections representing core entities:
+ * - /pieces/{pieceId}: Details of manufactured pieces.
+ * - /molds/{moldId}: Information about molds.
+ * - /machines/{machineId}: Details about machines.
+ * - /demand/{periodoYYYYWW}/{pieceId}: Demand data for a specific piece in a specific period.
+ * - /inventory/{pieceId}/{fechaISO}: Inventory levels for a specific piece on a specific date.
+ * - /inventory/current/{pieceId}: Current inventory level for a specific piece.
+ * - /calendars/{machineId}/{periodoYYYYWW}: Calendar events for a specific machine in a specific period.
+ * - /downtime/{machineId}/{YYYYMM}: Downtime events for a specific machine in a specific month.
+ * - /downtime_agg/{machineId}/{YYYYMM}: Aggregated downtime data for a specific machine in a specific month.
+ * - /plans/{planId}: Production plans.
+ * - /plans/{planId}/assignments/{assignmentId}: Assignments within a production plan.
+ * - /production/{fechaISO}: Actual production data for a specific date.
+ * - /settings/global: Global settings for the application.
  *
- * @keySecurityDecisions
- * - Public Read: All collections are readable by any user. This is suitable for prototype environments.
- * - No Writes by Default: All write operations (create, update, delete) are disabled by default.
- * - No User Listing: There are no user-specific rules.
- *
- * @denormalizationForAuthorization N/A (Prototype with public read, writes denied)
- * @structuralSegregation N/A (Prototype with public read, writes denied)
+ * Key Security Decisions:
+ * - No user-specific data or ownership.
+ * - All collections are globally readable and writable by any authenticated user.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows anyone to read Piece data.  No write access is granted by default.
+     * @description Allows any authenticated user to read and write Piece documents.
      * @path /pieces/{pieceId}
-     * @allow (get, list): Any user can read piece data.
-     * @deny (create, update, delete): No user can create, update, or delete piece data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Piece document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Piece document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /pieces/{pieceId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read Mold data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write Mold documents.
      * @path /molds/{moldId}
-     * @allow (get, list): Any user can read mold data.
-     * @deny (create, update, delete): No user can create, update, or delete mold data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Mold document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Mold document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /molds/{moldId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read Machine data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write Machine documents.
      * @path /machines/{machineId}
-     * @allow (get, list): Any user can read machine data.
-     * @deny (create, update, delete): No user can create, update, or delete machine data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Machine document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Machine document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /machines/{machineId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read Demand data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write Demand documents.
      * @path /demand/{periodoYYYYWW}/{pieceId}
-     * @allow (get, list): Any user can read demand data.
-     * @deny (create, update, delete): No user can create, update, or delete demand data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Demand document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Demand document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /demand/{periodoYYYYWW}/{pieceId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read Inventory data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write Inventory documents.
      * @path /inventory/{pieceId}/{fechaISO}
-     * @allow (get, list): Any user can read inventory data.
-     * @deny (create, update, delete): No user can create, update, or delete inventory data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Inventory document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Inventory document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /inventory/{pieceId}/{fechaISO} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read current Inventory data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write current Inventory documents.
      * @path /inventory/current/{pieceId}
-     * @allow (get, list): Any user can read inventory data.
-     * @deny (create, update, delete): No user can create, update, or delete inventory data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Inventory document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Inventory document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /inventory/current/{pieceId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read Calendar data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write Calendar documents.
      * @path /calendars/{machineId}/{periodoYYYYWW}
-     * @allow (get, list): Any user can read calendar data.
-     * @deny (create, update, delete): No user can create, update, or delete calendar data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Calendar document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Calendar document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /calendars/{machineId}/{periodoYYYYWW} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read Downtime data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write Downtime documents.
      * @path /downtime/{machineId}/{YYYYMM}
-     * @allow (get, list): Any user can read downtime data.
-     * @deny (create, update, delete): No user can create, update, or delete downtime data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Downtime document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Downtime document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /downtime/{machineId}/{YYYYMM} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read aggregated Downtime data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write aggregated Downtime documents.
      * @path /downtime_agg/{machineId}/{YYYYMM}
-     * @allow (get, list): Any user can read downtime aggregation data.
-     * @deny (create, update, delete): No user can create, update, or delete downtime aggregation data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any DowntimeAgg document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any DowntimeAgg document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /downtime_agg/{machineId}/{YYYYMM} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read Plan data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write Plan documents.
      * @path /plans/{planId}
-     * @allow (get, list): Any user can read plan data.
-     * @deny (create, update, delete): No user can create, update, or delete plan data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Plan document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Plan document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /plans/{planId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read Assignment data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write Assignment documents within a Plan.
      * @path /plans/{planId}/assignments/{assignmentId}
-     * @allow (get, list): Any user can read assignment data.
-     * @deny (create, update, delete): No user can create, update, or delete assignment data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Assignment document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Assignment document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /plans/{planId}/assignments/{assignmentId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read Production data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write Production documents.
      * @path /production/{fechaISO}
-     * @allow (get, list): Any user can read production data.
-     * @deny (create, update, delete): No user can create, update, or delete production data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Production document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Production document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /production/{fechaISO} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows anyone to read global Setting data. No write access is granted by default.
+     * @description Allows any authenticated user to read and write Setting documents.
      * @path /settings/global
-     * @allow (get, list): Any user can read setting data.
-     * @deny (create, update, delete): No user can create, update, or delete setting data by default.
-     * @principle Public read access with no write access.
+     * @allow (get, list) Authenticated user can read any Setting document.
+     * @allow (create, update, delete) Authenticated user can create, update or delete any Setting document.
+     * @deny (create, update, delete) Unauthenticated user cannot create, update, or delete.
+     * @principle Allows global access for authenticated users.
      */
     match /settings/global {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
+    
+    /**
+     * @description Denies listing the `/users` collection.
+     * @path /users
+     * @deny list Listing the `/users` collection is denied to all users.
+     * @principle Avoid user listing for privacy and security.
+     */
+    match /users {
+        allow get: if false; // Deny individual document reads.
+        allow list: if false; // Ensure listing is always denied.
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
+    }
+  }
+
+  /**
+   * @description Checks if the user is signed in.
+   * @return {boolean} True if the user is signed in, false otherwise.
+   */
+  function isSignedIn() {
+    return request.auth != null;
   }
 }
