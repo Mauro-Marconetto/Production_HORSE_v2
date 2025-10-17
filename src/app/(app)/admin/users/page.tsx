@@ -48,7 +48,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, MoreHorizontal, Loader2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { UserProfile } from '@/lib/types';
 import {
@@ -176,18 +176,21 @@ function UserForm({
 
 export default function AdminUsersPage() {
   const firestore = useFirestore();
-  const usersRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const usersRef = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
   const { data: users, isLoading } = useCollection<UserProfile>(usersRef);
   const { user: currentUser } = useUser();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [editingUser, setEditingUser] = useState<WithId<UserProfile> | null>(
     null
   );
   const [deletingUser, setDeletingUser] = useState<WithId<UserProfile> | null>(
     null
   );
+
+  const currentUserProfileExists = users?.some(u => u.id === currentUser?.uid);
 
   const handleAddNew = () => {
     setEditingUser(null);
@@ -205,6 +208,7 @@ export default function AdminUsersPage() {
   };
 
   const handleSave = async (data: Partial<UserProfile>) => {
+    if (!firestore) return;
     try {
       if (editingUser) {
         // Editing an existing user, just update their Firestore document
@@ -217,12 +221,10 @@ export default function AdminUsersPage() {
             throw new Error("Todos los campos son requeridos para crear un usuario.");
         }
         
-        // 1. Create the user in Firebase Auth
         const auth = getAuth();
         const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
         const newAuthUser = userCredential.user;
 
-        // 2. Create the user profile document in Firestore with the UID from Auth
         const userProfile: Omit<UserProfile, 'id'> = {
             name: data.name,
             email: data.email,
@@ -253,14 +255,11 @@ export default function AdminUsersPage() {
   };
 
   const handleDelete = async () => {
-    if (!deletingUser) return;
+    if (!deletingUser || !firestore) return;
     try {
-      // Note: This only deletes the Firestore document.
-      // Deleting a user from Firebase Auth requires admin privileges and is a backend operation.
-      // For this client-side app, we'll just remove them from our user list.
       const userDoc = doc(firestore, 'users', deletingUser.id);
       await deleteDoc(userDoc);
-      toast({ title: 'Usuario eliminado', description: 'El usuario ha sido eliminado de la lista.' });
+      toast({ title: 'Usuario eliminado', description: 'La información del usuario ha sido eliminada de Firestore.' });
       setDeletingUser(null);
     } catch (error: any) {
       toast({
@@ -270,6 +269,28 @@ export default function AdminUsersPage() {
       });
     }
   };
+  
+  const handleSyncProfile = async () => {
+    if (!currentUser || !firestore) {
+        toast({ title: "Error", description: "No se pudo obtener el usuario actual.", variant: "destructive" });
+        return;
+    }
+    setIsSyncing(true);
+    try {
+        const userProfile: Omit<UserProfile, 'id'> = {
+            name: currentUser.displayName || currentUser.email || 'Admin User',
+            email: currentUser.email!,
+            role: 'Admin',
+        };
+        await setDoc(doc(firestore, 'users', currentUser.uid), userProfile);
+        toast({ title: "Perfil Sincronizado", description: "Tu perfil de administrador ha sido creado en la base de datos." });
+    } catch (error: any) {
+        toast({ title: "Error de Sincronización", description: error.message, variant: "destructive" });
+    } finally {
+        setIsSyncing(false);
+    }
+  };
+
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -282,9 +303,17 @@ export default function AdminUsersPage() {
             Añadir, editar o eliminar usuarios y asignar roles.
           </p>
         </div>
-        <Button onClick={handleAddNew}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Añadir Usuario
-        </Button>
+        <div className="flex gap-2">
+            {currentUser && !currentUserProfileExists && !isLoading && (
+                 <Button onClick={handleSyncProfile} variant="outline" disabled={isSyncing}>
+                    {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    {isSyncing ? 'Sincronizando...' : 'Sincronizar Mi Perfil'}
+                </Button>
+            )}
+            <Button onClick={handleAddNew}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Usuario
+            </Button>
+        </div>
       </div>
 
       <Card>
@@ -308,8 +337,9 @@ export default function AdminUsersPage() {
               )}
               {!isLoading && users?.length === 0 && (
                  <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
-                    No se encontraron usuarios. ¡Añade el primero!
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-10">
+                    No se encontraron perfiles de usuario en la base de datos.
+                    {currentUser && !currentUserProfileExists && <div className="mt-2 text-xs">Haz clic en "Sincronizar Mi Perfil" para crear tu perfil de administrador.</div>}
                   </TableCell>
                 </TableRow>
               )}
@@ -373,8 +403,7 @@ export default function AdminUsersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará el perfil del
-              usuario de Firestore, pero no de Firebase Authentication.
+              Esta acción eliminará el perfil del usuario de la base de datos de Firestore, pero no eliminará al usuario de Firebase Authentication.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -388,3 +417,5 @@ export default function AdminUsersPage() {
     </main>
   );
 }
+
+    
