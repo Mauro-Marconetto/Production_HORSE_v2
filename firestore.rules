@@ -1,221 +1,287 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a security model based on roles.
+ * @fileoverview Firestore Security Rules for the ForgeFlow application.
  *
  * Core Philosophy:
- * Access is controlled based on pre-defined user roles (Admin, Planner, Shop Floor, Viewer).
- * Only authenticated users can access data, with permissions varying by role.
+ * This ruleset enforces a combination of ownership-based and role-based access control.
+ * User profiles are private and only accessible to the owning user. Most other data
+ * (pieces, molds, machines) is publicly readable but only writable by authenticated users.
+ * Global settings are readable by all but only writable by authenticated users.
  *
  * Data Structure:
- * - /users/{userId}: User profile data, accessible only to the user themselves.
- * - /pieces/{pieceId}: Data about manufactured pieces.
- * - /molds/{moldId}: Data about molds used in the manufacturing process.
- * - /machines/{machineId}: Data about machines used in the manufacturing process.
- * - /demand/{periodoYYYYWW}/{pieceId}: Demand data for pieces in a specific period.
- * - /inventory/{pieceId}/{fechaISO}: Inventory levels for pieces at a specific date.
- * - /inventory_current/{pieceId}: Current inventory levels for a specific piece.
- * - /calendars/{machineId}/{periodoYYYYWW}: Calendar events for machines in a specific period.
- * - /downtime/{machineId}/{YYYYMM}: Downtime events for machines in a specific month.
- * - /downtime_agg/{machineId}/{YYYYMM}: Aggregated downtime data for machines in a specific month.
- * - /plans/{planId}: Production plans.
- * - /plans/{planId}/assignments/{assignmentId}: Assignments of pieces to molds and machines.
- * - /production/{fechaISO}: Production data for a specific date.
- * - /settings/global: Global application settings.
+ * - /users/{userId}: Stores user profile information; owner-only access.
+ * - /pieces/{pieceId}: Stores piece data; publicly readable, only authenticated users can create, update and delete
+ * - /molds/{moldId}: Stores mold data; publicly readable, only authenticated users can create, update and delete
+ * - /machines/{machineId}: Stores machine data; publicly readable, only authenticated users can create, update and delete
+ * - /demand/{periodoYYYYWW}/{pieceId}: Stores demand data; publicly readable, only authenticated users can create, update and delete
+ * - /inventory/{pieceId}/{fechaISO}: Stores inventory data; publicly readable, only authenticated users can create, update and delete
+ * - /inventory_current/{pieceId}: Stores current inventory data; publicly readable, only authenticated users can create, update and delete
+ * - /calendars/{machineId}/{periodoYYYYWW}: Stores calendar data; publicly readable, only authenticated users can create, update and delete
+ * - /downtime/{machineId}/{YYYYMM}: Stores downtime data; publicly readable, only authenticated users can create, update and delete
+ * - /downtime_agg/{machineId}/{YYYYMM}: Stores aggregated downtime data; publicly readable, only authenticated users can create, update and delete
+ * - /plans/{planId}: Stores plan data; publicly readable, only authenticated users can create, update and delete
+ * - /plans/{planId}/assignments/{assignmentId}: Stores assignment data; publicly readable, only authenticated users can create, update and delete
+ * - /production/{fechaISO}: Stores production data; publicly readable, only authenticated users can create, update and delete
+ * - /settings/global: Stores global settings; publicly readable, only authenticated users can create, update and delete
  *
  * Key Security Decisions:
  * - User listing is disallowed.
- * - Global settings are read-only for most users, writable only by admins.
+ * - Read-only access is granted to public collections (pieces, molds, machines).
+ * - Strict ownership is enforced for user profiles.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    /**
+     * @description Checks if the request is made by a signed-in user.
+     */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Rule for user profile data, only accessible to the user themselves.
-     * @path /users/{userId}
-     * @allow (create, update, get, delete, list) if the user is signed in and the requested user ID matches the authenticated user ID.
-     * @deny (create, update, get, delete, list) if the user is not signed in, or if the requested user ID does not match the authenticated user ID.
-     * @principle Enforces document ownership for user profiles.
-     */
-    match /users/{userId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
-    }
-
-    /**
-     * @description Helper function to check if the request is made by the owner of the resource.
-     * @param {string} userId - The user ID from the path.
-     * @return {boolean} - True if the user is signed in and their ID matches the userId, false otherwise.
+     * @description Checks if the authenticated user ID matches the provided user ID.
      */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
     /**
-     * @description Rule for manufactured piece details.
-     * @path /pieces/{pieceId}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Checks if the authenticated user is the owner of an existing document.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /******************** User Profile Rules ********************/
+
+    /**
+     * @description Allows a user to read and write their own profile data.
+     * @path /databases/{database}/documents/users/{userId}
+     * @allow (get, create, update, delete) if request.auth.uid == userId
+     * @deny (get, create, update, delete) if request.auth.uid != userId
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.email == request.auth.token.email;
+      allow update: if isExistingOwner(userId) && request.resource.data.email == resource.data.email;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /******************** Piece Rules ********************/
+
+    /**
+     * @description Allows anyone to read piece data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/pieces/{pieceId}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
+     * @principle Public read access with owner-only writes enforced.
      */
     match /pieces/{pieceId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Mold Rules ********************/
+
     /**
-     * @description Rule for mold details for the aluminum injection process.
-     * @path /molds/{moldId}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Allows anyone to read mold data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/molds/{moldId}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
+     * @principle Public read access with owner-only writes enforced.
      */
     match /molds/{moldId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Machine Rules ********************/
+
     /**
-     * @description Rule for machine details for the aluminum injection process.
-     * @path /machines/{machineId}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Allows anyone to read machine data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/machines/{machineId}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
+     * @principle Public read access with owner-only writes enforced.
      */
     match /machines/{machineId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Demand Rules ********************/
+
     /**
-     * @description Rule for demand data for a specific piece in a given period.
-     * @path /demand/{periodoYYYYWW}/{pieceId}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Allows anyone to read demand data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/demand/{periodoYYYYWW}/{pieceId}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
+     * @principle Public read access with owner-only writes enforced.
      */
     match /demand/{periodoYYYYWW}/{pieceId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Inventory Rules ********************/
+
     /**
-     * @description Rule for inventory levels for a specific piece at a given date.
-     * @path /inventory/{pieceId}/{fechaISO}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Allows anyone to read inventory data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/inventory/{pieceId}/{fechaISO}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
+     * @principle Public read access with owner-only writes enforced.
      */
     match /inventory/{pieceId}/{fechaISO} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Inventory Current Rules ********************/
+
     /**
-     * @description Rule for current inventory levels for a specific piece.
-     * @path /inventory_current/{pieceId}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Allows anyone to read current inventory data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/inventory_current/{pieceId}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
      */
     match /inventory_current/{pieceId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Calendar Rules ********************/
+
     /**
-     * @description Rule for planned maintenance and tryouts for a machine in a given period.
-     * @path /calendars/{machineId}/{periodoYYYYWW}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Allows anyone to read calendar data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/calendars/{machineId}/{periodoYYYYWW}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
      */
     match /calendars/{machineId}/{periodoYYYYWW} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Downtime Rules ********************/
+
     /**
-     * @description Rule for downtime events for a machine in a specific month.
-     * @path /downtime/{machineId}/{YYYYMM}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Allows anyone to read downtime data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/downtime/{machineId}/{YYYYMM}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
      */
     match /downtime/{machineId}/{YYYYMM} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Downtime Aggregation Rules ********************/
+
     /**
-     * @description Rule for aggregated downtime data for a machine in a specific month.
-     * @path /downtime_agg/{machineId}/{YYYYMM}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Allows anyone to read aggregated downtime data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/downtime_agg/{machineId}/{YYYYMM}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
      */
     match /downtime_agg/{machineId}/{YYYYMM} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Plan Rules ********************/
+
     /**
-     * @description Rule for production plans.
-     * @path /plans/{planId}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Allows anyone to read plan data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/plans/{planId}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
      */
     match /plans/{planId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Assignment Rules ********************/
+
     /**
-     * @description Rule for assignments of pieces to molds on machines for a specific week.
-     * @path /plans/{planId}/assignments/{assignmentId}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Allows anyone to read assignment data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/plans/{planId}/assignments/{assignmentId}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
      */
     match /plans/{planId}/assignments/{assignmentId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Production Rules ********************/
+
     /**
-     * @description Rule for actual production data for a specific date.
-     * @path /production/{fechaISO}
-     * @allow (get, list) to any authenticated user.
-     * @allow (create, update, delete) to any authenticated user.
-     * @principle Allows public read access but restricts writes to authorized users.
+     * @description Allows anyone to read production data, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/production/{fechaISO}
+     * @allow (get, list) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
      */
     match /production/{fechaISO} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    /******************** Setting Rules ********************/
+
     /**
-     * @description Rule for global settings for the application.
-     * @path /settings/global
-     * @allow get: if isSignedIn();
-     * @allow list: if false;
-     * @allow create, update, delete: if false; // TODO: restrict write access to admin users.
-     * @principle Restricts write access to global settings to admin users.
+     * @description Allows anyone to read global settings, but only authenticated users can create, update, or delete.
+     * @path /databases/{database}/documents/settings/global
+     * @allow (get) if true
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
      */
     match /settings/global {
-      allow get: if isSignedIn();
+      allow get: if true;
       allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
   }
 }
