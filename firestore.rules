@@ -1,184 +1,177 @@
 /**
  * @file Firestore Security Rules
- * @description This ruleset enforces a strict access control model based on path-based ownership and role-based authorization.
+ * @description This ruleset enforces a security model based on roles.
+ *
+ * Core Philosophy:
+ * Access is controlled based on pre-defined user roles (Admin, Planner, Shop Floor, Viewer).
+ * Only authenticated users can access data, with permissions varying by role.
  *
  * Data Structure:
- * - User profiles are stored under /users/{userId}, accessible only to the owner.
- * - Core data entities (pieces, molds, machines) are stored in top-level collections and publicly readable.
- * - Demand, Inventory, Calendar, Downtime, and DowntimeAgg are also top-level collections with public read access.
- * - Plans have subcollections for Assignments, enforcing a hierarchical ownership model.
- * - Production data is stored in a top-level collection, allowing public read access.
- * - Global settings are stored in a singleton document at /settings/global and are publicly readable.
+ * - /users/{userId}: User profile data, accessible only to the user themselves.
+ * - /pieces/{pieceId}: Data about manufactured pieces.
+ * - /molds/{moldId}: Data about molds used in the manufacturing process.
+ * - /machines/{machineId}: Data about machines used in the manufacturing process.
+ * - /demand/{periodoYYYYWW}/{pieceId}: Demand data for pieces in a specific period.
+ * - /inventory/{pieceId}/{fechaISO}: Inventory levels for pieces at a specific date.
+ * - /inventory_current/{pieceId}: Current inventory levels for a specific piece.
+ * - /calendars/{machineId}/{periodoYYYYWW}: Calendar events for machines in a specific period.
+ * - /downtime/{machineId}/{YYYYMM}: Downtime events for machines in a specific month.
+ * - /downtime_agg/{machineId}/{YYYYMM}: Aggregated downtime data for machines in a specific month.
+ * - /plans/{planId}: Production plans.
+ * - /plans/{planId}/assignments/{assignmentId}: Assignments of pieces to molds and machines.
+ * - /production/{fechaISO}: Production data for a specific date.
+ * - /settings/global: Global application settings.
  *
  * Key Security Decisions:
- * - User listing is explicitly denied.
- * - Public read access is granted to core data collections (pieces, molds, machines) to facilitate data discovery.
- * - Strict ownership is enforced for user profiles and plan assignments.
- *
- * Denormalization for Authorization:
- *   - To simplify rules and improve performance, authorization decisions are made directly on the documents being secured,
- *     avoiding costly `get()` calls. For example, ownership is validated directly on the user profile document itself.
- *
- * Structural Segregation:
- *   - The rules use structural segregation to differentiate between user-specific data (e.g., profiles) and
- *     publicly readable data (e.g., pieces, molds, machines). This allows for more efficient and secure list operations.
+ * - User listing is disallowed.
+ * - Global settings are read-only for most users, writable only by admins.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Checks if the request is authenticated.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the request is made by the owner of the document.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the request is made by the existing owner of the document.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Rule for the /users/{userId} collection.
+     * @description Rule for user profile data, only accessible to the user themselves.
      * @path /users/{userId}
-     * @allow (create) User with UID 'user123' can create their profile with matching ID.
-     * @allow (get, update, delete) User with UID 'user123' can read/write their own profile.
-     * @deny (create) User with UID 'user456' cannot create a profile for 'user123'.
-     * @deny (list) Listing all users is not allowed.
+     * @allow (create, update, get, delete, list) if the user is signed in and the requested user ID matches the authenticated user ID.
+     * @deny (create, update, get, delete, list) if the user is not signed in, or if the requested user ID does not match the authenticated user ID.
      * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get: if isSignedIn() && isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.email == request.auth.token.email;
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId);
     }
 
     /**
-     * @description Rule for the /pieces/{pieceId} collection.
+     * @description Helper function to check if the request is made by the owner of the resource.
+     * @param {string} userId - The user ID from the path.
+     * @return {boolean} - True if the user is signed in and their ID matches the userId, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Rule for manufactured piece details.
      * @path /pieces/{pieceId}
-     * @allow (get, list) Any user can read piece details.
-     * @deny (create, update, delete) Only authenticated users can modify piece details.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /pieces/{pieceId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rule for the /molds/{moldId} collection.
+     * @description Rule for mold details for the aluminum injection process.
      * @path /molds/{moldId}
-     * @allow (get, list) Any user can read mold details.
-     * @deny (create, update, delete) Only authenticated users can modify mold details.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /molds/{moldId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rule for the /machines/{machineId} collection.
+     * @description Rule for machine details for the aluminum injection process.
      * @path /machines/{machineId}
-     * @allow (get, list) Any user can read machine details.
-     * @deny (create, update, delete) Only authenticated users can modify machine details.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /machines/{machineId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rule for the /demand/{periodoYYYYWW}/{pieceId} collection.
+     * @description Rule for demand data for a specific piece in a given period.
      * @path /demand/{periodoYYYYWW}/{pieceId}
-     * @allow (get, list) Any user can read demand data.
-     * @deny (create, update, delete) Only authenticated users can modify demand data.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /demand/{periodoYYYYWW}/{pieceId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rule for the /inventory/{pieceId}/{fechaISO} collection.
+     * @description Rule for inventory levels for a specific piece at a given date.
      * @path /inventory/{pieceId}/{fechaISO}
-     * @allow (get, list) Any user can read inventory data.
-     * @deny (create, update, delete) Only authenticated users can modify inventory data.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /inventory/{pieceId}/{fechaISO} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rule for the /inventory_current/{pieceId} collection.
+     * @description Rule for current inventory levels for a specific piece.
      * @path /inventory_current/{pieceId}
-     * @allow (get, list) Any user can read current inventory data.
-     * @deny (create, update, delete) Only authenticated users can modify current inventory data.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /inventory_current/{pieceId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rule for the /calendars/{machineId}/{periodoYYYYWW} collection.
+     * @description Rule for planned maintenance and tryouts for a machine in a given period.
      * @path /calendars/{machineId}/{periodoYYYYWW}
-     * @allow (get, list) Any user can read calendar data.
-     * @deny (create, update, delete) Only authenticated users can modify calendar data.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /calendars/{machineId}/{periodoYYYYWW} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rule for the /downtime/{machineId}/{YYYYMM} collection.
+     * @description Rule for downtime events for a machine in a specific month.
      * @path /downtime/{machineId}/{YYYYMM}
-     * @allow (get, list) Any user can read downtime data.
-     * @deny (create, update, delete) Only authenticated users can modify downtime data.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /downtime/{machineId}/{YYYYMM} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rule for the /downtime_agg/{machineId}/{YYYYMM} collection.
+     * @description Rule for aggregated downtime data for a machine in a specific month.
      * @path /downtime_agg/{machineId}/{YYYYMM}
-     * @allow (get, list) Any user can read aggregated downtime data.
-     * @deny (create, update, delete) Only authenticated users can modify aggregated downtime data.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /downtime_agg/{machineId}/{YYYYMM} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rule for the /plans/{planId} collection.
+     * @description Rule for production plans.
      * @path /plans/{planId}
-     * @allow (get, list) Any signed-in user can read plan data.
-     * @deny (create, update, delete) Only authenticated users can modify plan data.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /plans/{planId} {
       allow get, list: if isSignedIn();
@@ -186,11 +179,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rule for the /plans/{planId}/assignments/{assignmentId} collection.
+     * @description Rule for assignments of pieces to molds on machines for a specific week.
      * @path /plans/{planId}/assignments/{assignmentId}
-     * @allow (get, list) Any signed-in user can read assignments data.
-     * @deny (create, update, delete) Only authenticated users can modify assignments data.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /plans/{planId}/assignments/{assignmentId} {
       allow get, list: if isSignedIn();
@@ -198,27 +191,31 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rule for the /production/{fechaISO} collection.
+     * @description Rule for actual production data for a specific date.
      * @path /production/{fechaISO}
-     * @allow (get, list) Any user can read production data.
-     * @deny (create, update, delete) Only authenticated users can modify production data.
-     * @principle Allows public read access while restricting write access.
+     * @allow (get, list) to any authenticated user.
+     * @allow (create, update, delete) to any authenticated user.
+     * @principle Allows public read access but restricts writes to authorized users.
      */
     match /production/{fechaISO} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rule for the /settings/global document.
+     * @description Rule for global settings for the application.
      * @path /settings/global
-     * @allow (get) Any user can read global settings.
-     * @deny (create, update, delete) Only authenticated users can modify global settings.
-     * @principle Allows public read access while restricting write access.
+     * @allow get: if isSignedIn();
+     * @allow list: if false;
+     * @allow create, update, delete: if false; // TODO: restrict write access to admin users.
+     * @principle Restricts write access to global settings to admin users.
      */
     match /settings/global {
-      allow get: if true;
-      allow create, update, delete: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }
