@@ -55,17 +55,17 @@ export default function QualityPage() {
     // Client-side filtering for pending inspections
     const pendingInspection = useMemo(() => {
         if (!allProduction) return [];
-        return allProduction.filter(p => p.qtySegregada > 0 && p.inspeccionadoCalidad === false);
+        return allProduction.filter(p => p.qtySegregada > 0);
     }, [allProduction]);
 
     // Client-side filtering for history
     const inspectedHistory = useMemo(() => {
         if (!allProduction) return [];
         return allProduction.filter(p => {
-            const isInspected = p.inspeccionadoCalidad === true;
+            const isInspected = p.inspectionDate;
             if (!isInspected || !date?.from) return false;
             
-            const inspectionDate = new Date(p.fechaISO);
+            const inspectionDate = new Date(p.inspectionDate);
             const fromDate = date.from;
             const toDate = date.to ? addDays(date.to, 1) : addDays(fromDate, 1);
 
@@ -80,35 +80,26 @@ export default function QualityPage() {
 
     useEffect(() => {
         if (selectedProduction) {
-            const initialApta = selectedProduction.qtyAptaCalidad || 0;
-            const initialScrap = selectedProduction.qtyScrapCalidad || 0;
-
-            setQuantities({
-                qtyAptaCalidad: initialApta,
-                qtyScrapCalidad: initialScrap,
-            });
-            
-            const initialInput = initialApta > 0 ? String(initialApta) : (initialScrap > 0 ? String(initialScrap) : '');
-            const initialField = initialApta > 0 ? 'qtyAptaCalidad' : 'qtyScrapCalidad';
-            
-            setActiveField(initialField);
-            setCurrentInput(initialInput);
+            // Reset state for new inspection
+            setQuantities({ qtyAptaCalidad: 0, qtyScrapCalidad: 0 });
+            setCurrentInput('');
+            setActiveField('qtyAptaCalidad');
             setIsDialogOpen(true);
         }
     }, [selectedProduction]);
 
     useEffect(() => {
-      const parsedInput = Number(currentInput) || 0;
-      const totalSegregated = selectedProduction?.qtySegregada || 0;
-      const otherField = activeField === 'qtyAptaCalidad' ? 'qtyScrapCalidad' : 'qtyAptaCalidad';
-      
-      const newActiveQty = Math.min(parsedInput, totalSegregated);
-      const newOtherQty = Math.max(0, totalSegregated - newActiveQty);
+        const parsedInput = Number(currentInput) || 0;
+        const totalToInspectInThisSession = selectedProduction?.qtySegregada || 0;
+        const otherField = activeField === 'qtyAptaCalidad' ? 'qtyScrapCalidad' : 'qtyAptaCalidad';
+        
+        const newActiveQty = Math.min(parsedInput, totalToInspectInThisSession);
+        const newOtherQty = Math.max(0, totalToInspectInThisSession - newActiveQty);
 
-      setQuantities({
-        [activeField]: newActiveQty,
-        [otherField]: newOtherQty,
-      } as any);
+        setQuantities({
+            [activeField]: newActiveQty,
+            [otherField]: newOtherQty,
+        } as any);
 
     }, [currentInput, activeField, selectedProduction]);
 
@@ -122,28 +113,34 @@ export default function QualityPage() {
     const handleBackspace = () => setCurrentInput(prev => prev.slice(0, -1));
     const handleClear = () => setCurrentInput('');
 
-    const totalInspected = quantities.qtyAptaCalidad + quantities.qtyScrapCalidad;
-    const remainingToInspect = (selectedProduction?.qtySegregada || 0) - totalInspected;
+    const totalInspectedInSession = quantities.qtyAptaCalidad + quantities.qtyScrapCalidad;
+    const remainingToInspectInLot = (selectedProduction?.qtySegregada || 0) - totalInspectedInSession;
+
 
     const handleSaveInspection = async () => {
         if (!firestore || !selectedProduction || !user) {
             toast({ title: "Error", description: "No se puede guardar. Falta información de usuario o de base de datos.", variant: "destructive" });
             return;
         }
-        if (remainingToInspect !== 0) {
-            toast({ title: "Error de Validación", description: `Aún quedan ${remainingToInspect} unidades por clasificar.`, variant: "destructive" });
+        if (totalInspectedInSession <= 0) {
+            toast({ title: "Información", description: "Debes clasificar al menos una pieza.", variant: "default" });
             return;
         }
 
         setIsSaving(true);
         
         const prodDocRef = doc(firestore, 'production', selectedProduction.id);
+
+        const currentApta = selectedProduction.qtyAptaCalidad || 0;
+        const currentScrap = selectedProduction.qtyScrapCalidad || 0;
+        
         const updatedData = {
-            qtyAptaCalidad: quantities.qtyAptaCalidad,
-            qtyScrapCalidad: quantities.qtyScrapCalidad,
+            qtyAptaCalidad: currentApta + quantities.qtyAptaCalidad,
+            qtyScrapCalidad: currentScrap + quantities.qtyScrapCalidad,
+            qtySegregada: remainingToInspectInLot,
             inspectedBy: user.uid,
             inspectionDate: new Date().toISOString(),
-            inspeccionadoCalidad: true,
+            inspeccionadoCalidad: remainingToInspectInLot === 0, // Mark as fully inspected only if nothing remains
         };
 
         updateDoc(prodDocRef, updatedData)
@@ -191,7 +188,7 @@ export default function QualityPage() {
                 <TableHead>Máquina</TableHead>
                 <TableHead>Pieza / Molde</TableHead>
                 <TableHead>Turno</TableHead>
-                <TableHead className="text-right">Cantidad Segregada</TableHead>
+                <TableHead className="text-right">Cantidad Pendiente</TableHead>
                 <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -301,7 +298,7 @@ export default function QualityPage() {
                             <TableCell>{new Date(p.inspectionDate || p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                             <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
                             <TableCell>{getPieceCode(p.pieceId)} / {getMoldName(p.moldId)}</TableCell>
-                            <TableCell className="text-right font-medium">{p.qtySegregada.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-medium">{(p.qtyAptaCalidad || 0) + (p.qtyScrapCalidad || 0)}</TableCell>
                             <TableCell className="text-right text-green-600 font-bold">{(p.qtyAptaCalidad || 0).toLocaleString()}</TableCell>
                             <TableCell className="text-right text-destructive font-bold">{(p.qtyScrapCalidad || 0).toLocaleString()}</TableCell>
                         </TableRow>
@@ -333,8 +330,8 @@ export default function QualityPage() {
                 <div className="flex-grow p-6 grid grid-cols-2 gap-8">
                     <div className="flex flex-col gap-4">
                         <div className="p-4 rounded-lg bg-yellow-100 dark:bg-yellow-900/50 text-center">
-                            <p className="text-lg">Pendiente de Clasificar</p>
-                            <p className="text-5xl font-bold">{remainingToInspect.toLocaleString()}</p>
+                            <p className="text-lg">Clasificadas en esta sesión</p>
+                            <p className="text-5xl font-bold">{totalInspectedInSession.toLocaleString()}</p>
                         </div>
                         {inspectionFields.map(({key, label}) => (
                             <Button
@@ -363,7 +360,7 @@ export default function QualityPage() {
 
                 <DialogFooter className="p-6 pt-2 bg-muted border-t">
                     <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={handleCloseDialog}>Cancelar</Button>
-                    <Button type="button" className="w-48 h-12 text-lg" onClick={handleSaveInspection} disabled={isSaving || remainingToInspect !== 0}>
+                    <Button type="button" className="w-48 h-12 text-lg" onClick={handleSaveInspection} disabled={isSaving || totalInspectedInSession === 0}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {isSaving ? "Guardando..." : "Confirmar"}
                     </Button>
