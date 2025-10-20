@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, doc, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, doc, addDoc, serverTimestamp, Timestamp, query, orderBy } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,8 +27,8 @@ export default function ProductionPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
 
-    const prodCollection = useMemoFirebase(() => firestore ? collection(firestore, 'production') : null, [firestore]);
-    const { data: production, isLoading: isLoadingProd } = useCollection<Production>(prodCollection);
+    const prodQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'production'), orderBy('fechaISO', 'desc')) : null, [firestore]);
+    const { data: production, isLoading: isLoadingProd } = useCollection<Production>(prodQuery);
 
     const machinesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]);
     const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(machinesCollection);
@@ -97,6 +97,7 @@ export default function ProductionPage() {
                 moldId,
                 pieceId,
                 ...quantities,
+                inspeccionadoCalidad: false, // Always false on creation
                 fechaISO: Timestamp.now().toDate().toISOString(), // Use client-side timestamp for consistency
             };
             await addDoc(collection(firestore, "production"), productionData);
@@ -145,7 +146,7 @@ export default function ProductionPage() {
                 <TableHead>Turno</TableHead>
                 <TableHead className="text-right">Unidades Producidas</TableHead>
                 <TableHead className="text-right">Scrap (%)</TableHead>
-                <TableHead className="text-center">Estado</TableHead>
+                <TableHead className="text-center">Calidad</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -156,7 +157,7 @@ export default function ProductionPage() {
                     </TableCell>
                 </TableRow>
               )}
-              {production?.sort((a,b) => b.fechaISO.localeCompare(a.fechaISO)).map((p) => {
+              {production?.map((p) => {
                 const totalUnits = p.qtyFinalizada + p.qtySinPrensar + p.qtyScrap + p.qtySegregada;
                 const scrapPct = totalUnits > 0 ? p.qtyScrap / totalUnits : 0;
                 const isScrapHigh = scrapPct > 0.05;
@@ -173,15 +174,26 @@ export default function ProductionPage() {
                       {(scrapPct * 100).toFixed(1)}%
                     </TableCell>
                     <TableCell className="text-center">
-                      {isScrapHigh ? (
-                        <span className="flex items-center justify-center text-destructive"><AlertTriangle className="h-4 w-4 mr-1"/> Scrap Alto</span>
+                      {p.qtySegregada > 0 ? (
+                        p.inspeccionadoCalidad ? (
+                          <Badge variant="secondary">Inspeccionado</Badge>
+                        ) : (
+                          <Badge variant="destructive">Pendiente</Badge>
+                        )
                       ) : (
-                        <span className="flex items-center justify-center text-green-600"><CheckCircle className="h-4 w-4 mr-1"/> En Tolerancia</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                   </TableRow>
                 );
               })}
+              {!isLoadingProd && (!production || production.length === 0) && (
+                 <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                        No hay registros de producción.
+                    </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

@@ -123,8 +123,11 @@ export interface Production {
   qtySinPrensar: number;
   qtyScrap: number;
   qtySegregada: number;
-  unidades: number; // deprecated, use qtyFinalizada + qtySinPrensar
-  scrapPct: number; // deprecated, calculate on the fly
+  
+  // Quality Inspection fields
+  inspeccionadoCalidad?: boolean;
+  qtyAptaCalidad?: number;
+  qtyScrapCalidad?: number;
 }
 
 export interface ScrapEntry {

@@ -20,6 +20,7 @@ import {
   Loader2,
   Shield,
   PanelLeft,
+  History,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -63,6 +64,7 @@ const adminNavItems = [
   { href: "/admin/clients", icon: Building, label: "Clientes" },
   { href: "/admin/users", icon: Users, label: "Usuarios" },
   { href: "/admin/roles", icon: Shield, label: "Roles" },
+  { href: "/scrap-history", icon: History, label: "Historial Scrap" },
 ];
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
@@ -119,7 +121,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }
   }, [isAdmin, userAllowedRoutes]);
 
-  if (isClientLoading) {
+   if (isClientLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -181,7 +183,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
         <div className="flex flex-col flex-1">
-            <header className="sticky top-0 z-10 flex h-[57px] items-center gap-1 border-b bg-background px-4 xl:hidden">
+            <header className="sticky top-0 z-40 flex h-[57px] items-center gap-1 border-b bg-background px-4 xl:hidden">
                 <SidebarTrigger>
                     <PanelLeft />
                 </SidebarTrigger>
