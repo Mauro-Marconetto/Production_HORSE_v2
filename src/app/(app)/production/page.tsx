@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { collection, doc, addDoc, serverTimestamp, Timestamp, query, orderBy } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -91,25 +91,32 @@ export default function ProductionPage() {
         }
 
         setIsSaving(true);
-        try {
-            const productionData: Omit<Production, 'id'> = {
-                turno,
-                machineId,
-                moldId,
-                pieceId,
-                ...quantities,
-                inspeccionadoCalidad: false,
-                fechaISO: new Date().toISOString(),
-            };
-            await addDoc(collection(firestore, "production"), productionData);
-            toast({ title: "Éxito", description: "Producción declarada correctamente." });
-            setIsDialogOpen(false);
-        } catch (error: any) {
-            console.error("Error saving production:", error);
-            toast({ title: "Error", description: error.message || "No se pudo guardar la producción.", variant: "destructive" });
-        } finally {
-            setIsSaving(false);
-        }
+        const productionData: Omit<Production, 'id'> = {
+            turno,
+            machineId,
+            moldId,
+            pieceId,
+            ...quantities,
+            inspeccionadoCalidad: false,
+            fechaISO: new Date().toISOString(),
+        };
+
+        addDoc(collection(firestore, "production"), productionData)
+            .then(() => {
+                toast({ title: "Éxito", description: "Producción declarada correctamente." });
+                setIsDialogOpen(false);
+            })
+            .catch((error) => {
+                const contextualError = new FirestorePermissionError({
+                    path: 'production',
+                    operation: 'create',
+                    requestResourceData: productionData,
+                });
+                errorEmitter.emit('permission-error', contextualError);
+            })
+            .finally(() => {
+                setIsSaving(false);
+            });
     };
     
     const isStep1Valid = turno && machineId && moldId;

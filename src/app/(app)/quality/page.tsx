@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { collection, doc, updateDoc, query, where } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -29,17 +29,13 @@ export default function QualityPage() {
         firestore 
             ? query(
                 collection(firestore, 'production'), 
-                where('qtySegregada', '>', 0)
+                where('qtySegregada', '>', 0),
+                where('inspeccionadoCalidad', '==', false)
               )
             : null, 
     [firestore]);
     
-    const { data: allSegregated, isLoading: isLoadingProd } = useCollection<Production>(segregatedQuery);
-
-    // Filter for not-yet-inspected items on the client
-    const pendingInspection = useMemo(() => {
-        return allSegregated?.filter(p => p.inspeccionadoCalidad === false) || [];
-    }, [allSegregated]);
+    const { data: pendingInspection, isLoading: isLoadingProd } = useCollection<Production>(segregatedQuery);
     
     const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]));
     const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]));
@@ -109,21 +105,30 @@ export default function QualityPage() {
         }
 
         setIsSaving(true);
-        try {
-            const prodDocRef = doc(firestore, 'production', selectedProduction.id);
-            await updateDoc(prodDocRef, {
-                qtyAptaCalidad: quantities.qtyAptaCalidad,
-                qtyScrapCalidad: quantities.qtyScrapCalidad,
-                inspeccionadoCalidad: true,
+        
+        const prodDocRef = doc(firestore, 'production', selectedProduction.id);
+        const updatedData = {
+            qtyAptaCalidad: quantities.qtyAptaCalidad,
+            qtyScrapCalidad: quantities.qtyScrapCalidad,
+            inspeccionadoCalidad: true,
+        };
+
+        updateDoc(prodDocRef, updatedData)
+            .then(() => {
+                toast({ title: "Éxito", description: "Inspección de calidad guardada correctamente." });
+                handleCloseDialog();
+            })
+            .catch((error) => {
+                const contextualError = new FirestorePermissionError({
+                    path: prodDocRef.path,
+                    operation: 'update',
+                    requestResourceData: updatedData,
+                });
+                errorEmitter.emit('permission-error', contextualError);
+            })
+            .finally(() => {
+                setIsSaving(false);
             });
-            toast({ title: "Éxito", description: "Inspección de calidad guardada correctamente." });
-            handleCloseDialog();
-        } catch (error: any) {
-            console.error("Error saving quality inspection:", error);
-            toast({ title: "Error", description: error.message || "No se pudo guardar la inspección.", variant: "destructive" });
-        } finally {
-            setIsSaving(false);
-        }
     };
 
     const isLoading = isLoadingProd || isLoadingMachines || isLoadingMolds || isLoadingPieces;
