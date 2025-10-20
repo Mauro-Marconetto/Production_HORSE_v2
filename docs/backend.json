@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -78,9 +79,9 @@
           "type": "string",
           "description": "The piece's unique code."
         },
-        "cliente": {
+        "clienteId": {
           "type": "string",
-          "description": "The client associated with the piece."
+          "description": "Reference to Client."
         },
         "peso": {
           "type": "number",
@@ -106,7 +107,7 @@
       "required": [
         "id",
         "codigo",
-        "cliente",
+        "clienteId",
         "peso",
         "familia",
         "stockMin",
@@ -567,6 +568,26 @@
         "minAvail",
         "maxAvail"
       ]
+    },
+    "Client": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Client",
+      "description": "Represents a client.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the client."
+        },
+        "nombre": {
+          "type": "string",
+          "description": "The name of the client."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
     }
   },
   "auth": {
@@ -833,6 +854,22 @@
             "$ref": "#/backend/entities/Setting"
           },
           "description": "Stores global settings for the application."
+        }
+      },
+      {
+        "path": "clients/{clientId}",
+        "definition": {
+          "entityName": "Client",
+          "schema": {
+            "$ref": "#/backend/entities/Client"
+          },
+          "description": "Stores client information.",
+          "params": [
+            {
+              "name": "clientId",
+              "description": "Unique identifier for the client."
+            }
+          ]
         }
       }
     ],
