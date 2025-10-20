@@ -1,5 +1,47 @@
 {
   "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User Profile",
+      "type": "object",
+      "description": "Represents a user's profile in the system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user (matches Auth UID)."
+        },
+        "name": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "role": {
+          "type": "string",
+          "description": "The user's role in the application.",
+          "enum": [
+            "Admin",
+            "Planner",
+            "Shop Floor",
+            "Viewer"
+          ]
+        },
+        "avatar": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to the user's avatar image (optional)."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email",
+        "role"
+      ]
+    },
     "Piece": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Piece",
@@ -514,6 +556,22 @@
   "firestore": {
     "structure": [
       {
+        "path": "users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores user profile information.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "Unique identifier for the user, matching Firebase Auth UID."
+            }
+          ]
+        }
+      },
+      {
         "path": "pieces/{pieceId}",
         "definition": {
           "entityName": "Piece",
@@ -743,3 +801,4 @@
     "reasoning": "The Firestore data structure is designed to support the ForgeFlow application's production planning and execution features. It prioritizes authorization independence and QAPs by denormalizing data where necessary and using structural segregation. Path-based ownership is used for user-specific data, and membership maps are avoided since there's no collaborative data in the application. The structure enables secure list operations by ensuring that each collection has a homogeneous security posture.\n\n**Authorization Independence:** Data such as the Machines, Molds and Pieces collections are global, so they don't need any explicit authorization besides roles. User-specific collections like Assignments are secured via path-based ownership.\n\n**QAPs:** List operations are secured by structural segregation. For instance, listing assignments is only allowed within a specific plan (plans/{planId}/assignments/{assignmentId}).  This prevents unauthorized listing of assignments across different plans."
   }
 }
+    

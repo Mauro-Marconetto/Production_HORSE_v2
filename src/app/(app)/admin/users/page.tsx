@@ -43,6 +43,7 @@ import { ADMIN_EMAILS } from '@/lib/config';
 function AdminUsersPageClient() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const auth = getAuth();
   const { toast } = useToast();
 
   const usersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
@@ -116,16 +117,15 @@ function AdminUsersPageClient() {
             setIsSaving(false);
             return;
         }
-        // This is a temporary auth instance for user creation.
-        // In a real-world scenario, this should be a cloud function.
-        const tempAuth = getAuth(getAuth().app);
-        const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
+        // The user creation should be handled by a backend function for security reasons in a production app.
+        // For this prototype, we'll proceed on the client, but be aware of the security implications.
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const uid = userCredential.user.uid;
         const userDocRef = doc(firestore, 'users', uid);
         await setDoc(userDocRef, { name, email, role, id: uid });
       } else {
         const userDocRef = doc(firestore, 'users', selectedUser.id);
-        await setDoc(userDocRef, { name, email, role, id: selectedUser.id }, { merge: true });
+        await setDoc(userDocRef, { name, email: selectedUser.email, role, id: selectedUser.id }, { merge: true });
       }
 
       toast({
@@ -161,6 +161,8 @@ function AdminUsersPageClient() {
     }
     setIsDeleting(true);
     try {
+        // Deleting the user from Firestore.
+        // Note: This does not delete the user from Firebase Auth. That would require a backend function.
         await deleteDoc(doc(firestore, 'users', userId));
         toast({
             title: 'Usuario Eliminado',
@@ -350,3 +352,5 @@ export default function AdminUsersPage() {
         </main>
     );
 }
+
+    

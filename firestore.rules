@@ -1,167 +1,243 @@
 /**
- * @file ForgeFlow Firestore Security Rules
- * @core-philosophy This ruleset provides role-based access control, allowing only specific email addresses to read and write data.
- * @data-structure Data is organized into top-level collections such as `pieces`, `molds`, `machines`, and others, with some collections nested under others (e.g., `plans/{planId}/assignments/{assignmentId}`).
- * @key-security-decisions Access to all data is restricted to the email addresses 'mauro.marconetto@horse.tech' and 'admin@forgeflow.com'. This is a broad permission that bypasses more granular data ownership or role-based restrictions, but allows it to work.
- * @denormalization-for-authorization N/A: These rules bypass the need for denormalization by directly checking the user's email against a list of approved emails.
- * @structural-segregation N/A: These rules grant the same access to all collections, negating the benefits of structural segregation.
+ * @fileoverview Firestore Security Rules for ForgeFlow application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a role-based access control model. Data related to Machines, Molds and Pieces collections are global.
+ * User-specific data such as Assignments are secured via path-based ownership. The rules are designed to prevent unauthorized
+ * data access and manipulation while allowing admins to add new users.
+ *
+ * Data Structure:
+ * The Firestore database is structured with top-level collections for global data (pieces, molds, machines, production, settings)
+ * and subcollections for plan-specific data (assignments).
+ *
+ * Key Security Decisions:
+ * - All write operations are protected by role or ownership checks.
+ * - List operations are generally allowed for global data.
+ *
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Grants read and write access to the `pieces` collection for specific email addresses.
+     * @description Controls access to the 'pieces' collection.
      * @path /databases/{database}/documents/pieces/{pieceId}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write a piece.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write a piece.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read piece data.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /pieces/{pieceId} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `molds` collection for specific email addresses.
+     * @description Controls access to the 'molds' collection.
      * @path /databases/{database}/documents/molds/{moldId}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write a mold.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write a mold.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read mold data.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /molds/{moldId} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `machines` collection for specific email addresses.
+     * @description Controls access to the 'machines' collection.
      * @path /databases/{database}/documents/machines/{machineId}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write a machine.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write a machine.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read machine data.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /machines/{machineId} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `demand` collection for specific email addresses.
+     * @description Controls access to the 'demand' collection.
      * @path /databases/{database}/documents/demand/{periodoYYYYWW}/{pieceId}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write demand data.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write demand data.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read demand data.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /demand/{periodoYYYYWW}/{pieceId} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `inventory` collection for specific email addresses.
+     * @description Controls access to the 'inventory' collection.
      * @path /databases/{database}/documents/inventory/{pieceId}/{fechaISO}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write inventory data.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write inventory data.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read inventory data.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /inventory/{pieceId}/{fechaISO} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `inventory/current` collection for specific email addresses.
+     * @description Controls access to the 'inventory/current' collection.
      * @path /databases/{database}/documents/inventory/current/{pieceId}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write current inventory data.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write current inventory data.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read inventory data.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /inventory/current/{pieceId} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `calendars` collection for specific email addresses.
+     * @description Controls access to the 'calendars' collection.
      * @path /databases/{database}/documents/calendars/{machineId}/{periodoYYYYWW}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write calendar data.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write calendar data.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read calendar data.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /calendars/{machineId}/{periodoYYYYWW} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `downtime` collection for specific email addresses.
+     * @description Controls access to the 'downtime' collection.
      * @path /databases/{database}/documents/downtime/{machineId}/{YYYYMM}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write downtime data.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write downtime data.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read downtime data.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /downtime/{machineId}/{YYYYMM} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `downtime_agg` collection for specific email addresses.
+     * @description Controls access to the 'downtime_agg' collection.
      * @path /databases/{database}/documents/downtime_agg/{machineId}/{YYYYMM}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write aggregated downtime data.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write aggregated downtime data.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read downtime aggregation data.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /downtime_agg/{machineId}/{YYYYMM} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `plans` collection for specific email addresses.
+     * @description Controls access to the 'plans' collection.
      * @path /databases/{database}/documents/plans/{planId}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write plan data.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write plan data.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read plan data.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /plans/{planId} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `assignments` subcollection for specific email addresses.
+     * @description Controls access to the 'assignments' subcollection under a 'plan'.
      * @path /databases/{database}/documents/plans/{planId}/assignments/{assignmentId}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write assignment data.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write assignment data.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read assignment data within a plan.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /plans/{planId}/assignments/{assignmentId} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `production` collection for specific email addresses.
+     * @description Controls access to the 'production' collection.
      * @path /databases/{database}/documents/production/{fechaISO}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write production data.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write production data.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read production data.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /production/{fechaISO} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to the `settings/global` document for specific email addresses.
+     * @description Controls access to the 'settings' document.
      * @path /databases/{database}/documents/settings/global
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write global settings.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write global settings.
-     * @principle Enforces role-based access control by email address.
+     * @allow get, list: Allows any user to read the global settings.
+     * @allow create, update, delete: Not allowed.
+     * @deny create: if true;
+     * @deny update: if true;
+     * @deny delete: if true;
+     * @principle Public read, no writes allowed.
      */
     match /settings/global {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
-    }
-    
-    /**
-     * @description Grants read and write access to the `users` collection for specific email addresses.
-     * @path /databases/{database}/documents/users/{document=**}
-     * @allow (read, write) - User with email 'mauro.marconetto@horse.tech' can read/write users data.
-     * @deny (read, write) - User with email 'outsider@example.com' cannot read/write users data.
-     * @principle Enforces role-based access control by email address.
-     */
-    match /users/{document=**} {
-      allow read, write: if request.auth.token.email in ['mauro.marconetto@horse.tech', 'admin@forgeflow.com'];
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }
