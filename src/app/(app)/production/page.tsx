@@ -91,7 +91,7 @@ export default function ProductionPage() {
         }
 
         setIsSaving(true);
-        const productionData: Omit<Production, 'id'> = {
+        const productionData: Omit<Production, 'id' | 'qtyAptaCalidad' | 'qtyScrapCalidad'> = {
             turno,
             machineId,
             moldId,
@@ -169,6 +169,7 @@ export default function ProductionPage() {
                 const totalUnits = p.qtyFinalizada + p.qtySinPrensar + p.qtyScrap + p.qtySegregada;
                 const scrapPct = totalUnits > 0 ? p.qtyScrap / totalUnits : 0;
                 const isScrapHigh = scrapPct > 0.05;
+                const unidadesProducidas = (p.qtyFinalizada || 0) + (p.qtyAptaCalidad || 0);
 
                 return (
                   <TableRow key={p.id}>
@@ -177,7 +178,7 @@ export default function ProductionPage() {
                     <TableCell>{getPieceCode(p.pieceId)}</TableCell>
                     <TableCell>{getMoldName(p.moldId)}</TableCell>
                     <TableCell className="capitalize">{p.turno}</TableCell>
-                    <TableCell className="text-right">{(p.qtyFinalizada + p.qtySinPrensar).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{unidadesProducidas.toLocaleString()}</TableCell>
                     <TableCell className={`text-right ${isScrapHigh ? 'text-destructive' : ''}`}>
                       {(scrapPct * 100).toFixed(1)}%
                     </TableCell>
