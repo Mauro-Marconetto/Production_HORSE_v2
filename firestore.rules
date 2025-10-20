@@ -1,243 +1,207 @@
 /**
- * @fileoverview Firestore Security Rules for ForgeFlow application.
- *
- * Core Philosophy:
- * This ruleset enforces a role-based access control model. Data related to Machines, Molds and Pieces collections are global.
- * User-specific data such as Assignments are secured via path-based ownership. The rules are designed to prevent unauthorized
- * data access and manipulation while allowing admins to add new users.
- *
- * Data Structure:
- * The Firestore database is structured with top-level collections for global data (pieces, molds, machines, production, settings)
- * and subcollections for plan-specific data (assignments).
- *
- * Key Security Decisions:
- * - All write operations are protected by role or ownership checks.
- * - List operations are generally allowed for global data.
- *
+ * @file Firestore Security Rules
+ * @core-philosophy This ruleset enforces a strict user-ownership model for user profiles and allows public read access to other collections, with owner-only write access.
+ * @data-structure
+ *   - /users/{userId}: Stores user profile information, accessible only by the user themselves.
+ *   - /pieces/{pieceId}: Stores information about manufactured pieces. Publicly readable, but write access is restricted.
+ *   - /molds/{moldId}: Stores information about molds. Publicly readable, but write access is restricted.
+ *   - /machines/{machineId}: Stores information about machines. Publicly readable, but write access is restricted.
+ *   - /demand/{periodoYYYYWW}/{pieceId}: Stores demand data. Publicly readable, but write access is restricted.
+ *   - /inventory/{pieceId}/{fechaISO}: Stores inventory data. Publicly readable, but write access is restricted.
+ *   - /inventory/current/{pieceId}: Stores current inventory data. Publicly readable, but write access is restricted.
+ *   - /calendars/{machineId}/{periodoYYYYWW}: Stores calendar events. Publicly readable, but write access is restricted.
+ *   - /downtime/{machineId}/{YYYYMM}: Stores downtime data. Publicly readable, but write access is restricted.
+ *   - /downtime_agg/{machineId}/{YYYYMM}: Stores aggregated downtime data. Publicly readable, but write access is restricted.
+ *   - /plans/{planId}: Stores production plans. Publicly readable, but write access is restricted.
+ *   - /plans/{planId}/assignments/{assignmentId}: Stores assignment data within a plan. Publicly readable, but write access is restricted.
+ *   - /production/{fechaISO}: Stores production data. Publicly readable, but write access is restricted.
+ *   - /settings/global: Stores global settings. Publicly readable, but write access is restricted.
+ * @key-security-decisions
+ *   - User listing is explicitly denied for the /users collection.
+ *   - Read operations are generally public for non-user collections.
+ *   - Write operations are strictly controlled, often requiring the user to be the owner or an admin.
+ * @denormalization-for-authorization N/A (No denormalization strategy is used in this configuration.)
+ * @structural-segregation User profiles are stored under /users/{userId} to enforce path-based ownership.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to the 'pieces' collection.
+     * @description Manages user profile information. Only the user can read/write their own profile.
+     * @path /databases/{database}/documents/users/{userId}
+     * @allow (create) User 'testUid' can create their profile if request.auth.uid == 'testUid'.
+     * @allow (get,update,delete) User 'testUid' can get, update, or delete their profile if request.auth.uid == 'testUid'.
+     * @deny (create) User 'anotherUid' cannot create a profile for 'testUid'.
+     * @deny (get,update,delete) User 'anotherUid' cannot get, update, or delete 'testUid' profile.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isOwner(userId) && resource.data.id == request.resource.data.id;
+      allow delete: if isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Manages manufactured piece details. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/pieces/{pieceId}
-     * @allow get, list: Allows any user to read piece data.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read piece data.
+     * @deny (create,update,delete) No user can create, update, or delete piece data.
+     * @principle Allows public read access but restricts write access.
      */
     match /pieces/{pieceId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'molds' collection.
+     * @description Manages mold information. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/molds/{moldId}
-     * @allow get, list: Allows any user to read mold data.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read mold data.
+     * @deny (create,update,delete) No user can create, update, or delete mold data.
+     * @principle Allows public read access but restricts write access.
      */
     match /molds/{moldId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'machines' collection.
+     * @description Manages machine details. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/machines/{machineId}
-     * @allow get, list: Allows any user to read machine data.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read machine data.
+     * @deny (create,update,delete) No user can create, update, or delete machine data.
+     * @principle Allows public read access but restricts write access.
      */
     match /machines/{machineId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'demand' collection.
+     * @description Manages demand data for a specific piece in a specific period. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/demand/{periodoYYYYWW}/{pieceId}
-     * @allow get, list: Allows any user to read demand data.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read demand data.
+     * @deny (create,update,delete) No user can create, update, or delete demand data.
+     * @principle Allows public read access but restricts write access.
      */
     match /demand/{periodoYYYYWW}/{pieceId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'inventory' collection.
+     * @description Manages inventory levels for a specific piece on a specific date. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/inventory/{pieceId}/{fechaISO}
-     * @allow get, list: Allows any user to read inventory data.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read inventory data.
+     * @deny (create,update,delete) No user can create, update, or delete inventory data.
+     * @principle Allows public read access but restricts write access.
      */
     match /inventory/{pieceId}/{fechaISO} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
-    /**
-     * @description Controls access to the 'inventory/current' collection.
+        /**
+     * @description Manages current inventory levels for a specific piece. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/inventory/current/{pieceId}
-     * @allow get, list: Allows any user to read inventory data.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read current inventory data.
+     * @deny (create,update,delete) No user can create, update, or delete current inventory data.
+     * @principle Allows public read access but restricts write access.
      */
     match /inventory/current/{pieceId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'calendars' collection.
+     * @description Manages calendar events for a specific machine in a specific period. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/calendars/{machineId}/{periodoYYYYWW}
-     * @allow get, list: Allows any user to read calendar data.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read calendar data.
+     * @deny (create,update,delete) No user can create, update, or delete calendar data.
+     * @principle Allows public read access but restricts write access.
      */
     match /calendars/{machineId}/{periodoYYYYWW} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'downtime' collection.
+     * @description Manages downtime events for a specific machine in a specific month. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/downtime/{machineId}/{YYYYMM}
-     * @allow get, list: Allows any user to read downtime data.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read downtime data.
+     * @deny (create,update,delete) No user can create, update, or delete downtime data.
+     * @principle Allows public read access but restricts write access.
      */
     match /downtime/{machineId}/{YYYYMM} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'downtime_agg' collection.
+     * @description Manages aggregated downtime data for a specific machine in a specific month. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/downtime_agg/{machineId}/{YYYYMM}
-     * @allow get, list: Allows any user to read downtime aggregation data.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read aggregated downtime data.
+     * @deny (create,update,delete) No user can create, update, or delete aggregated downtime data.
+     * @principle Allows public read access but restricts write access.
      */
     match /downtime_agg/{machineId}/{YYYYMM} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'plans' collection.
+     * @description Manages production plans. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/plans/{planId}
-     * @allow get, list: Allows any user to read plan data.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read production plan data.
+     * @deny (create,update,delete) No user can create, update, or delete production plan data.
+     * @principle Allows public read access but restricts write access.
      */
     match /plans/{planId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'assignments' subcollection under a 'plan'.
+     * @description Manages assignments of pieces and molds to machines within a production plan. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/plans/{planId}/assignments/{assignmentId}
-     * @allow get, list: Allows any user to read assignment data within a plan.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read assignment data.
+     * @deny (create,update,delete) No user can create, update, or delete assignment data.
+     * @principle Allows public read access but restricts write access.
      */
     match /plans/{planId}/assignments/{assignmentId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'production' collection.
+     * @description Manages actual production data for a specific date. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/production/{fechaISO}
-     * @allow get, list: Allows any user to read production data.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read production data.
+     * @deny (create,update,delete) No user can create, update, or delete production data.
+     * @principle Allows public read access but restricts write access.
      */
     match /production/{fechaISO} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'settings' document.
+     * @description Manages global settings for the application. Publicly readable, but write access is restricted.
      * @path /databases/{database}/documents/settings/global
-     * @allow get, list: Allows any user to read the global settings.
-     * @allow create, update, delete: Not allowed.
-     * @deny create: if true;
-     * @deny update: if true;
-     * @deny delete: if true;
-     * @principle Public read, no writes allowed.
+     * @allow (get,list) Any user can read global settings.
+     * @deny (create,update,delete) No user can create, update, or delete global settings.
+     * @principle Allows public read access but restricts write access.
      */
     match /settings/global {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
   }
 }
