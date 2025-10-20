@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, doc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, where, orderBy } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,18 +24,20 @@ export default function QualityPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
 
-    // Query for production runs with segregated quantity
-    const segregatedQuery = useMemoFirebase(() => 
+    // Query for all production runs, ordered by date. Filtering will happen on the client.
+    const productionQuery = useMemoFirebase(() => 
         firestore 
-            ? query(
-                collection(firestore, 'production'), 
-                where('qtySegregada', '>', 0),
-                where('inspeccionadoCalidad', '==', false)
-              )
+            ? query(collection(firestore, 'production'), orderBy('fechaISO', 'desc'))
             : null, 
     [firestore]);
     
-    const { data: pendingInspection, isLoading: isLoadingProd } = useCollection<Production>(segregatedQuery);
+    const { data: allProduction, isLoading: isLoadingProd } = useCollection<Production>(productionQuery);
+
+    // Client-side filtering to find lots pending inspection
+    const pendingInspection = useMemo(() => {
+        if (!allProduction) return [];
+        return allProduction.filter(p => p.qtySegregada > 0 && !p.inspeccionadoCalidad);
+    }, [allProduction]);
     
     const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]));
     const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]));
@@ -171,7 +173,7 @@ export default function QualityPage() {
                     </TableCell>
                 </TableRow>
               )}
-              {!isLoading && pendingInspection?.map((p) => (
+              {!isLoading && pendingInspection.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                     <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
@@ -185,7 +187,7 @@ export default function QualityPage() {
                     </TableCell>
                   </TableRow>
               ))}
-               {!isLoading && (!pendingInspection || pendingInspection.length === 0) && (
+               {!isLoading && pendingInspection.length === 0 && (
                 <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                         No hay lotes pendientes de inspección.
