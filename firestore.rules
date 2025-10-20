@@ -2,55 +2,51 @@
  * @fileoverview Firestore Security Rules for ForgeFlow application.
  *
  * Core Philosophy:
- * This ruleset enforces a security model based on a combination of ownership and public read access.
+ * This ruleset enforces a strict user-ownership model for user profiles
+ * and allows public read access to shared resources like machines, molds, and pieces.
  *
  * Data Structure:
- * The Firestore database is structured with a mix of top-level collections (e.g., 'pieces', 'molds', 'machines', 'production', 'clients') and user-specific subcollections ('users/{userId}'). Some collections use composite keys in the path.
+ * - User profiles are stored under /users/{userId}, accessible only by the owning user.
+ * - Global data like machines, molds, pieces, and clients are stored in top-level collections
+ *   and are publicly readable.
+ * - Plans and their assignments are stored under /plans/{planId}/assignments/{assignmentId}.
+ * - Production data is stored under /production/{fechaISO}.
  *
  * Key Security Decisions:
- * - User listing is generally disallowed.
- * - Most top-level collections allow public read access but require owner-only access for writes.
+ * - User listing is disallowed for privacy.
+ * - Global settings are publicly readable but not writable by clients.
+ * - Ambiguous relationships default to the most secure interpretation: owner-only access.
+ *
+ * Denormalization for Authorization:
+ *  - N/A: All authorization checks are based on path-based ownership.
+ * Structural Segregation:
+ *  - The app uses structural segregation to avoid the need for boolean flags to grant access.
+ *    For example, the production data is under /production/{fechaISO}.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to determine if the request is authenticated
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    // Helper function to determine if the authenticated user ID matches the provided user ID.
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Helper function to determine if the authenticated user is the existing owner of the document
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
     /**
-     * @description Secures user profile information, allowing only the user to read/write their own profile.
+     * @description Manages user profile access, ensuring only the owner can read/write.
      * @path /users/{userId}
-     * @allow (create) User with UID 'user123' creates their profile at /users/user123.
-     * @deny (create) User with UID 'user123' attempts to create a profile for /users/otherUser.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) Signed-in user creates their own profile.
+     * @allow (get, update, delete, list) Signed-in user accesses their own profile.
+     * @deny  (create) Signed-in user attempts to create a profile for another user.
+     * @deny  (get, update, delete, list) Signed-in user attempts to access another user's profile.
+     * @principle Enforces document ownership for all operations on user profiles.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow get, update, delete, list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
     }
 
     /**
-     * @description Secures application roles and their page access permissions.
+     * @description Manages access to application roles, which are globally readable.
      * @path /roles/{roleId}
-     * @allow (get, list) Any authenticated user can read role information.
+     * @allow (get, list) Any user can read the list of roles and any specific role.
      * @deny (create, update, delete) No user can create, update, or delete roles.
-     * @principle Restricts write access to roles.
+     * @principle Roles are read-only and managed by administrators only (not implemented in this prototype).
      */
     match /roles/{roleId} {
       allow get, list: if true;
@@ -58,197 +54,180 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures manufactured pieces information. Allows public read access, owner-only writes.
+     * @description Manages access to piece data, which is publicly readable.
      * @path /pieces/{pieceId}
-     * @allow (get, list) Any user can read piece information.
-     * @deny (create, update, delete) Only the owner can write piece information.
-     * @principle Enforces owner-only access for writes.
+     * @allow (get, list) Any user can read the list of pieces and any specific piece.
+     * @deny (create, update, delete) No user can create, update, or delete pieces.
+     * @principle Pieces are read-only and managed by administrators only (not implemented in this prototype).
      */
     match /pieces/{pieceId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Secures mold information used in the aluminum injection process. Allows public read access, owner-only writes.
+     * @description Manages access to mold data, which is publicly readable.
      * @path /molds/{moldId}
-     * @allow (get, list) Any user can read mold information.
-     * @deny (create, update, delete) Only the owner can write mold information.
-     * @principle Enforces owner-only access for writes.
+     * @allow (get, list) Any user can read the list of molds and any specific mold.
+     * @deny (create, update, delete) No user can create, update, or delete molds.
+     * @principle Molds are read-only and managed by administrators only (not implemented in this prototype).
      */
     match /molds/{moldId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Secures machine information used in production. Allows public read access, owner-only writes.
+     * @description Manages access to machine data, which is publicly readable.
      * @path /machines/{machineId}
-     * @allow (get, list) Any user can read machine information.
-     * @deny (create, update, delete) Only the owner can write machine information.
-     * @principle Enforces owner-only access for writes.
+     * @allow (get, list) Any user can read the list of machines and any specific machine.
+     * @deny (create, update, delete) No user can create, update, or delete machines.
+     * @principle Machines are read-only and managed by administrators only (not implemented in this prototype).
      */
     match /machines/{machineId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Secures demand data for a specific piece in a specific period. Allows public read access, owner-only writes.
+     * @description Manages access to demand data, which is publicly readable.
      * @path /demand/{periodoYYYYWW}/{pieceId}
-     * @allow (get, list) Any user can read demand information.
-     * @deny (create, update, delete) Only the owner can write demand information.
-     * @principle Enforces owner-only access for writes.
+     * @allow (get, list) Any user can read demand data.
+     * @deny (create, update, delete) No user can create, update, or delete demand data.
+     * @principle Demand data is read-only and managed by administrators only (not implemented in this prototype).
      */
     match /demand/{periodoYYYYWW}/{pieceId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Secures inventory levels for a specific piece on a specific date. Allows public read access, owner-only writes.
+     * @description Manages access to inventory data, which is publicly readable.
      * @path /inventory/{pieceId}/{fechaISO}
-     * @allow (get, list) Any user can read inventory information.
-     * @deny (create, update, delete) Only the owner can write inventory information.
-     * @principle Enforces owner-only access for writes.
+     * @allow (get, list) Any user can read inventory data.
+     * @deny (create, update, delete) No user can create, update, or delete inventory data.
+     * @principle Inventory data is read-only and managed by administrators only (not implemented in this prototype).
      */
     match /inventory/{pieceId}/{fechaISO} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
-    /**
-     * @description Secures the current inventory level for a specific piece. Allows public read access, owner-only writes.
-     * @path /inventory/current/{pieceId}
-     * @allow (get, list) Any user can read the current inventory information.
-     * @deny (create, update, delete) Only the owner can write the current inventory information.
-     */
+     /**
+      * @description Manages access to current inventory data, which is publicly readable.
+      * @path inventory/current/{pieceId}
+      * @allow (get, list) Any user can read current inventory data.
+      * @deny (create, update, delete) No user can create, update, or delete current inventory data.
+      * @principle Current inventory data is read-only and managed by administrators only (not implemented in this prototype).
+      */
     match /inventory/current/{pieceId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Secures calendar events for a specific machine in a specific period. Allows public read access, owner-only writes.
+     * @description Manages access to calendar data, which is publicly readable.
      * @path /calendars/{machineId}/{periodoYYYYWW}
-     * @allow (get, list) Any user can read calendar information.
-     * @deny (create, update, delete) Only the owner can write calendar information.
-     * @principle Enforces owner-only access for writes.
+     * @allow (get, list) Any user can read calendar data.
+     * @deny (create, update, delete) No user can create, update, or delete calendar data.
+     * @principle Calendar data is read-only and managed by administrators only (not implemented in this prototype).
      */
     match /calendars/{machineId}/{periodoYYYYWW} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Secures downtime events for a specific machine in a specific month. Allows public read access, owner-only writes.
+     * @description Manages access to downtime data, which is publicly readable.
      * @path /downtime/{machineId}/{YYYYMM}
-     * @allow (get, list) Any user can read downtime information.
-     * @deny (create, update, delete) Only the owner can write downtime information.
-     * @principle Enforces owner-only access for writes.
+     * @allow (get, list) Any user can read downtime data.
+     * @deny (create, update, delete) No user can create, update, or delete downtime data.
+     * @principle Downtime data is read-only and managed by administrators only (not implemented in this prototype).
      */
     match /downtime/{machineId}/{YYYYMM} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Secures aggregated downtime data for a specific machine in a specific month. Allows public read access, owner-only writes.
+     * @description Manages access to aggregated downtime data, which is publicly readable.
      * @path /downtime_agg/{machineId}/{YYYYMM}
-     * @allow (get, list) Any user can read aggregated downtime information.
-     * @deny (create, update, delete) Only the owner can write aggregated downtime information.
-     * @principle Enforces owner-only access for writes.
+     * @allow (get, list) Any user can read aggregated downtime data.
+     * @deny (create, update, delete) No user can create, update, or delete aggregated downtime data.
+     * @principle Aggregated downtime data is read-only and managed by administrators only (not implemented in this prototype).
      */
     match /downtime_agg/{machineId}/{YYYYMM} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Secures production plans. Allows public read access, owner-only writes.
+     * @description Manages access to production plans, which are publicly readable.
      * @path /plans/{planId}
-     * @allow (get, list) Any user can read plan information.
-     * @deny (create, update, delete) Only the owner can write plan information.
-     * @principle Enforces owner-only access for writes.
+     * @allow (get, list) Any user can read production plans.
+     * @deny (create, update, delete) No user can create, update, or delete production plans.
+     * @principle Production plans are read-only and managed by administrators only (not implemented in this prototype).
      */
     match /plans/{planId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Secures assignments of pieces and molds to machines for a specific week within a production plan. Allows public read access, owner-only writes.
+     * @description Manages access to assignment data within a plan, which is publicly readable.
      * @path /plans/{planId}/assignments/{assignmentId}
-     * @allow (get, list) Any user can read assignment information.
-     * @deny (create, update, delete) Only the owner can write assignment information.
-     * @principle Enforces owner-only access for writes.
+     * @allow (get, list) Any user can read assignment data within a specific plan.
+     * @deny (create, update, delete) No user can create, update, or delete assignment data.
+     * @principle Assignment data is read-only and managed by administrators only (not implemented in this prototype).
      */
     match /plans/{planId}/assignments/{assignmentId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
-    /**
-     * @description Secures actual production data for a specific date. Allows public read access, owner-only writes.
-     * @path /production/{fechaISO}
-     * @allow (get, list) Any user can read production information.
-     * @deny (create, update, delete) Only the owner can write production information.
-     * @principle Enforces owner-only access for writes.
-     */
+   /**
+    * @description Manages access to production data, which is publicly readable.
+    * @path /production/{fechaISO}
+    * @allow (get, list) Any user can read production data for a specific date.
+    * @deny (create, update, delete) No user can create, update, or delete production data.
+    * @principle Production data is read-only and managed by administrators only (not implemented in this prototype).
+    */
     match /production/{fechaISO} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Secures global settings for the application.
+     * @description Manages access to global settings, which are publicly readable.
      * @path /settings/global
-     * @allow get: if true;
-     * @deny write: Always denies all writes to global settings.
-     * @principle Restricts write access to global settings.
+     * @allow (get) Any user can read global settings.
+     * @deny (create, update, delete, list) No user can create, update, or delete global settings.
+     * @principle Global settings are read-only and managed by administrators only (not implemented in this prototype).
      */
     match /settings/global {
       allow get: if true;
-      allow create, update, delete: if false;
-      allow list: if false;
+      allow create, update, delete, list: if false;
     }
 
     /**
-     * @description Secures client information. Allows public read access, owner-only writes.
+     * @description Manages access to client data, which is publicly readable.
      * @path /clients/{clientId}
-     * @allow (get, list) Any user can read client information.
-     * @deny (create, update, delete) Only the owner can write client information.
-     * @principle Enforces owner-only access for writes.
+     * @allow (get, list) Any user can read client data.
+     * @deny (create, update, delete) No user can create, update, or delete client data.
+     * @principle Client data is read-only and managed by administrators only (not implemented in this prototype).
      */
     match /clients/{clientId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
+    }
+
+    // functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
   }
 }
