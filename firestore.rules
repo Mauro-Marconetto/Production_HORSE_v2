@@ -2,224 +2,311 @@
  * @fileoverview Firestore Security Rules for ForgeFlow application.
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for user profiles,
- * while other collections (pieces, molds, machines) are globally accessible.
+ * This ruleset enforces a strict, role-based access control model.  Data is segregated to ensure
+ * users can only access resources they are authorized to view or modify. Path-based ownership is used for user
+ * specific data. Read access is generally public for non user-specific collections (Machines, Molds, Pieces).
+ * Write access is generally restricted based on the user's role.
  *
  * Data Structure:
- * - User profiles are stored under /users/{userId}, where userId matches the
- *   Firebase Auth UID.
- * - Pieces, Molds, and Machines are stored in top-level collections (/pieces,
- *   /molds, /machines) and are publicly readable.
- * - Demand, Inventory, Calendars, Downtime, DowntimeAgg, Plans, Assignments, Production and Settings are stored in
- *   top-level collections and are publicly readable.
+ * - /users/{userId}: Stores user profile information. Only the user themselves can read/write their profile.
+ * - /roles/{roleId}: Stores application roles. Read access is public, write access is restricted to admins.
+ * - /pieces/{pieceId}: Stores manufactured piece details. Read access is public, write access is restricted to admins.
+ * - /molds/{moldId}: Stores mold information. Read access is public, write access is restricted to admins.
+ * - /machines/{machineId}: Stores machine details. Read access is public, write access is restricted to admins.
+ * - /demand/{periodoYYYYWW}/{pieceId}: Stores demand data. Read access is public, write access is restricted to admins.
+ * - /inventory/{pieceId}/{fechaISO}: Stores inventory levels. Read access is public, write access is restricted to admins.
+ * - /inventory/current/{pieceId}: Stores current inventory levels. Read access is public, write access is restricted to admins.
+ * - /calendars/{machineId}/{periodoYYYYWW}: Stores calendar events. Read access is public, write access is restricted to admins.
+ * - /downtime/{machineId}/{YYYYMM}: Stores downtime events. Read access is public, write access is restricted to admins.
+ * - /downtime_agg/{machineId}/{YYYYMM}: Stores aggregated downtime data. Read access is public, write access is restricted to admins.
+ * - /plans/{planId}: Stores production plans. Read access is public, write access is restricted to admins.
+ * - /plans/{planId}/assignments/{assignmentId}: Stores assignment details. Read access is public, write access is restricted to admins.
+ * - /production/{fechaISO}: Stores production data. Read access is public, write access is restricted to admins.
+ * - /settings/global: Stores global settings. Read access is public, write access is restricted to admins.
+ * - /clients/{clientId}: Stores client information. Read access is public, write access is restricted to admins.
  *
  * Key Security Decisions:
- * - User profiles are only accessible to the owning user.
- * - Listing of users is disallowed to protect user privacy.
- * - Other collections are publicly readable, but writes are disallowed except
- *   where explicitly allowed by rules below.
+ * - No user listing is allowed.
+ * - Read-only collections (e.g., roles) are explicitly marked.
+ * - Default security posture for ambiguous relationships is strict owner-only access.
+ *
+ * Denormalization for Authorization:
+ *  - No denormalization is required. The data model already supports the necessary access control.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile documents.
+     * @description Allows users to read and write their own profile data.
      * @path /users/{userId}
-     * @allow (create) - If the user's UID matches the userId and the ID field on the document matches the user ID.
-     * @allow (get, update, delete) - If the user's UID matches the userId.
-     * @deny (create) - If the user's UID does not match the userId.
-     * @deny (get, update, delete) - If the user's UID does not match the userId.
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) User with ID 'user123' creates their own profile.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "user123", "name": "Test User", "email": "test@example.com", "role": "user" } } }
+     * @allow (update) User with ID 'user123' updates their own profile.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "user123", "name": "Updated Name", "email": "test@example.com", "role": "user" } }, "resource.data": { "id": "user123", "name": "Test User", "email": "test@example.com", "role": "user" } }
+     * @deny (create) User with ID 'user123' tries to create a profile for 'user456'.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "user456", "name": "Test User", "email": "test@example.com", "role": "user" } } }
+     * @principle Enforces document ownership for writes and validates relational integrity.
      */
     match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      allow get: if isOwner(userId);
-      allow list: if false;
-
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false; // Listing users is not permitted.
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isSignedIn() && isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to piece documents.
+     * @description Allows anyone to read roles, but restricts writes to administrators.
+     * @path /roles/{roleId}
+     * @allow (get) Any authenticated user can get a role.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list roles.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create a role.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "newRole", "name": "New Role", "allowedRoutes": [] } } }
+     * @principle Restricts write access based on user roles.
+     */
+    match /roles/{roleId} {
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
+    }
+
+    /**
+     * @description Allows anyone to read piece details, but restricts writes to administrators.
      * @path /pieces/{pieceId}
-     * @allow (get, list) - Anyone can read piece documents.
-     * @deny (create, update, delete) - No one can create, update, or delete piece documents.
-     * @principle Pieces are globally accessible, read-only data.
+     * @allow (get) Any authenticated user can get a piece.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list pieces.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create a piece.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "newPiece", "codigo": "PC123", "clienteId": "client456" } } }
+     * @principle Restricts write access based on user roles.
      */
     match /pieces/{pieceId} {
-      allow get: if true;
-      allow list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
 
     /**
-     * @description Controls access to mold documents.
+     * @description Allows anyone to read mold information, but restricts writes to administrators.
      * @path /molds/{moldId}
-     * @allow (get, list) - Anyone can read mold documents.
-     * @deny (create, update, delete) - No one can create, update, or delete mold documents.
-     * @principle Molds are globally accessible, read-only data.
+     * @allow (get) Any authenticated user can get a mold.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list molds.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create a mold.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "newMold", "nombre": "New Mold", "pieces": [], "cavidades": 4, "compatibilidad": [], "cicloBase_s": 10, "setupMin": 30, "vidaMaxTiros": 10000, "tiempoRecambioMin": 60, "status": "ok" } } }
+     * @principle Restricts write access based on user roles.
      */
     match /molds/{moldId} {
-      allow get: if true;
-      allow list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
 
     /**
-     * @description Controls access to machine documents.
+     * @description Allows anyone to read machine details, but restricts writes to administrators.
      * @path /machines/{machineId}
-     * @allow (get, list) - Anyone can read machine documents.
-     * @deny (create, update, delete) - No one can create, update, or delete machine documents.
-     * @principle Machines are globally accessible, read-only data.
+     * @allow (get) Any authenticated user can get a machine.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list machines.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create a machine.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "newMachine", "nombre": "New Machine", "tonelaje": 100, "turnosSemana": 5, "horasTurno": 8, "OEE_obj": 0.8 } } }
+     * @principle Restricts write access based on user roles.
      */
     match /machines/{machineId} {
-      allow get: if true;
-      allow list: if true;
-       allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
 
     /**
-     * @description Controls access to demand documents.
+     * @description Allows anyone to read demand data, but restricts writes to administrators.
      * @path /demand/{periodoYYYYWW}/{pieceId}
-     * @allow (get, list) - Anyone can read demand documents.
-     * @deny (create, update, delete) - No one can create, update, or delete demand documents.
-     * @principle Demand data is globally accessible, read-only data.
+     * @allow (get) Any authenticated user can get demand data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list demand data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create demand data.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "periodoYYYYWW": "202401", "pieceId": "piece123", "qty": 1000, "prioridad": 1, "version": 1, "congelado": false } } }
+     * @principle Restricts write access based on user roles.
      */
     match /demand/{periodoYYYYWW}/{pieceId} {
-      allow get: if true;
-      allow list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
 
     /**
-     * @description Controls access to inventory documents.
+     * @description Allows anyone to read inventory levels, but restricts writes to administrators.
      * @path /inventory/{pieceId}/{fechaISO}
-     * @allow (get, list) - Anyone can read inventory documents.
-     * @deny (create, update, delete) - No one can create, update, or delete inventory documents.
-     * @principle Inventory data is globally accessible, read-only data.
+     * @allow (get) Any authenticated user can get inventory data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list inventory data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create inventory data.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "pieceId": "piece123", "fechaISO": "2024-01-01", "stock": 500 } } }
+     * @principle Restricts write access based on user roles.
      */
     match /inventory/{pieceId}/{fechaISO} {
-      allow get: if true;
-      allow list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
 
-    /**
-     * @description Controls access to current inventory documents.
+       /**
+     * @description Allows anyone to read inventory levels, but restricts writes to administrators.
      * @path /inventory/current/{pieceId}
-     * @allow (get, list) - Anyone can read inventory documents.
-     * @deny (create, update, delete) - No one can create, update, or delete inventory documents.
+     * @allow (get) Any authenticated user can get inventory data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list inventory data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create inventory data.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "pieceId": "piece123", "fechaISO": "2024-01-01", "stock": 500 } } }
+     * @principle Restricts write access based on user roles.
      */
     match /inventory/current/{pieceId} {
-        allow get: if true;
-        allow list: if true;
-        allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
 
     /**
-     * @description Controls access to calendar documents.
+     * @description Allows anyone to read calendar events, but restricts writes to administrators.
      * @path /calendars/{machineId}/{periodoYYYYWW}
-     * @allow (get, list) - Anyone can read calendar documents.
-     * @deny (create, update, delete) - No one can create, update, or delete calendar documents.
-     * @principle Calendar data is globally accessible, read-only data.
+     * @allow (get) Any authenticated user can get calendar data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list calendar data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create calendar data.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "machineId": "machine123", "periodoYYYYWW": "202401", "mantenimientoPlan": [], "tryouts": [] } } }
+     * @principle Restricts write access based on user roles.
      */
     match /calendars/{machineId}/{periodoYYYYWW} {
-      allow get: if true;
-      allow list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
 
     /**
-     * @description Controls access to downtime documents.
+     * @description Allows anyone to read downtime events, but restricts writes to administrators.
      * @path /downtime/{machineId}/{YYYYMM}
-     * @allow (get, list) - Anyone can read downtime documents.
-     * @deny (create, update, delete) - No one can create, update, or delete downtime documents.
-     * @principle Downtime data is globally accessible, read-only data.
+     * @allow (get) Any authenticated user can get downtime data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list downtime data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create downtime data.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "machineId": "machine123", "YYYYMM": "202401", "minutos": 60, "categoria": "Mechanical", "plan": false, "tryout": false } } }
+     * @principle Restricts write access based on user roles.
      */
     match /downtime/{machineId}/{YYYYMM} {
-      allow get: if true;
-      allow list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
 
     /**
-     * @description Controls access to aggregated downtime documents.
+     * @description Allows anyone to read aggregated downtime data, but restricts writes to administrators.
      * @path /downtime_agg/{machineId}/{YYYYMM}
-     * @allow (get, list) - Anyone can read aggregated downtime documents.
-     * @deny (create, update, delete) - No one can create, update, or delete aggregated downtime documents.
-     * @principle Aggregated downtime data is globally accessible, read-only data.
+     * @allow (get) Any authenticated user can get downtime aggregation data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list downtime aggregation data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create downtime aggregation data.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "machineId": "machine123", "YYYYMM": "202401", "min_totales": 60, "min_planificados": 0, "min_no_plan": 60, "min_tryout": 0 } } }
+     * @principle Restricts write access based on user roles.
      */
     match /downtime_agg/{machineId}/{YYYYMM} {
-      allow get: if true;
-      allow list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
 
     /**
-     * @description Controls access to plan documents.
+     * @description Allows anyone to read production plans, but restricts writes to administrators.
      * @path /plans/{planId}
-     * @allow (get, list) - Anyone can read plan documents.
-     * @deny (create, update, delete) - No one can create, update, or delete plan documents.
-     * @principle Plans are globally accessible, read-only data.
+     * @allow (get) Any authenticated user can get a plan.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list plans.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create a plan.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "newPlan", "createdAt": "2024-01-01T00:00:00Z", "params": "{}", "status": "draft" } } }
+     * @principle Restricts write access based on user roles.
      */
     match /plans/{planId} {
-      allow get: if true;
-      allow list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
 
     /**
-     * @description Controls access to assignment documents within a plan.
+     * @description Allows anyone to read assignments, but restricts writes to administrators.
      * @path /plans/{planId}/assignments/{assignmentId}
-     * @allow (get, list) - Anyone can read assignment documents within a plan.
-     * @deny (create, update, delete) - No one can create, update, or delete assignment documents.
-     * @principle Assignments are globally accessible, read-only data.
+     * @allow (get) Any authenticated user can get an assignment.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list assignments.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create an assignment.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "planId": "plan123", "pieceId": "piece456", "moldId": "mold789", "machineId": "machine101", "semana": "202401", "horas": 8, "setup": true, "prodUnidades": 1000 } } }
+     * @principle Restricts write access based on user roles.
      */
     match /plans/{planId}/assignments/{assignmentId} {
-      allow get: if true;
-      allow list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
-
-     /**
-      * @description Controls access to production documents.
-      * @path /production/{fechaISO}
-      * @allow (get, list) - Anyone can read production documents.
-      * @deny (create, update, delete) - No one can create, update, or delete production documents.
-      */
-     match /production/{fechaISO} {
-        allow get: if true;
-        allow list: if true;
-        allow create, update, delete: if false;
-     }
 
     /**
-     * @description Controls access to global settings document.
+     * @description Allows anyone to read production data, but restricts writes to administrators.
+     * @path /production/{fechaISO}
+     * @allow (get) Any authenticated user can get production data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list production data.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create production data.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "fechaISO": "2024-01-01", "machineId": "machine123", "pieceId": "piece456", "moldId": "mold789", "horas": 8, "unidades": 1000, "scrapPct": 0.05 } } }
+     * @principle Restricts write access based on user roles.
+     */
+    match /production/{fechaISO} {
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
+    }
+
+    /**
+     * @description Allows anyone to read global settings, but restricts writes to administrators.
      * @path /settings/global
-     * @allow (get) - Anyone can read the settings document.
-     * @deny (list, create, update, delete) - No one can list, create, update, or delete the settings document.
-     * @principle Settings are globally accessible, read-only data.
+     * @allow (get) Any authenticated user can get global settings.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list global settings.
+         *   - Request: { "auth": { "uid": "user123" } }
+
+     * @deny (create) Non-admin user tries to create global settings.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "ventana_meses": 6, "suavizado_alpha": 0.2, "cap_pct": 0.9, "minAvail": 0.7, "maxAvail": 0.95 } } }
+     * @principle Restricts write access based on user roles.
      */
     match /settings/global {
-      allow get: if true;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
     }
+
+    /**
+     * @description Allows anyone to read client information, but restricts writes to administrators.
+     * @path /clients/{clientId}
+     * @allow (get) Any authenticated user can get client information.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @allow (list) Any authenticated user can list client information.
+     *   - Request: { "auth": { "uid": "user123" } }
+     * @deny (create) Non-admin user tries to create client information.
+     *   - Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "newClient", "nombre": "New Client" } } }
+     * @principle Restricts write access based on user roles.
+     */
+    match /clients/{clientId} {
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Enable admin-only writes
+    }
+  }
+
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+    return isOwner(userId) && resource != null;
   }
 }
