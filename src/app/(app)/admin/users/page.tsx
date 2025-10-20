@@ -6,7 +6,7 @@ import { useState, useMemo, useTransition, useCallback } from 'react';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { firebaseConfig } from '@/firebase/config';
 
 import { Button } from '@/components/ui/button';
@@ -40,7 +40,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, PlusCircle, Trash2, Edit, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { UserProfile } from '@/lib/types';
-import { ADMIN_EMAILS } from '@/lib/config';
 
 
 function AdminUsersPageClient() {
@@ -335,8 +334,18 @@ function AdminUsersPageClient() {
 
 export default function AdminUsersPage() {
     const { user, isUserLoading } = useUser();
+    const firestore = useFirestore();
 
-    if (isUserLoading) {
+    const userProfileRef = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return doc(firestore, 'users', user.uid);
+    }, [user, firestore]);
+
+    const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+    const isLoading = isUserLoading || isProfileLoading;
+
+    if (isLoading) {
         return (
             <div className="flex h-screen w-full items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin" />
@@ -344,7 +353,7 @@ export default function AdminUsersPage() {
         );
     }
 
-    const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
+    const isAdmin = userProfile?.role === 'Admin';
 
     if (!isAdmin) {
         return (
@@ -368,7 +377,3 @@ export default function AdminUsersPage() {
         </main>
     );
 }
-
-    
-
-    
