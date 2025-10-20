@@ -19,6 +19,7 @@ import {
   Building,
   Loader2,
   Shield,
+  PanelLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -36,6 +37,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarInset,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { UserNav } from "@/components/user-nav";
 import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
@@ -168,9 +170,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <UserNav />
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset>{children}</SidebarInset>
+      <div className="flex flex-col flex-1">
+          <header className="sticky top-0 z-10 flex h-[57px] items-center gap-1 border-b bg-background px-4 xl:hidden">
+              <SidebarTrigger>
+                  <PanelLeft />
+              </SidebarTrigger>
+          </header>
+          <SidebarInset>{children}</SidebarInset>
+      </div>
     </SidebarProvider>
   );
 }
-
-    
