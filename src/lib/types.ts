@@ -125,9 +125,9 @@ export interface Production {
   qtySegregada: number;
   
   // Quality Inspection fields
-  inspeccionadoCalidad?: boolean;
-  qtyAptaCalidad?: number;
-  qtyScrapCalidad?: number;
+  inspeccionadoCalidad: boolean;
+  qtyAptaCalidad: number;
+  qtyScrapCalidad: number;
 }
 
 export interface ScrapEntry {

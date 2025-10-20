@@ -99,6 +99,8 @@ export default function ProductionPage() {
                 pieceId,
                 ...quantities,
                 inspeccionadoCalidad: false, // Always false on creation
+                qtyAptaCalidad: 0,
+                qtyScrapCalidad: 0,
                 fechaISO: Timestamp.now().toDate().toISOString(), // Use client-side timestamp for consistency
             };
             await addDoc(collection(firestore, "production"), productionData);
