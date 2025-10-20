@@ -8,6 +8,7 @@ export interface Client {
 export interface Piece {
   id: string;
   codigo: string;
+  clienteId: string;
 }
 
 export interface Mold {
@@ -168,5 +169,3 @@ export interface Role {
     name: string;
     allowedRoutes: string[];
 }
-
-    

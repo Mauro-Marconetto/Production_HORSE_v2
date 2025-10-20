@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -67,6 +67,7 @@ export default function AdminClientsPage() {
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     const clientId = selectedClient ? selectedClient.id : `C${Date.now()}`;
+    const pieceCodigo = formData.get('pieceCodigo') as string;
     
     const clientData: Client = {
       id: clientId,
@@ -74,12 +75,27 @@ export default function AdminClientsPage() {
     };
 
     try {
-      const clientDocRef = doc(firestore, 'clients', clientId);
-      await setDoc(clientDocRef, clientData, { merge: true });
+        const batch = writeBatch(firestore);
+
+        const clientDocRef = doc(firestore, 'clients', clientId);
+        batch.set(clientDocRef, clientData, { merge: true });
+
+        if (pieceCodigo) {
+            const pieceId = `P${Date.now()}`;
+            const pieceDocRef = doc(firestore, 'pieces', pieceId);
+            const pieceData: Piece = {
+                id: pieceId,
+                codigo: pieceCodigo,
+                clienteId: clientId,
+            };
+            batch.set(pieceDocRef, pieceData);
+        }
+
+        await batch.commit();
 
       toast({
         title: 'Éxito',
-        description: `Cliente ${selectedClient ? 'actualizado' : 'creado'} correctamente.`,
+        description: `Cliente ${selectedClient ? 'actualizado' : 'creado'} correctamente. ${pieceCodigo ? 'Y pieza asociada.' : ''}`,
       });
       setIsDialogOpen(false);
     } catch (error: any) {
@@ -96,7 +112,6 @@ export default function AdminClientsPage() {
 
     const handleDelete = async (clientId: string) => {
         if (!firestore) return;
-        // Check if client has pieces
         const clientHasPieces = pieces?.some(p => p.clienteId === clientId);
         if (clientHasPieces) {
             toast({
@@ -236,8 +251,12 @@ export default function AdminClientsPage() {
           <form onSubmit={handleSave}>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="nombre" className="text-right">Nombre</Label>
+                <Label htmlFor="nombre" className="text-right">Nombre Cliente</Label>
                 <Input id="nombre" name="nombre" defaultValue={selectedClient?.nombre || ''} className="col-span-3" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="pieceCodigo" className="text-right">Añadir Pieza (Opcional)</Label>
+                <Input id="pieceCodigo" name="pieceCodigo" placeholder="Código de la nueva pieza" className="col-span-3" />
               </div>
             </div>
             <DialogFooter>
@@ -254,5 +273,3 @@ export default function AdminClientsPage() {
     </main>
   );
 }
-
-    
