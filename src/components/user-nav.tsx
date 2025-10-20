@@ -66,7 +66,6 @@ export function UserNav() {
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={handleLogout}>
             Cerrar Sesión
-            <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
