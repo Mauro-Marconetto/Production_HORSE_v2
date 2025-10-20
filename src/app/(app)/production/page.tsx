@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { collection, doc, addDoc, serverTimestamp, Timestamp, query, orderBy } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,6 +26,7 @@ const declarationFields: { key: DeclarationField, label: string }[] = [
 
 export default function ProductionPage() {
     const firestore = useFirestore();
+    const { user } = useUser();
     const { toast } = useToast();
 
     const prodQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'production'), orderBy('fechaISO', 'desc')) : null, [firestore]);
@@ -82,7 +83,10 @@ export default function ProductionPage() {
     const handleClear = () => setCurrentInput('');
 
     const handleSaveProduction = async () => {
-        if (!firestore) return;
+        if (!firestore || !user) {
+            toast({ title: "Error", description: "No has iniciado sesión.", variant: "destructive" });
+            return;
+        };
         
         const pieceId = molds?.find(m => m.id === moldId)?.pieces[0];
         if (!pieceId) {
@@ -91,12 +95,13 @@ export default function ProductionPage() {
         }
 
         setIsSaving(true);
-        const productionData: Omit<Production, 'id' | 'qtyAptaCalidad' | 'qtyScrapCalidad'> = {
+        const productionData: Omit<Production, 'id' > = {
             turno,
             machineId,
             moldId,
             pieceId,
             ...quantities,
+            createdBy: user.uid,
             inspeccionadoCalidad: false,
             fechaISO: new Date().toISOString(),
         };
@@ -333,5 +338,3 @@ export default function ProductionPage() {
     </main>
   );
 }
-
-    

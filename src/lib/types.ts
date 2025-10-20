@@ -118,17 +118,21 @@ export interface Production {
   machineId: string;
   pieceId: string;
   moldId: string;
-  turno: 'mañana' | 'tarde' | 'noche';
+  turno: 'mañana' | 'tarde' | 'noche' | '';
   qtyFinalizada: number;
   qtySinPrensar: number;
   qtyScrap: number;
   qtySegregada: number;
+  createdBy?: string; // UID of user who declared production
   
   // Quality Inspection fields
   inspeccionadoCalidad: boolean;
   qtyAptaCalidad?: number;
   qtyScrapCalidad?: number;
+  inspectedBy?: string; // UID of user who inspected
+  inspectionDate?: string; // ISO date of inspection
 }
+
 
 export interface ScrapEntry {
     id: string;

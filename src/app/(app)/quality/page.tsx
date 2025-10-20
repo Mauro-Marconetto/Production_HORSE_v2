@@ -2,8 +2,8 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, doc, updateDoc, query, orderBy } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, doc, updateDoc, query, orderBy, where } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -27,8 +27,10 @@ const inspectionFields: { key: QualityInspectionField, label: string }[] = [
 
 export default function QualityPage() {
     const firestore = useFirestore();
+    const { user } = useUser();
     const { toast } = useToast();
 
+    // Query for all production data, let client-side filtering handle the logic
     const productionQuery = useMemoFirebase(() => 
         firestore 
             ? query(collection(firestore, 'production'), orderBy('fechaISO', 'desc'))
@@ -50,21 +52,22 @@ export default function QualityPage() {
         to: new Date(),
     });
 
-    // Client-side filtering
+    // Client-side filtering for pending inspections
     const pendingInspection = useMemo(() => {
         if (!allProduction) return [];
-        return allProduction.filter(p => p.qtySegregada > 0 && !p.inspeccionadoCalidad);
+        return allProduction.filter(p => p.qtySegregada > 0 && p.inspeccionadoCalidad === false);
     }, [allProduction]);
 
+    // Client-side filtering for history
     const inspectedHistory = useMemo(() => {
         if (!allProduction) return [];
         return allProduction.filter(p => {
-            const isInspected = p.inspeccionadoCalidad;
+            const isInspected = p.inspeccionadoCalidad === true;
             if (!isInspected || !date?.from) return false;
             
             const inspectionDate = new Date(p.fechaISO);
             const fromDate = date.from;
-            const toDate = date.to ? addDays(date.to, 1) : addDays(fromDate, 1); // include the whole "to" day
+            const toDate = date.to ? addDays(date.to, 1) : addDays(fromDate, 1);
 
             return inspectionDate >= fromDate && inspectionDate < toDate;
         });
@@ -123,7 +126,10 @@ export default function QualityPage() {
     const remainingToInspect = (selectedProduction?.qtySegregada || 0) - totalInspected;
 
     const handleSaveInspection = async () => {
-        if (!firestore || !selectedProduction) return;
+        if (!firestore || !selectedProduction || !user) {
+            toast({ title: "Error", description: "No se puede guardar. Falta información de usuario o de base de datos.", variant: "destructive" });
+            return;
+        }
         if (remainingToInspect !== 0) {
             toast({ title: "Error de Validación", description: `Aún quedan ${remainingToInspect} unidades por clasificar.`, variant: "destructive" });
             return;
@@ -135,6 +141,8 @@ export default function QualityPage() {
         const updatedData = {
             qtyAptaCalidad: quantities.qtyAptaCalidad,
             qtyScrapCalidad: quantities.qtyScrapCalidad,
+            inspectedBy: user.uid,
+            inspectionDate: new Date().toISOString(),
             inspeccionadoCalidad: true,
         };
 
@@ -160,7 +168,6 @@ export default function QualityPage() {
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
     const getMoldName = (id: string) => molds?.find(m => m.id === id)?.nombre || 'N/A';
-
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
@@ -291,7 +298,7 @@ export default function QualityPage() {
                     )}
                     {!isLoading && inspectedHistory.map((p) => (
                         <TableRow key={p.id}>
-                            <TableCell>{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
+                            <TableCell>{new Date(p.inspectionDate || p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                             <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
                             <TableCell>{getPieceCode(p.pieceId)} / {getMoldName(p.moldId)}</TableCell>
                             <TableCell className="text-right font-medium">{p.qtySegregada.toLocaleString()}</TableCell>
