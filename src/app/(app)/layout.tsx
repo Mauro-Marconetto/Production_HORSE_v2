@@ -83,12 +83,18 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const { data: roles, isLoading: isLoadingRoles } = useCollection<Role>(rolesCollection);
 
   const [visibleNavItems, setVisibleNavItems] = useState(allNavItems);
+  const [isClientLoading, setIsClientLoading] = useState(true);
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    // This effect runs only on the client, after initial render.
+    // This helps avoid hydration errors by ensuring server and client match initially.
+    const combinedLoading = isUserLoading || isProfileLoading || isLoadingRoles;
+    setIsClientLoading(combinedLoading);
+
+    if (!combinedLoading && !user) {
       router.push("/");
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, isProfileLoading, isLoadingRoles, router]);
 
   useEffect(() => {
     setOpenMobile(false);
@@ -113,9 +119,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }
   }, [isAdmin, userAllowedRoutes]);
 
-  const isLoading = isUserLoading || isProfileLoading || isLoadingRoles;
-
-  if (isLoading || !user) {
+  if (isClientLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
