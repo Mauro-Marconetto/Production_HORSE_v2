@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { useState, useMemo, useEffect } from 'react';
+import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,8 +39,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from '@/components/ui/checkbox';
 import { MoreHorizontal, PlusCircle, Loader2, Trash2 } from 'lucide-react';
-import type { Piece, Mold, Client } from '@/lib/types';
+import type { Piece, Mold, Machine } from '@/lib/types';
 
 export default function AdminPiecesPage() {
     const firestore = useFirestore();
@@ -52,12 +53,42 @@ export default function AdminPiecesPage() {
     const moldsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]);
     const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(moldsCollection);
     
-    const clientsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'clients') : null, [firestore]);
-    const { data: clients, isLoading: isLoadingClients } = useCollection<Client>(clientsCollection);
+    const machinesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]);
+    const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(machinesCollection);
 
     const [isSaving, setIsSaving] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
+    const [selectedMoldId, setSelectedMoldId] = useState<string>('none');
+    const [compatibleMachines, setCompatibleMachines] = useState<string[]>([]);
+    
+    const isLoading = isLoadingPieces || isLoadingMolds || isLoadingMachines;
+
+    useEffect(() => {
+        if (isDialogOpen && selectedPiece) {
+            const associatedMold = molds?.find(m => m.pieces.includes(selectedPiece.id));
+            if (associatedMold) {
+                setSelectedMoldId(associatedMold.id);
+                setCompatibleMachines(associatedMold.compatibilidad || []);
+            } else {
+                setSelectedMoldId('none');
+                setCompatibleMachines([]);
+            }
+        } else if (isDialogOpen && !selectedPiece) {
+            // Reset for new piece
+            setSelectedMoldId('none');
+            setCompatibleMachines([]);
+        }
+    }, [isDialogOpen, selectedPiece, molds]);
+
+     useEffect(() => {
+        if (selectedMoldId !== 'none') {
+            const mold = molds?.find(m => m.id === selectedMoldId);
+            setCompatibleMachines(mold?.compatibilidad || []);
+        } else {
+            setCompatibleMachines([]);
+        }
+    }, [selectedMoldId, molds]);
 
     const openNewPieceDialog = () => {
         setSelectedPiece(null);
@@ -76,33 +107,45 @@ export default function AdminPiecesPage() {
         setIsSaving(true);
         const formData = new FormData(e.currentTarget);
         const pieceId = selectedPiece ? selectedPiece.id : `P${Date.now()}`;
-        const moldId = formData.get('moldId') as string;
+        const codigo = formData.get('codigo') as string;
+        const currentMoldId = selectedMoldId;
 
-        const pieceData: Piece = {
-            id: pieceId,
-            codigo: formData.get('codigo') as string,
-            clienteId: formData.get('clienteId') as string,
-            peso: Number(formData.get('peso')),
-            familia: formData.get('familia') as string,
-            stockMin: Number(formData.get('stockMin')),
-            stockMax: Number(formData.get('stockMax')),
-        };
+        // Find the original mold associated with the piece if it's being edited
+        const originalMold = selectedPiece ? molds?.find(m => m.pieces.includes(selectedPiece.id)) : undefined;
 
         try {
-            const pieceDocRef = doc(firestore, 'pieces', pieceId);
-            await setDoc(pieceDocRef, pieceData, { merge: true });
+            const batch = writeBatch(firestore);
 
-            // If a mold was selected, update its 'pieces' array
-            if (moldId && moldId !== 'none') {
-                const moldDocRef = doc(firestore, 'molds', moldId);
-                const selectedMold = molds?.find(m => m.id === moldId);
-                if (selectedMold) {
-                    const updatedPieces = selectedMold.pieces.includes(pieceId) 
-                        ? selectedMold.pieces 
-                        : [...selectedMold.pieces, pieceId];
-                    await setDoc(moldDocRef, { pieces: updatedPieces }, { merge: true });
+            // 1. Create or update the piece document
+            const pieceDocRef = doc(firestore, 'pieces', pieceId);
+            batch.set(pieceDocRef, { id: pieceId, codigo }, { merge: true });
+
+            // 2. Handle mold association changes
+            if (originalMold && originalMold.id !== currentMoldId) {
+                // Piece was moved from an old mold, so remove it from the old mold's pieces array
+                const oldMoldRef = doc(firestore, 'molds', originalMold.id);
+                const updatedOldMoldPieces = originalMold.pieces.filter(pId => pId !== pieceId);
+                batch.update(oldMoldRef, { pieces: updatedOldMoldPieces });
+            }
+
+            if (currentMoldId !== 'none') {
+                const newMold = molds?.find(m => m.id === currentMoldId);
+                if (newMold) {
+                    const newMoldRef = doc(firestore, 'molds', newMold.id);
+                    // Add piece to new mold's pieces array if it's not already there
+                    const updatedNewMoldPieces = newMold.pieces.includes(pieceId) 
+                        ? newMold.pieces 
+                        : [...newMold.pieces, pieceId];
+                    
+                    // 3. Update the new mold with the piece association and compatibility
+                    batch.update(newMoldRef, { 
+                        pieces: updatedNewMoldPieces,
+                        compatibilidad: compatibleMachines 
+                    });
                 }
             }
+            
+            await batch.commit();
             
             toast({
                 title: 'Éxito',
@@ -124,7 +167,20 @@ export default function AdminPiecesPage() {
     const handleDelete = async (pieceId: string) => {
         if (!firestore) return;
         try {
-            await deleteDoc(doc(firestore, 'pieces', pieceId));
+            // Also remove piece from any mold that contains it
+            const batch = writeBatch(firestore);
+            const pieceDocRef = doc(firestore, 'pieces', pieceId);
+            
+            const associatedMold = molds?.find(m => m.pieces.includes(pieceId));
+            if (associatedMold) {
+                const moldRef = doc(firestore, 'molds', associatedMold.id);
+                const updatedPieces = associatedMold.pieces.filter(pId => pId !== pieceId);
+                batch.update(moldRef, { pieces: updatedPieces });
+            }
+
+            batch.delete(pieceDocRef);
+            await batch.commit();
+
             toast({
                 title: 'Pieza Eliminada',
                 description: 'La pieza ha sido eliminada correctamente.',
@@ -139,8 +195,6 @@ export default function AdminPiecesPage() {
         }
     };
     
-    const isLoading = isLoadingPieces || isLoadingMolds || isLoadingClients;
-
     return (
         <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
             <div className="flex items-center justify-between">
@@ -158,27 +212,28 @@ export default function AdminPiecesPage() {
                     <TableHeader>
                     <TableRow>
                         <TableHead>Pieza</TableHead>
-                        <TableHead>Cliente</TableHead>
                         <TableHead>Molde Asociado</TableHead>
-                        <TableHead className="text-right">Stock Mín/Máx</TableHead>
+                        <TableHead>Máquinas Compatibles</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading && (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">
+                                <TableCell colSpan={4} className="h-24 text-center">
                                     <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                                 </TableCell>
                             </TableRow>
                         )}
                         {!isLoading && pieces?.map((piece) => {
-                            const client = clients?.find(c => c.id === piece.clienteId);
                             const mold = molds?.find(m => m.pieces.includes(piece.id));
+                            const compatibleMachineNames = mold?.compatibilidad
+                                .map(machineId => machines?.find(m => m.id === machineId)?.nombre)
+                                .filter(Boolean) || [];
+
                             return (
                                 <TableRow key={piece.id}>
                                     <TableCell className="font-medium">{piece.codigo}</TableCell>
-                                    <TableCell>{client?.nombre || 'N/A'}</TableCell>
                                     <TableCell>
                                         {mold ? (
                                              <Badge variant={mold.status === 'ok' ? 'secondary' : 'destructive'}>
@@ -188,7 +243,15 @@ export default function AdminPiecesPage() {
                                             <span className="text-xs text-muted-foreground">Sin molde</span>
                                         )}
                                    </TableCell>
-                                   <TableCell className="text-right">{piece.stockMin} / {piece.stockMax}</TableCell>
+                                   <TableCell>
+                                        <div className="flex flex-wrap gap-1">
+                                            {compatibleMachineNames.length > 0 ? (
+                                                compatibleMachineNames.map(name => <Badge key={name} variant="outline">{name}</Badge>)
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">No definido</span>
+                                            )}
+                                        </div>
+                                   </TableCell>
                                     <TableCell className="text-right">
                                         <AlertDialog>
                                             <DropdownMenu>
@@ -236,7 +299,7 @@ export default function AdminPiecesPage() {
                         })}
                          {!isLoading && (!pieces || pieces.length === 0) && (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">
+                                <TableCell colSpan={4} className="h-24 text-center">
                                     No se encontraron piezas.
                                 </TableCell>
                             </TableRow>
@@ -251,51 +314,19 @@ export default function AdminPiecesPage() {
                 <DialogHeader>
                     <DialogTitle>{selectedPiece ? 'Editar Pieza' : 'Añadir Nueva Pieza'}</DialogTitle>
                     <DialogDescription>
-                    Completa los detalles de la pieza. Haz clic en guardar cuando hayas terminado.
+                    Completa los detalles de la pieza y su configuración de producción.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSave}>
-                    <div className="grid gap-4 py-4">
+                    <div className="grid gap-6 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="codigo" className="text-right">Código</Label>
                             <Input id="codigo" name="codigo" defaultValue={selectedPiece?.codigo || ''} className="col-span-3" required />
                         </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="familia" className="text-right">Familia</Label>
-                            <Input id="familia" name="familia" defaultValue={selectedPiece?.familia || ''} className="col-span-3" required />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="clienteId" className="text-right">Cliente</Label>
-                             <Select name="clienteId" defaultValue={selectedPiece?.clienteId}>
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="Selecciona un cliente" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                {isLoadingClients ? (
-                                    <SelectItem value="loading" disabled>Cargando clientes...</SelectItem>
-                                ) : (
-                                    clients?.map(client => (
-                                        <SelectItem key={client.id} value={client.id}>{client.nombre}</SelectItem>
-                                    ))
-                                )}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="peso" className="text-right">Peso (kg)</Label>
-                            <Input id="peso" name="peso" type="number" step="0.01" defaultValue={selectedPiece?.peso || ''} className="col-span-3" required />
-                        </div>
-                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="stockMin" className="text-right">Stock Mínimo</Label>
-                            <Input id="stockMin" name="stockMin" type="number" defaultValue={selectedPiece?.stockMin || ''} className="col-span-3" required />
-                        </div>
-                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="stockMax" className="text-right">Stock Máximo</Label>
-                            <Input id="stockMax" name="stockMax" type="number" defaultValue={selectedPiece?.stockMax || ''} className="col-span-3" required />
-                        </div>
+                        
                         <div className="grid grid-cols-4 items-center gap-4">
                            <Label htmlFor="moldId" className="text-right">Molde</Label>
-                             <Select name="moldId" defaultValue={molds?.find(m => m.pieces.includes(selectedPiece?.id || ''))?.id || 'none'}>
+                             <Select name="moldId" value={selectedMoldId} onValueChange={setSelectedMoldId}>
                                 <SelectTrigger className="col-span-3">
                                     <SelectValue placeholder="Selecciona un molde" />
                                 </SelectTrigger>
@@ -311,6 +342,37 @@ export default function AdminPiecesPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+
+                         {selectedMoldId !== 'none' && (
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label className="text-right pt-2">
+                                    Máquinas Compatibles
+                                </Label>
+                                <div className="col-span-3 grid grid-cols-2 gap-4 rounded-lg border p-4">
+                                    {isLoadingMachines ? <p>Cargando máquinas...</p> : machines?.map(machine => (
+                                        <div key={machine.id} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`machine-${machine.id}`}
+                                                checked={compatibleMachines.includes(machine.id)}
+                                                onCheckedChange={(checked) => {
+                                                    setCompatibleMachines(prev => 
+                                                        checked 
+                                                            ? [...prev, machine.id]
+                                                            : prev.filter(id => id !== machine.id)
+                                                    );
+                                                }}
+                                            />
+                                            <label
+                                                htmlFor={`machine-${machine.id}`}
+                                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                            >
+                                                {machine.nombre}
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>

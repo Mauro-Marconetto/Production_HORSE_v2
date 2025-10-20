@@ -78,40 +78,11 @@
         "codigo": {
           "type": "string",
           "description": "The piece's unique code."
-        },
-        "clienteId": {
-          "type": "string",
-          "description": "Reference to Client."
-        },
-        "peso": {
-          "type": "number",
-          "description": "The weight of the piece."
-        },
-        "familia": {
-          "type": "string",
-          "description": "The family the piece belongs to."
-        },
-        "stockMin": {
-          "type": "number",
-          "description": "The minimum stock level for the piece."
-        },
-        "stockMax": {
-          "type": "number",
-          "description": "The maximum stock level for the piece."
-        },
-        "taktObjetivo": {
-          "type": "number",
-          "description": "The target takt time for the piece (optional)."
         }
       },
       "required": [
         "id",
-        "codigo",
-        "clienteId",
-        "peso",
-        "familia",
-        "stockMin",
-        "stockMax"
+        "codigo"
       ]
     },
     "Mold": {
@@ -876,5 +847,4 @@
     "reasoning": "The Firestore data structure is designed to support the ForgeFlow application's production planning and execution features. It prioritizes authorization independence and QAPs by denormalizing data where necessary and using structural segregation. Path-based ownership is used for user-specific data, and membership maps are avoided since there's no collaborative data in the application. The structure enables secure list operations by ensuring that each collection has a homogeneous security posture.\n\n**Authorization Independence:** Data such as the Machines, Molds and Pieces collections are global, so they don't need any explicit authorization besides roles. User-specific collections like Assignments are secured via path-based ownership.\n\n**QAPs:** List operations are secured by structural segregation. For instance, listing assignments is only allowed within a specific plan (plans/{planId}/assignments/{assignmentId}).  This prevents unauthorized listing of assignments across different plans."
   }
 }
-
     

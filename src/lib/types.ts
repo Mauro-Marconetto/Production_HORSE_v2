@@ -8,12 +8,6 @@ export interface Client {
 export interface Piece {
   id: string;
   codigo: string;
-  clienteId: string;
-  peso: number;
-  familia: string;
-  stockMin: number;
-  stockMax: number;
-  taktObjetivo?: number;
 }
 
 export interface Mold {
