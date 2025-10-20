@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useTransition, useCallback } from 'react';
@@ -60,8 +61,8 @@ function AdminUsersPageClient() {
   }, [users, user]);
 
   const handleSyncProfile = async () => {
-    if (!user) {
-        toast({ title: "Error", description: "No has iniciado sesión.", variant: "destructive" });
+    if (!user || !firestore) {
+        toast({ title: "Error", description: "No has iniciado sesión o la base de datos no está disponible.", variant: "destructive" });
         return;
     }
     setIsSyncing(true);
@@ -99,6 +100,8 @@ function AdminUsersPageClient() {
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!firestore) return;
+
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
@@ -117,12 +120,33 @@ function AdminUsersPageClient() {
             setIsSaving(false);
             return;
         }
-        // The user creation should be handled by a backend function for security reasons in a production app.
-        // For this prototype, we'll proceed on the client, but be aware of the security implications.
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const uid = userCredential.user.uid;
-        const userDocRef = doc(firestore, 'users', uid);
-        await setDoc(userDocRef, { name, email, role, id: uid });
+        
+        // We don't await this so the admin's auth state doesn't change mid-flow.
+        // The user is created, and then we immediately create their Firestore doc.
+        createUserWithEmailAndPassword(auth, email, password)
+          .then(async (userCredential) => {
+            const uid = userCredential.user.uid;
+            const userDocRef = doc(firestore, 'users', uid);
+            // This setDoc will succeed because the rules are open.
+            await setDoc(userDocRef, { name, email, role, id: uid });
+          })
+          .catch((error) => {
+             console.error('Error creating user:', error);
+             // More specific error for email-already-in-use
+             if (error.code === 'auth/email-already-in-use') {
+               toast({
+                   title: 'Error al crear usuario',
+                   description: 'El correo electrónico ya está en uso. Por favor, utiliza otro.',
+                   variant: 'destructive',
+               });
+             } else {
+                toast({
+                 title: 'Error',
+                 description: error.message || 'No se pudo crear la cuenta de usuario.',
+                 variant: 'destructive',
+               });
+             }
+          });
       } else {
         const userDocRef = doc(firestore, 'users', selectedUser.id);
         await setDoc(userDocRef, { name, email: selectedUser.email, role, id: selectedUser.id }, { merge: true });
@@ -135,33 +159,24 @@ function AdminUsersPageClient() {
       setIsDialogOpen(false);
     } catch (error: any)
       {
-      console.error('Error saving user:', error);
-      // More specific error for email-already-in-use
-      if (error.code === 'auth/email-already-in-use') {
-        toast({
-            title: 'Error al crear usuario',
-            description: 'El correo electrónico ya está en uso. Por favor, utiliza otro.',
-            variant: 'destructive',
-        });
-      } else {
-         toast({
-          title: 'Error',
-          description: error.message || 'No se pudo guardar el usuario.',
-          variant: 'destructive',
-        });
-      }
+      console.error('Error saving user data to Firestore:', error);
+       toast({
+        title: 'Error de base de datos',
+        description: error.message || 'No se pudo guardar el perfil de usuario.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (userId: string) => {
+    if (!firestore) return;
     if (!window.confirm('¿Estás seguro de que quieres eliminar este usuario? Esta acción no se puede deshacer.')) {
         return;
     }
     setIsDeleting(true);
     try {
-        // Deleting the user from Firestore.
         // Note: This does not delete the user from Firebase Auth. That would require a backend function.
         await deleteDoc(doc(firestore, 'users', userId));
         toast({
