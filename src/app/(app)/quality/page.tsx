@@ -29,13 +29,16 @@ export default function QualityPage() {
         firestore 
             ? query(
                 collection(firestore, 'production'), 
-                where('qtySegregada', '>', 0),
-                where('inspeccionadoCalidad', '==', false)
+                where('qtySegregada', '>', 0)
               )
             : null, 
     [firestore]);
     
     const { data: segregatedProduction, isLoading: isLoadingProd } = useCollection<Production>(segregatedQuery);
+    
+    const pendingInspection = useMemo(() => {
+        return segregatedProduction?.filter(p => p.inspeccionadoCalidad === false) || [];
+    }, [segregatedProduction]);
 
     const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]));
     const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]));
@@ -154,7 +157,7 @@ export default function QualityPage() {
                     </TableCell>
                 </TableRow>
               )}
-              {!isLoading && segregatedProduction?.map((p) => (
+              {!isLoading && pendingInspection.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                     <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
@@ -168,7 +171,7 @@ export default function QualityPage() {
                     </TableCell>
                   </TableRow>
               ))}
-               {!isLoading && (!segregatedProduction || segregatedProduction.length === 0) && (
+               {!isLoading && pendingInspection.length === 0 && (
                 <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                         No hay lotes pendientes de inspección.
