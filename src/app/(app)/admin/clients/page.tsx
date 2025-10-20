@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import { collection, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { collection, doc, setDoc, writeBatch } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -49,6 +50,20 @@ export default function AdminClientsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [selectedPieces, setSelectedPieces] = useState<string[]>([]);
+  
+  const isLoading = isLoadingClients || isLoadingPieces;
+
+  useEffect(() => {
+    if (isDialogOpen) {
+        if (selectedClient) {
+            const associatedPieces = pieces?.filter(p => p.clienteId === selectedClient.id).map(p => p.id) || [];
+            setSelectedPieces(associatedPieces);
+        } else {
+            setSelectedPieces([]);
+        }
+    }
+  }, [isDialogOpen, selectedClient, pieces]);
 
   const openNewClientDialog = () => {
     setSelectedClient(null);
@@ -67,7 +82,6 @@ export default function AdminClientsPage() {
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     const clientId = selectedClient ? selectedClient.id : `C${Date.now()}`;
-    const pieceCodigo = formData.get('pieceCodigo') as string;
     
     const clientData: Client = {
       id: clientId,
@@ -77,25 +91,32 @@ export default function AdminClientsPage() {
     try {
         const batch = writeBatch(firestore);
 
+        // 1. Set client data
         const clientDocRef = doc(firestore, 'clients', clientId);
         batch.set(clientDocRef, clientData, { merge: true });
 
-        if (pieceCodigo) {
-            const pieceId = `P${Date.now()}`;
-            const pieceDocRef = doc(firestore, 'pieces', pieceId);
-            const pieceData: Piece = {
-                id: pieceId,
-                codigo: pieceCodigo,
-                clienteId: clientId,
-            };
-            batch.set(pieceDocRef, pieceData);
+        // 2. Un-associate pieces that were deselected
+        if (selectedClient && pieces) {
+            const originalPieceIds = pieces.filter(p => p.clienteId === selectedClient.id).map(p => p.id);
+            const deselectedPieceIds = originalPieceIds.filter(id => !selectedPieces.includes(id));
+            
+            deselectedPieceIds.forEach(pieceId => {
+                const pieceRef = doc(firestore, 'pieces', pieceId);
+                batch.update(pieceRef, { clienteId: "" }); // or delete the field: clienteId: deleteField()
+            });
         }
+
+        // 3. Associate selected pieces
+        selectedPieces.forEach(pieceId => {
+            const pieceRef = doc(firestore, 'pieces', pieceId);
+            batch.update(pieceRef, { clienteId: clientId });
+        });
 
         await batch.commit();
 
       toast({
         title: 'Éxito',
-        description: `Cliente ${selectedClient ? 'actualizado' : 'creado'} correctamente. ${pieceCodigo ? 'Y pieza asociada.' : ''}`,
+        description: `Cliente ${selectedClient ? 'actualizado' : 'creado'} y piezas asociadas correctamente.`,
       });
       setIsDialogOpen(false);
     } catch (error: any) {
@@ -116,14 +137,14 @@ export default function AdminClientsPage() {
         if (clientHasPieces) {
             toast({
                 title: 'Error al Eliminar',
-                description: 'No se puede eliminar un cliente que tiene piezas asociadas.',
+                description: 'No se puede eliminar un cliente que tiene piezas asociadas. Desvincúlelas primero.',
                 variant: 'destructive',
             });
             return;
         }
 
         try {
-        await deleteDoc(doc(firestore, 'clients', clientId));
+        await writeBatch(firestore).delete(doc(firestore, 'clients', clientId)).commit();
         toast({
             title: 'Cliente Eliminado',
             description: 'El cliente ha sido eliminado correctamente.',
@@ -138,7 +159,6 @@ export default function AdminClientsPage() {
         }
     };
 
-    const isLoading = isLoadingClients || isLoadingPieces;
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -245,18 +265,44 @@ export default function AdminClientsPage() {
           <DialogHeader>
             <DialogTitle>{selectedClient ? 'Editar Cliente' : 'Añadir Nuevo Cliente'}</DialogTitle>
             <DialogDescription>
-              Completa los detalles del cliente. Haz clic en guardar cuando hayas terminado.
+              Completa los detalles del cliente y selecciona las piezas asociadas.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSave}>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-6 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="nombre" className="text-right">Nombre Cliente</Label>
                 <Input id="nombre" name="nombre" defaultValue={selectedClient?.nombre || ''} className="col-span-3" required />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="pieceCodigo" className="text-right">Añadir Pieza (Opcional)</Label>
-                <Input id="pieceCodigo" name="pieceCodigo" placeholder="Código de la nueva pieza" className="col-span-3" />
+              <div className="grid grid-cols-4 items-start gap-4">
+                 <Label className="text-right pt-2">Piezas Asociadas</Label>
+                 <div className="col-span-3 grid grid-cols-2 gap-4 rounded-lg border p-4 max-h-60 overflow-y-auto">
+                    {isLoadingPieces ? <p>Cargando piezas...</p> : pieces?.map(piece => (
+                        <div key={piece.id} className="flex items-center space-x-2">
+                           <Checkbox
+                                id={`piece-${piece.id}`}
+                                checked={selectedPieces.includes(piece.id)}
+                                onCheckedChange={(checked) => {
+                                    setSelectedPieces(prev => 
+                                        checked 
+                                            ? [...prev, piece.id]
+                                            : prev.filter(id => id !== piece.id)
+                                    );
+                                }}
+                                // A piece can only belong to one client
+                                disabled={!selectedPieces.includes(piece.id) && !!piece.clienteId && piece.clienteId !== selectedClient?.id}
+                            />
+                            <label
+                                htmlFor={`piece-${piece.id}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            >
+                                {piece.codigo}
+                                {piece.clienteId && piece.clienteId !== selectedClient?.id && <span className="text-xs text-muted-foreground ml-1"> (Asignada)</span>}
+                            </label>
+                        </div>
+                    ))}
+                    {!isLoadingPieces && (!pieces || pieces.length === 0) && <p className="text-sm text-muted-foreground">No hay piezas definidas. Créalas en la sección de Piezas.</p>}
+                 </div>
               </div>
             </div>
             <DialogFooter>
@@ -273,3 +319,5 @@ export default function AdminClientsPage() {
     </main>
   );
 }
+
+    
