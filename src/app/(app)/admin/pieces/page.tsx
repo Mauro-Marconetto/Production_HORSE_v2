@@ -93,7 +93,7 @@ export default function AdminPiecesPage() {
             await setDoc(pieceDocRef, pieceData, { merge: true });
 
             // If a mold was selected, update its 'pieces' array
-            if (moldId) {
+            if (moldId && moldId !== 'none') {
                 const moldDocRef = doc(firestore, 'molds', moldId);
                 const selectedMold = molds?.find(m => m.id === moldId);
                 if (selectedMold) {
@@ -295,12 +295,12 @@ export default function AdminPiecesPage() {
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                            <Label htmlFor="moldId" className="text-right">Molde</Label>
-                             <Select name="moldId" defaultValue={molds?.find(m => m.pieces.includes(selectedPiece?.id || ''))?.id}>
+                             <Select name="moldId" defaultValue={molds?.find(m => m.pieces.includes(selectedPiece?.id || ''))?.id || 'none'}>
                                 <SelectTrigger className="col-span-3">
                                     <SelectValue placeholder="Selecciona un molde" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                <SelectItem value="">Sin molde</SelectItem>
+                                <SelectItem value="none">Sin molde</SelectItem>
                                 {isLoadingMolds ? (
                                     <SelectItem value="loading" disabled>Cargando moldes...</SelectItem>
                                 ) : (
@@ -326,4 +326,3 @@ export default function AdminPiecesPage() {
     );
 }
 
-    
