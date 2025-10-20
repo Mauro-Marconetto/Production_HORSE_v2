@@ -4,8 +4,10 @@
 
 import { useState, useMemo, useTransition, useCallback } from 'react';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { initializeApp, deleteApp } from 'firebase/app';
 import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+import { firebaseConfig } from '@/firebase/config';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -111,42 +113,33 @@ function AdminUsersPageClient() {
 
     try {
       if (!selectedUser) {
-         if (!password) {
-            toast({
-                title: "Error",
-                description: "La contraseña es obligatoria para nuevos usuarios.",
-                variant: "destructive",
-            });
-            setIsSaving(false);
-            return;
-        }
-        
-        // We don't await this so the admin's auth state doesn't change mid-flow.
-        // The user is created, and then we immediately create their Firestore doc.
-        createUserWithEmailAndPassword(auth, email, password)
-          .then(async (userCredential) => {
-            const uid = userCredential.user.uid;
-            const userDocRef = doc(firestore, 'users', uid);
-            // This setDoc will succeed because the rules are open.
-            await setDoc(userDocRef, { name, email, role, id: uid });
-          })
-          .catch((error) => {
-             console.error('Error creating user:', error);
-             // More specific error for email-already-in-use
-             if (error.code === 'auth/email-already-in-use') {
-               toast({
-                   title: 'Error al crear usuario',
-                   description: 'El correo electrónico ya está en uso. Por favor, utiliza otro.',
-                   variant: 'destructive',
-               });
-             } else {
-                toast({
-                 title: 'Error',
-                 description: error.message || 'No se pudo crear la cuenta de usuario.',
-                 variant: 'destructive',
-               });
-             }
+        if (!password) {
+          toast({
+            title: "Error",
+            description: "La contraseña es obligatoria para nuevos usuarios.",
+            variant: "destructive",
           });
+          setIsSaving(false);
+          return;
+        }
+
+        // Create a temporary, secondary Firebase app instance to create the user
+        // This prevents the main app's auth state from changing and logging out the admin
+        const tempAppName = `temp-user-creation-${Date.now()}`;
+        const tempApp = initializeApp(firebaseConfig, tempAppName);
+        const tempAuth = getAuth(tempApp);
+
+        try {
+            const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
+            const uid = userCredential.user.uid;
+
+            // Now, use the main Firestore instance (where the admin is authenticated) to create the user's profile document
+            const userDocRef = doc(firestore, 'users', uid);
+            await setDoc(userDocRef, { name, email, role, id: uid });
+        } finally {
+             // Clean up the temporary app instance
+            await deleteApp(tempApp);
+        }
       } else {
         const userDocRef = doc(firestore, 'users', selectedUser.id);
         await setDoc(userDocRef, { name, email: selectedUser.email, role, id: selectedUser.id }, { merge: true });
@@ -157,14 +150,22 @@ function AdminUsersPageClient() {
         description: `Usuario ${selectedUser ? 'actualizado' : 'creado'} correctamente.`,
       });
       setIsDialogOpen(false);
-    } catch (error: any)
-      {
-      console.error('Error saving user data to Firestore:', error);
-       toast({
-        title: 'Error de base de datos',
-        description: error.message || 'No se pudo guardar el perfil de usuario.',
-        variant: 'destructive',
-      });
+    } catch (error: any) {
+      console.error('Error saving user data:', error);
+       // More specific error for email-already-in-use
+       if (error.code === 'auth/email-already-in-use') {
+         toast({
+             title: 'Error al crear usuario',
+             description: 'El correo electrónico ya está en uso. Por favor, utiliza otro.',
+             variant: 'destructive',
+         });
+       } else {
+          toast({
+           title: 'Error',
+           description: error.message || 'No se pudo guardar el perfil de usuario.',
+           variant: 'destructive',
+         });
+       }
     } finally {
       setIsSaving(false);
     }
@@ -367,5 +368,7 @@ export default function AdminUsersPage() {
         </main>
     );
 }
+
+    
 
     
