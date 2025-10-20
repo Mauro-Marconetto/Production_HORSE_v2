@@ -38,6 +38,7 @@ import {
   SidebarGroupLabel,
   SidebarInset,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { UserNav } from "@/components/user-nav";
 import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
@@ -64,11 +65,12 @@ const adminNavItems = [
   { href: "/admin/roles", icon: Shield, label: "Roles" },
 ];
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const firestore = useFirestore();
+  const { setOpenMobile } = useSidebar();
 
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -87,6 +89,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.push("/");
     }
   }, [user, isUserLoading, router]);
+
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [pathname, setOpenMobile]);
 
   const { isAdmin, userAllowedRoutes } = useMemo(() => {
     const isAdmin = userProfile?.role === 'Admin';
@@ -118,66 +124,75 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <Image src="/logo.png" width={140} height={32} alt="ForgeFlow Logo" />
-          </Link>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            {visibleNavItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname.startsWith(item.href)}
-                  tooltip={item.label}
-                >
-                  <Link href={item.href}>
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-          
-          {isAdmin && (
-            <SidebarGroup className="mt-auto">
-                <SidebarGroupLabel>Administración</SidebarGroupLabel>
-                <SidebarMenu>
-                {adminNavItems.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                        asChild
-                        isActive={pathname.startsWith(item.href)}
-                        tooltip={item.label}
-                    >
-                        <Link href={item.href}>
-                        <item.icon />
-                        <span>{item.label}</span>
-                        </Link>
-                    </SidebarMenuButton>
-                    </SidebarMenuItem>
-                ))}
-                </SidebarMenu>
-            </SidebarGroup>
-          )}
+      <>
+        <Sidebar>
+          <SidebarHeader>
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <Image src="/logo.png" width={140} height={32} alt="ForgeFlow Logo" />
+            </Link>
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarMenu>
+              {visibleNavItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname.startsWith(item.href)}
+                    tooltip={item.label}
+                  >
+                    <Link href={item.href}>
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+            
+            {isAdmin && (
+              <SidebarGroup className="mt-auto">
+                  <SidebarGroupLabel>Administración</SidebarGroupLabel>
+                  <SidebarMenu>
+                  {adminNavItems.map((item) => (
+                      <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                          asChild
+                          isActive={pathname.startsWith(item.href)}
+                          tooltip={item.label}
+                      >
+                          <Link href={item.href}>
+                          <item.icon />
+                          <span>{item.label}</span>
+                          </Link>
+                      </SidebarMenuButton>
+                      </SidebarMenuItem>
+                  ))}
+                  </SidebarMenu>
+              </SidebarGroup>
+            )}
 
-        </SidebarContent>
-        <SidebarFooter>
-          <UserNav />
-        </SidebarFooter>
-      </Sidebar>
-      <div className="flex flex-col flex-1">
-          <header className="sticky top-0 z-10 flex h-[57px] items-center gap-1 border-b bg-background px-4 xl:hidden">
-              <SidebarTrigger>
-                  <PanelLeft />
-              </SidebarTrigger>
-          </header>
-          <SidebarInset>{children}</SidebarInset>
-      </div>
-    </SidebarProvider>
+          </SidebarContent>
+          <SidebarFooter>
+            <UserNav />
+          </SidebarFooter>
+        </Sidebar>
+        <div className="flex flex-col flex-1">
+            <header className="sticky top-0 z-10 flex h-[57px] items-center gap-1 border-b bg-background px-4 xl:hidden">
+                <SidebarTrigger>
+                    <PanelLeft />
+                </SidebarTrigger>
+            </header>
+            <SidebarInset>{children}</SidebarInset>
+        </div>
+      </>
   );
+}
+
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <SidebarProvider>
+      <AppLayoutContent>{children}</AppLayoutContent>
+    </SidebarProvider>
+  )
 }
