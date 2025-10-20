@@ -169,7 +169,7 @@ export default function ProductionPage() {
                 const totalUnits = p.qtyFinalizada + p.qtySinPrensar + p.qtyScrap + p.qtySegregada;
                 const scrapPct = totalUnits > 0 ? p.qtyScrap / totalUnits : 0;
                 const isScrapHigh = scrapPct > 0.05;
-                const unidadesProducidas = (p.qtyFinalizada || 0) + (p.qtyAptaCalidad || 0);
+                const unidadesProducidas = (p.qtyFinalizada || 0) + (p.qtyAptaCalidad || 0) + (p.qtySinPrensar || 0);
 
                 return (
                   <TableRow key={p.id}>
@@ -333,3 +333,5 @@ export default function ProductionPage() {
     </main>
   );
 }
+
+    
