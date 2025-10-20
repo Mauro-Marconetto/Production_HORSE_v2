@@ -92,16 +92,14 @@ export default function ProductionPage() {
 
         setIsSaving(true);
         try {
-            const productionData = {
+            const productionData: Omit<Production, 'id'> = {
                 turno,
                 machineId,
                 moldId,
                 pieceId,
                 ...quantities,
-                inspeccionadoCalidad: false, // Always false on creation
-                qtyAptaCalidad: 0,
-                qtyScrapCalidad: 0,
-                fechaISO: Timestamp.now().toDate().toISOString(), // Use client-side timestamp for consistency
+                inspeccionadoCalidad: false,
+                fechaISO: new Date().toISOString(),
             };
             await addDoc(collection(firestore, "production"), productionData);
             toast({ title: "Éxito", description: "Producción declarada correctamente." });

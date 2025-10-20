@@ -29,17 +29,14 @@ export default function QualityPage() {
         firestore 
             ? query(
                 collection(firestore, 'production'), 
-                where('qtySegregada', '>', 0)
+                where('qtySegregada', '>', 0),
+                where('inspeccionadoCalidad', '==', false)
               )
             : null, 
     [firestore]);
     
-    const { data: segregatedProduction, isLoading: isLoadingProd } = useCollection<Production>(segregatedQuery);
+    const { data: pendingInspection, isLoading: isLoadingProd } = useCollection<Production>(segregatedQuery);
     
-    const pendingInspection = useMemo(() => {
-        return segregatedProduction?.filter(p => p.inspeccionadoCalidad === false) || [];
-    }, [segregatedProduction]);
-
     const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]));
     const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]));
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]));
@@ -50,17 +47,24 @@ export default function QualityPage() {
 
     // Inspection Dialog State
     const [activeField, setActiveField] = useState<QualityInspectionField>('qtyAptaCalidad');
-    const [quantities, setQuantities] = useState({ qtyAptaCalidad: 0, qtyScrapCalidad: 0 });
+    const [quantities, setQuantities] = useState<{qtyAptaCalidad: number, qtyScrapCalidad: number}>({ qtyAptaCalidad: 0, qtyScrapCalidad: 0 });
     const [currentInput, setCurrentInput] = useState('');
 
     useEffect(() => {
         if (selectedProduction) {
+            const initialApta = selectedProduction.qtyAptaCalidad || 0;
+            const initialScrap = selectedProduction.qtyScrapCalidad || 0;
+
             setQuantities({
-                qtyAptaCalidad: selectedProduction.qtyAptaCalidad || 0,
-                qtyScrapCalidad: selectedProduction.qtyScrapCalidad || 0,
+                qtyAptaCalidad: initialApta,
+                qtyScrapCalidad: initialScrap,
             });
-            setCurrentInput(String(selectedProduction.qtyAptaCalidad || ''));
-            setActiveField('qtyAptaCalidad');
+            
+            const initialInput = initialApta > 0 ? String(initialApta) : (initialScrap > 0 ? String(initialScrap) : '');
+            const initialField = initialApta > 0 ? 'qtyAptaCalidad' : 'qtyScrapCalidad';
+            
+            setActiveField(initialField);
+            setCurrentInput(initialInput);
             setIsDialogOpen(true);
         }
     }, [selectedProduction]);
@@ -104,7 +108,8 @@ export default function QualityPage() {
         try {
             const prodDocRef = doc(firestore, 'production', selectedProduction.id);
             await updateDoc(prodDocRef, {
-                ...quantities,
+                qtyAptaCalidad: quantities.qtyAptaCalidad,
+                qtyScrapCalidad: quantities.qtyScrapCalidad,
                 inspeccionadoCalidad: true,
             });
             toast({ title: "Éxito", description: "Inspección de calidad guardada correctamente." });
@@ -157,7 +162,7 @@ export default function QualityPage() {
                     </TableCell>
                 </TableRow>
               )}
-              {!isLoading && pendingInspection.map((p) => (
+              {!isLoading && pendingInspection?.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                     <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
@@ -171,7 +176,7 @@ export default function QualityPage() {
                     </TableCell>
                   </TableRow>
               ))}
-               {!isLoading && pendingInspection.length === 0 && (
+               {!isLoading && (!pendingInspection || pendingInspection.length === 0) && (
                 <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                         No hay lotes pendientes de inspección.
