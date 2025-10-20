@@ -1,12 +1,15 @@
+
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useUser } from "@/firebase";
+import { getAuth, signOut } from "firebase/auth";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -15,47 +18,55 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function UserNav() {
+  const { user } = useUser();
+  const router = useRouter();
+  const auth = getAuth();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push("/"); // Redirect to login page after sign out
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+
+  // Get first two letters for avatar fallback
+  const getAvatarFallback = (name: string | null | undefined, email: string | null | undefined) => {
+    if (name) {
+      return name.slice(0, 2).toUpperCase();
+    }
+    if (email) {
+      return email.slice(0, 2).toUpperCase();
+    }
+    return "JD"; // Default
+  };
+  
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="@shadcn" />
-            <AvatarFallback>JD</AvatarFallback>
+            <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || ''} />
+            <AvatarFallback>
+                {getAvatarFallback(user?.displayName, user?.email)}
+            </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">John Doe</p>
+            <p className="text-sm font-medium leading-none">{user?.displayName || "Usuario"}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              planner@forgeflow.com
+              {user?.email || "No email"}
             </p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem>
-            Perfil
-            <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            Facturación
-            <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            Configuración
-            <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-          </DropdownMenuItem>
-          <DropdownMenuItem>Nuevo Equipo</DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/">
+        <DropdownMenuItem onSelect={handleLogout}>
             Cerrar Sesión
             <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
-          </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
