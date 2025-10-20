@@ -2,16 +2,21 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, doc, updateDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { Check, Edit, Loader2 } from "lucide-react";
+import { Check, Edit, Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Production, Machine, Mold, Piece } from "@/lib/types";
+import { addDays, format } from "date-fns";
+import type { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
 
 type QualityInspectionField = 'qtyAptaCalidad' | 'qtyScrapCalidad';
 
@@ -24,7 +29,6 @@ export default function QualityPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
 
-    // Query for all production runs, ordered by date. Filtering will happen on the client.
     const productionQuery = useMemoFirebase(() => 
         firestore 
             ? query(collection(firestore, 'production'), orderBy('fechaISO', 'desc'))
@@ -33,12 +37,6 @@ export default function QualityPage() {
     
     const { data: allProduction, isLoading: isLoadingProd } = useCollection<Production>(productionQuery);
 
-    // Client-side filtering to find lots pending inspection
-    const pendingInspection = useMemo(() => {
-        if (!allProduction) return [];
-        return allProduction.filter(p => p.qtySegregada > 0 && !p.inspeccionadoCalidad);
-    }, [allProduction]);
-    
     const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]));
     const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]));
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]));
@@ -46,6 +44,31 @@ export default function QualityPage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedProduction, setSelectedProduction] = useState<Production | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    
+    const [date, setDate] = useState<DateRange | undefined>({
+        from: addDays(new Date(), -7),
+        to: new Date(),
+    });
+
+    // Client-side filtering
+    const pendingInspection = useMemo(() => {
+        if (!allProduction) return [];
+        return allProduction.filter(p => p.qtySegregada > 0 && !p.inspeccionadoCalidad);
+    }, [allProduction]);
+
+    const inspectedHistory = useMemo(() => {
+        if (!allProduction) return [];
+        return allProduction.filter(p => {
+            const isInspected = p.inspeccionadoCalidad;
+            if (!isInspected || !date?.from) return false;
+            
+            const inspectionDate = new Date(p.fechaISO);
+            const fromDate = date.from;
+            const toDate = date.to ? addDays(date.to, 1) : addDays(fromDate, 1); // include the whole "to" day
+
+            return inspectionDate >= fromDate && inspectionDate < toDate;
+        });
+    }, [allProduction, date]);
 
     // Inspection Dialog State
     const [activeField, setActiveField] = useState<QualityInspectionField>('qtyAptaCalidad');
@@ -198,6 +221,96 @@ export default function QualityPage() {
           </Table>
         </CardContent>
       </Card>
+      
+      <Card>
+        <CardHeader>
+            <div className="flex items-center justify-between">
+                <div>
+                    <CardTitle>Historial de Inspecciones</CardTitle>
+                    <CardDescription>
+                        Lotes que ya han sido inspeccionados por el equipo de calidad.
+                    </CardDescription>
+                </div>
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn(
+                        "w-[260px] justify-start text-left font-normal",
+                        !date && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date?.from ? (
+                        date.to ? (
+                            <>
+                            {format(date.from, "LLL dd, y")} -{" "}
+                            {format(date.to, "LLL dd, y")}
+                            </>
+                        ) : (
+                            format(date.from, "LLL dd, y")
+                        )
+                        ) : (
+                        <span>Selecciona un rango</span>
+                        )}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={setDate}
+                        numberOfMonths={2}
+                    />
+                    </PopoverContent>
+                </Popover>
+            </div>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Fecha Inspección</TableHead>
+                        <TableHead>Máquina</TableHead>
+                        <TableHead>Pieza / Molde</TableHead>
+                        <TableHead className="text-right">Total Segregado</TableHead>
+                        <TableHead className="text-right text-green-600">Cantidad Apta</TableHead>
+                        <TableHead className="text-right text-destructive">Cantidad Scrap</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                     {isLoading && (
+                        <TableRow>
+                            <TableCell colSpan={6} className="h-24 text-center">
+                                <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+                            </TableCell>
+                        </TableRow>
+                    )}
+                    {!isLoading && inspectedHistory.map((p) => (
+                        <TableRow key={p.id}>
+                            <TableCell>{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
+                            <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
+                            <TableCell>{getPieceCode(p.pieceId)} / {getMoldName(p.moldId)}</TableCell>
+                            <TableCell className="text-right font-medium">{p.qtySegregada.toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-green-600 font-bold">{(p.qtyAptaCalidad || 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-destructive font-bold">{(p.qtyScrapCalidad || 0).toLocaleString()}</TableCell>
+                        </TableRow>
+                    ))}
+                    {!isLoading && inspectedHistory.length === 0 && (
+                        <TableRow>
+                            <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                                No hay inspecciones en el rango de fechas seleccionado.
+                            </TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </CardContent>
+      </Card>
+
 
       <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
           <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
