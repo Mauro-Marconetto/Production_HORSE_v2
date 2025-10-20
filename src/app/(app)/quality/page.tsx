@@ -24,18 +24,22 @@ export default function QualityPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
 
-    // Query for production runs with segregated quantity that has not been inspected yet
+    // Query for production runs with segregated quantity
     const segregatedQuery = useMemoFirebase(() => 
         firestore 
             ? query(
                 collection(firestore, 'production'), 
-                where('qtySegregada', '>', 0),
-                where('inspeccionadoCalidad', '==', false)
+                where('qtySegregada', '>', 0)
               )
             : null, 
     [firestore]);
     
-    const { data: pendingInspection, isLoading: isLoadingProd } = useCollection<Production>(segregatedQuery);
+    const { data: allSegregated, isLoading: isLoadingProd } = useCollection<Production>(segregatedQuery);
+
+    // Filter for not-yet-inspected items on the client
+    const pendingInspection = useMemo(() => {
+        return allSegregated?.filter(p => p.inspeccionadoCalidad === false) || [];
+    }, [allSegregated]);
     
     const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]));
     const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]));
