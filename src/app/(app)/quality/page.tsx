@@ -55,7 +55,7 @@ export default function QualityPage() {
     // Client-side filtering for pending inspections
     const pendingInspection = useMemo(() => {
         if (!allProduction) return [];
-        return allProduction.filter(p => p.qtySegregada > 0);
+        return allProduction.filter(p => p.qtySegregada > 0 && p.inspeccionadoCalidad === false);
     }, [allProduction]);
 
     // Client-side filtering for history
@@ -87,21 +87,11 @@ export default function QualityPage() {
             setIsDialogOpen(true);
         }
     }, [selectedProduction]);
-
+    
     useEffect(() => {
         const parsedInput = Number(currentInput) || 0;
-        const totalToInspectInThisSession = selectedProduction?.qtySegregada || 0;
-        const otherField = activeField === 'qtyAptaCalidad' ? 'qtyScrapCalidad' : 'qtyAptaCalidad';
-        
-        const newActiveQty = Math.min(parsedInput, totalToInspectInThisSession);
-        const newOtherQty = Math.max(0, totalToInspectInThisSession - newActiveQty);
-
-        setQuantities({
-            [activeField]: newActiveQty,
-            [otherField]: newOtherQty,
-        } as any);
-
-    }, [currentInput, activeField, selectedProduction]);
+        setQuantities(q => ({ ...q, [activeField]: parsedInput }));
+    }, [currentInput, activeField]);
 
 
     const handleCloseDialog = () => {
@@ -114,8 +104,7 @@ export default function QualityPage() {
     const handleClear = () => setCurrentInput('');
 
     const totalInspectedInSession = quantities.qtyAptaCalidad + quantities.qtyScrapCalidad;
-    const remainingToInspectInLot = (selectedProduction?.qtySegregada || 0) - totalInspectedInSession;
-
+    const isInspectionAmountValid = totalInspectedInSession <= (selectedProduction?.qtySegregada || 0);
 
     const handleSaveInspection = async () => {
         if (!firestore || !selectedProduction || !user) {
@@ -126,6 +115,10 @@ export default function QualityPage() {
             toast({ title: "Información", description: "Debes clasificar al menos una pieza.", variant: "default" });
             return;
         }
+        if (!isInspectionAmountValid) {
+            toast({ title: "Error de validación", description: "La cantidad inspeccionada no puede ser mayor a la cantidad segregada.", variant: "destructive" });
+            return;
+        }
 
         setIsSaving(true);
         
@@ -133,14 +126,15 @@ export default function QualityPage() {
 
         const currentApta = selectedProduction.qtyAptaCalidad || 0;
         const currentScrap = selectedProduction.qtyScrapCalidad || 0;
+        const remainingSegregada = (selectedProduction.qtySegregada || 0) - totalInspectedInSession;
         
         const updatedData = {
             qtyAptaCalidad: currentApta + quantities.qtyAptaCalidad,
             qtyScrapCalidad: currentScrap + quantities.qtyScrapCalidad,
-            qtySegregada: remainingToInspectInLot,
+            qtySegregada: remainingSegregada,
             inspectedBy: user.uid,
             inspectionDate: new Date().toISOString(),
-            inspeccionadoCalidad: remainingToInspectInLot === 0, // Mark as fully inspected only if nothing remains
+            inspeccionadoCalidad: remainingSegregada === 0, // Mark as fully inspected only if nothing remains
         };
 
         updateDoc(prodDocRef, updatedData)
@@ -329,9 +323,14 @@ export default function QualityPage() {
 
                 <div className="flex-grow p-6 grid grid-cols-2 gap-8">
                     <div className="flex flex-col gap-4">
-                        <div className="p-4 rounded-lg bg-yellow-100 dark:bg-yellow-900/50 text-center">
+                        <div className={`p-4 rounded-lg text-center ${isInspectionAmountValid ? 'bg-yellow-100 dark:bg-yellow-900/50' : 'bg-destructive/20'}`}>
                             <p className="text-lg">Clasificadas en esta sesión</p>
                             <p className="text-5xl font-bold">{totalInspectedInSession.toLocaleString()}</p>
+                            {!isInspectionAmountValid && (
+                                <p className="text-sm text-destructive font-semibold mt-1">
+                                    La suma excede la cantidad segregada.
+                                </p>
+                            )}
                         </div>
                         {inspectionFields.map(({key, label}) => (
                             <Button
@@ -360,7 +359,7 @@ export default function QualityPage() {
 
                 <DialogFooter className="p-6 pt-2 bg-muted border-t">
                     <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={handleCloseDialog}>Cancelar</Button>
-                    <Button type="button" className="w-48 h-12 text-lg" onClick={handleSaveInspection} disabled={isSaving || totalInspectedInSession === 0}>
+                    <Button type="button" className="w-48 h-12 text-lg" onClick={handleSaveInspection} disabled={isSaving || totalInspectedInSession === 0 || !isInspectionAmountValid}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {isSaving ? "Guardando..." : "Confirmar"}
                     </Button>
@@ -370,3 +369,5 @@ export default function QualityPage() {
     </main>
   );
 }
+
+    
