@@ -119,8 +119,12 @@ export interface Production {
   pieceId: string;
   moldId: string;
   turno: 'mañana' | 'tarde' | 'noche';
-  unidades: number;
-  scrapPct: number;
+  qtyFinalizada: number;
+  qtySinPrensar: number;
+  qtyScrap: number;
+  qtySegregada: number;
+  unidades: number; // deprecated, use qtyFinalizada + qtySinPrensar
+  scrapPct: number; // deprecated, calculate on the fly
 }
 
 export interface ScrapEntry {
