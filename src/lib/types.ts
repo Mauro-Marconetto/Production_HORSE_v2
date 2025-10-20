@@ -165,6 +165,14 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
-  role: 'Admin' | 'Planner' | 'Shop Floor' | 'Viewer';
+  role: string;
   avatar?: string;
 }
+
+export interface Role {
+    id: string;
+    name: string;
+    allowedRoutes: string[];
+}
+
+    

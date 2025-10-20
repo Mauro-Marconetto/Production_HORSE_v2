@@ -21,13 +21,7 @@
         },
         "role": {
           "type": "string",
-          "description": "The user's role in the application.",
-          "enum": [
-            "Admin",
-            "Planner",
-            "Shop Floor",
-            "Viewer"
-          ]
+          "description": "The name of the user's role."
         },
         "avatar": {
           "type": "string",
@@ -40,6 +34,34 @@
         "name",
         "email",
         "role"
+      ]
+    },
+    "Role": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Role",
+      "description": "Defines a user role and its page access permissions.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the role (usually the role name in lowercase)."
+        },
+        "name": {
+          "type": "string",
+          "description": "The display name of the role."
+        },
+        "allowedRoutes": {
+          "type": "array",
+          "description": "A list of application routes this role can access.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "allowedRoutes"
       ]
     },
     "Piece": {
@@ -572,6 +594,22 @@
         }
       },
       {
+        "path": "roles/{roleId}",
+        "definition": {
+          "entityName": "Role",
+          "schema": {
+            "$ref": "#/backend/entities/Role"
+          },
+          "description": "Stores application roles and their page access permissions.",
+          "params": [
+            {
+              "name": "roleId",
+              "description": "Unique identifier for the role."
+            }
+          ]
+        }
+      },
+      {
         "path": "pieces/{pieceId}",
         "definition": {
           "entityName": "Piece",
@@ -801,4 +839,5 @@
     "reasoning": "The Firestore data structure is designed to support the ForgeFlow application's production planning and execution features. It prioritizes authorization independence and QAPs by denormalizing data where necessary and using structural segregation. Path-based ownership is used for user-specific data, and membership maps are avoided since there's no collaborative data in the application. The structure enables secure list operations by ensuring that each collection has a homogeneous security posture.\n\n**Authorization Independence:** Data such as the Machines, Molds and Pieces collections are global, so they don't need any explicit authorization besides roles. User-specific collections like Assignments are secured via path-based ownership.\n\n**QAPs:** List operations are secured by structural segregation. For instance, listing assignments is only allowed within a specific plan (plans/{planId}/assignments/{assignmentId}).  This prevents unauthorized listing of assignments across different plans."
   }
 }
+
     

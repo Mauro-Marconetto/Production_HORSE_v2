@@ -2,9 +2,8 @@
 
 'use client';
 
-import { useState, useMemo, useTransition, useCallback } from 'react';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { initializeApp, deleteApp } from 'firebase/app';
+import { useState, useMemo, useTransition, useCallback, useEffect } from 'react';
+import { getAuth, createUserWithEmailAndPassword, initializeApp } from 'firebase/auth';
 import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { firebaseConfig } from '@/firebase/config';
@@ -39,7 +38,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, PlusCircle, Trash2, Edit, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { UserProfile } from '@/lib/types';
+import type { UserProfile, Role } from '@/lib/types';
 
 
 function AdminUsersPageClient() {
@@ -50,6 +49,9 @@ function AdminUsersPageClient() {
 
   const usersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
   const { data: users, isLoading: isLoadingUsers } = useCollection<UserProfile>(usersCollection);
+  
+  const rolesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'roles') : null, [firestore]);
+  const { data: roles, isLoading: isLoadingRoles } = useCollection<Role>(rolesCollection);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -121,24 +123,21 @@ function AdminUsersPageClient() {
           setIsSaving(false);
           return;
         }
-
+        
         // Create a temporary, secondary Firebase app instance to create the user
         // This prevents the main app's auth state from changing and logging out the admin
         const tempAppName = `temp-user-creation-${Date.now()}`;
         const tempApp = initializeApp(firebaseConfig, tempAppName);
         const tempAuth = getAuth(tempApp);
+        
+        const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
+        const uid = userCredential.user.uid;
 
-        try {
-            const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
-            const uid = userCredential.user.uid;
-
-            // Now, use the main Firestore instance (where the admin is authenticated) to create the user's profile document
-            const userDocRef = doc(firestore, 'users', uid);
-            await setDoc(userDocRef, { name, email, role, id: uid });
-        } finally {
-             // Clean up the temporary app instance
-            await deleteApp(tempApp);
-        }
+        // Now, use the main Firestore instance (where the admin is authenticated) to create the user's profile document
+        const userDocRef = doc(firestore, 'users', uid);
+        await setDoc(userDocRef, { name, email, role, id: uid });
+        
+        // We don't need to sign out from the temp app, it's isolated.
       } else {
         const userDocRef = doc(firestore, 'users', selectedUser.id);
         await setDoc(userDocRef, { name, email: selectedUser.email, role, id: selectedUser.id }, { merge: true });
@@ -309,10 +308,13 @@ function AdminUsersPageClient() {
                   <SelectValue placeholder="Selecciona un rol" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Admin">Admin</SelectItem>
-                  <SelectItem value="Planner">Planner</SelectItem>
-                  <SelectItem value="Shop Floor">Shop Floor</SelectItem>
-                  <SelectItem value="Viewer">Viewer</SelectItem>
+                  {isLoadingRoles ? (
+                    <SelectItem value="loading" disabled>Cargando roles...</SelectItem>
+                  ) : (
+                    roles?.map(role => (
+                        <SelectItem key={role.id} value={role.name}>{role.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -377,3 +379,5 @@ export default function AdminUsersPage() {
         </main>
     );
 }
+
+    

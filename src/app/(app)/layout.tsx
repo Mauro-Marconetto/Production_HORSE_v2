@@ -18,6 +18,7 @@ import {
   CalendarDays,
   Building,
   Loader2,
+  Shield,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -36,14 +37,12 @@ import {
   SidebarGroupLabel,
   SidebarInset,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { UserNav } from "@/components/user-nav";
-import { Separator } from "@/components/ui/separator";
-import { useUser, useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { useEffect } from "react";
-import type { UserProfile } from "@/lib/types";
+import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
+import { useEffect, useMemo, useState } from "react";
+import type { UserProfile, Role } from "@/lib/types";
 
-const navItems = [
+const allNavItems = [
   { href: "/dashboard", icon: Home, label: "Panel" },
   { href: "/planner", icon: GanttChartSquare, label: "Planificador" },
   { href: "/calendar", icon: CalendarDays, label: "Calendario" },
@@ -60,6 +59,7 @@ const adminNavItems = [
   { href: "/admin/machines", icon: Cog, label: "Máquinas" },
   { href: "/admin/clients", icon: Building, label: "Clientes" },
   { href: "/admin/users", icon: Users, label: "Usuarios" },
+  { href: "/admin/roles", icon: Shield, label: "Roles" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -74,6 +74,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [user, firestore]);
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+  
+  const rolesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'roles') : null, [firestore]);
+  const { data: roles, isLoading: isLoadingRoles } = useCollection<Role>(rolesCollection);
+
+  const [visibleNavItems, setVisibleNavItems] = useState(allNavItems);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -81,8 +86,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, isUserLoading, router]);
 
-  const isAdmin = userProfile?.role === 'Admin';
-  const isLoading = isUserLoading || isProfileLoading;
+  const { isAdmin, userAllowedRoutes } = useMemo(() => {
+    const isAdmin = userProfile?.role === 'Admin';
+    if (isAdmin) {
+      return { isAdmin: true, userAllowedRoutes: allNavItems.map(item => item.href) };
+    }
+    const userRole = roles?.find(r => r.name === userProfile?.role);
+    const userAllowedRoutes = userRole?.allowedRoutes || [];
+    return { isAdmin: false, userAllowedRoutes };
+  }, [userProfile, roles]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      setVisibleNavItems(allNavItems);
+    } else {
+      const filteredNav = allNavItems.filter(item => userAllowedRoutes.includes(item.href));
+      setVisibleNavItems(filteredNav);
+    }
+  }, [isAdmin, userAllowedRoutes]);
+
+  const isLoading = isUserLoading || isProfileLoading || isLoadingRoles;
 
   if (isLoading || !user) {
     return (
@@ -102,7 +125,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {navItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
@@ -149,3 +172,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    
