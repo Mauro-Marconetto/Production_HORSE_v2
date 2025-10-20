@@ -3,7 +3,8 @@
 'use client';
 
 import { useState, useMemo, useTransition, useCallback, useEffect } from 'react';
-import { getAuth, createUserWithEmailAndPassword, initializeApp } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { initializeApp } from 'firebase/app';
 import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { firebaseConfig } from '@/firebase/config';
@@ -44,7 +45,6 @@ import type { UserProfile, Role } from '@/lib/types';
 function AdminUsersPageClient() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const auth = getAuth();
   const { toast } = useToast();
 
   const usersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
