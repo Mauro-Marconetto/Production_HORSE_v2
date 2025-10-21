@@ -4,7 +4,11 @@
 backends:
   backend:
     runConfig:
-      # Increase this value to automatically spin up more instances in response to increased traffic.
       maxInstances: 1
     labels: {}
     branch: main
+  pre-produccion:
+    runConfig:
+      maxInstances: 1
+    labels: {}
+    branch: develop
