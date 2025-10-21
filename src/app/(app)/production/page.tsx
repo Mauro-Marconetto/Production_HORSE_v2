@@ -239,6 +239,7 @@ export default function ProductionPage() {
                 <TableHead>Molde</TableHead>
                 <TableHead>Turno</TableHead>
                 <TableHead className="text-right">Unidades OK</TableHead>
+                <TableHead className="text-right">Unidades Sin Prensar</TableHead>
                 <TableHead className="text-right">Unidades Producidas</TableHead>
                 <TableHead className="text-right">Scrap (%)</TableHead>
                 <TableHead className="text-center">Calidad</TableHead>
@@ -247,7 +248,7 @@ export default function ProductionPage() {
             <TableBody>
               {(isLoadingProd || isLoadingMachines || isLoadingMolds || isLoadingPieces) && (
                 <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
+                    <TableCell colSpan={10} className="h-24 text-center">
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                     </TableCell>
                 </TableRow>
@@ -257,7 +258,8 @@ export default function ProductionPage() {
                 const scrapTotal = (p.qtyScrap || 0) + (p.qtyScrapCalidad || 0);
                 const scrapPct = totalUnits > 0 ? scrapTotal / totalUnits : 0;
                 const isScrapHigh = scrapPct > 0.05;
-                const unidadesOK = (p.qtyFinalizada || 0) + (p.qtyAptaCalidad || 0) + (p.qtySinPrensar || 0) + (p.qtyAptaSinPrensarCalidad || 0);
+                const unidadesOK = (p.qtyFinalizada || 0) + (p.qtyAptaCalidad || 0);
+                const unidadesSinPrensar = (p.qtySinPrensar || 0) + (p.qtyAptaSinPrensarCalidad || 0);
 
                 return (
                   <TableRow key={p.id}>
@@ -267,6 +269,7 @@ export default function ProductionPage() {
                     <TableCell>{getMoldName(p.moldId)}</TableCell>
                     <TableCell className="capitalize">{p.turno}</TableCell>
                     <TableCell className="text-right">{unidadesOK.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{unidadesSinPrensar.toLocaleString()}</TableCell>
                     <TableCell className="text-right">{totalUnits.toLocaleString()}</TableCell>
                     <TableCell className={`text-right ${isScrapHigh ? 'text-destructive' : ''}`}>
                       {(scrapPct * 100).toFixed(1)}%
@@ -287,7 +290,7 @@ export default function ProductionPage() {
               })}
               {!isLoadingProd && (!production || production.length === 0) && (
                  <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                         No hay registros de producción.
                     </TableCell>
                 </TableRow>
