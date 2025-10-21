@@ -129,6 +129,7 @@ export interface Production {
   pieceId: string;
   moldId: string;
   turno: 'mañana' | 'tarde' | 'noche' | '';
+  nroRack?: string;
   qtyFinalizada: number;
   qtySinPrensar: number;
   qtyScrap: number;
@@ -136,7 +137,6 @@ export interface Production {
   createdBy?: string; // UID of user who declared production
   
   // Quality Segregation fields
-  nroRack?: string;
   defecto?: string;
   tipoControl?: string;
 

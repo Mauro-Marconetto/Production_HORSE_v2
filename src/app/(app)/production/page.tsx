@@ -18,6 +18,9 @@ import { isToday, isWithinInterval } from "date-fns";
 
 type ProductionStep = 'selection' | 'declaration' | 'summary';
 type DeclarationField = 'qtyFinalizada' | 'qtySinPrensar' | 'qtyScrap';
+type PressingStep = 'list' | 'declaration';
+type PressingDeclarationField = 'pressedQty' | 'scrapQty';
+
 
 const declarationFields: { key: DeclarationField, label: string }[] = [
     { key: 'qtyFinalizada', label: 'Finalizada' },
@@ -60,41 +63,64 @@ export default function ProductionPage() {
     const piecesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]);
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesCollection);
 
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isProdDialogOpen, setIsProdDialogOpen] = useState(false);
+    const [isPressingDialogOpen, setIsPressingDialogOpen] = useState(false);
+
     const [step, setStep] = useState<ProductionStep>('selection');
     const [isSaving, setIsSaving] = useState(false);
 
-    // Step 1 State
+    // Production Declaration State
     const [turno, setTurno] = useState<'mañana' | 'tarde' | 'noche' | ''>('');
     const [machineId, setMachineId] = useState('');
     const [moldId, setMoldId] = useState('');
     const [existingProduction, setExistingProduction] = useState<Production | null>(null);
+    const [prodQuantities, setProdQuantities] = useState({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
+    const [prodCurrentInput, setProdCurrentInput] = useState('');
+    const [prodActiveField, setProdActiveField] = useState<DeclarationField>('qtyFinalizada');
 
-    // Step 2 State
-    const [activeField, setActiveField] = useState<DeclarationField>('qtyFinalizada');
-    const [quantities, setQuantities] = useState({
-        qtyFinalizada: 0,
-        qtySinPrensar: 0,
-        qtyScrap: 0,
-    });
-    const [currentInput, setCurrentInput] = useState('');
-    
-    const resetDialogState = () => {
+    // Pressing Declaration State
+    const [pressingStep, setPressingStep] = useState<PressingStep>('list');
+    const [selectedLotForPressing, setSelectedLotForPressing] = useState<Production | null>(null);
+    const [pressingQuantities, setPressingQuantities] = useState({ pressedQty: 0, scrapQty: 0 });
+    const [pressingCurrentInput, setPressingCurrentInput] = useState('');
+    const [pressingActiveField, setPressingActiveField] = useState<PressingDeclarationField>('pressedQty');
+
+
+    const lotsToPress = useMemo(() => {
+        if (!production) return [];
+        return production.filter(p => (p.qtySinPrensar || 0) > 0 || (p.qtyAptaSinPrensarCalidad || 0) > 0);
+    }, [production]);
+
+    const resetProdDialogState = () => {
         setStep('selection');
         setTurno('');
         setMachineId('');
         setMoldId('');
         setExistingProduction(null);
-        setQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
-        setCurrentInput('');
-        setActiveField('qtyFinalizada');
+        setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
+        setProdCurrentInput('');
+        setProdActiveField('qtyFinalizada');
+    }
+    
+    const resetPressingDialogState = () => {
+        setPressingStep('list');
+        setSelectedLotForPressing(null);
+        setPressingQuantities({ pressedQty: 0, scrapQty: 0 });
+        setPressingCurrentInput('');
+        setPressingActiveField('pressedQty');
     }
 
     useEffect(() => {
-        if(isDialogOpen) {
-            resetDialogState();
+        if(isProdDialogOpen) {
+            resetProdDialogState();
         }
-    }, [isDialogOpen])
+    }, [isProdDialogOpen]);
+    
+    useEffect(() => {
+        if(isPressingDialogOpen) {
+            resetPressingDialogState();
+        }
+    }, [isPressingDialogOpen]);
     
     useEffect(() => {
         async function checkForExisting() {
@@ -103,14 +129,14 @@ export default function ProductionPage() {
                 setExistingProduction(existing);
                 if (existing) {
                     setMoldId(existing.moldId);
-                    setQuantities({
+                    setProdQuantities({
                         qtyFinalizada: existing.qtyFinalizada || 0,
                         qtySinPrensar: existing.qtySinPrensar || 0,
                         qtyScrap: existing.qtyScrap || 0,
                     });
                 } else {
                     const machine = machines?.find(m => m.id === machineId);
-                     setQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 }); // Reset quantities if no existing
+                     setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 }); // Reset quantities if no existing
                     if (machine?.moldAssignments) {
                         const today = new Date();
                         const currentAssignment = machine.moldAssignments.find(a => 
@@ -135,18 +161,23 @@ export default function ProductionPage() {
 
     useEffect(() => {
         // Update quantity for active field when currentInput changes
-        const existingQty = existingProduction ? (existingProduction[activeField] || 0) : 0;
-        setQuantities(q => ({ ...q, [activeField]: existingQty + (Number(currentInput) || 0) }));
-    }, [currentInput, activeField, existingProduction]);
+        const existingQty = existingProduction ? (existingProduction[prodActiveField] || 0) : 0;
+        setProdQuantities(q => ({ ...q, [prodActiveField]: existingQty + (Number(prodCurrentInput) || 0) }));
+    }, [prodCurrentInput, prodActiveField, existingProduction]);
+
+    useEffect(() => {
+        const parsedInput = Number(pressingCurrentInput) || 0;
+        setPressingQuantities(q => ({ ...q, [pressingActiveField]: parsedInput }));
+    }, [pressingCurrentInput, pressingActiveField]);
 
 
-    const handleNumericButton = (value: string) => setCurrentInput(prev => prev + value);
-    const handleBackspace = () => setCurrentInput(prev => prev.slice(0, -1));
-    const handleClear = () => setCurrentInput('');
+    const handleProdNumericButton = (value: string) => setProdCurrentInput(prev => prev + value);
+    const handleProdBackspace = () => setProdCurrentInput(prev => prev.slice(0, -1));
+    const handleProdClear = () => setProdCurrentInput('');
     
     const handleGoToDeclaration = () => {
-        setCurrentInput(''); // Reset keyboard input when moving to declaration step
-        setActiveField('qtyFinalizada'); // Set default active field
+        setProdCurrentInput(''); // Reset keyboard input when moving to declaration step
+        setProdActiveField('qtyFinalizada'); // Set default active field
         setStep('declaration');
     }
 
@@ -168,7 +199,7 @@ export default function ProductionPage() {
              if (existingProduction) {
                 // Update existing document
                 const docRef = doc(firestore, 'production', existingProduction.id);
-                await updateDoc(docRef, quantities);
+                await updateDoc(docRef, prodQuantities);
                 toast({ title: "Éxito", description: "Producción actualizada correctamente." });
             } else {
                 // Create new document
@@ -177,7 +208,7 @@ export default function ProductionPage() {
                     machineId,
                     moldId,
                     pieceId,
-                    ...quantities,
+                    ...prodQuantities,
                     qtySegregada: 0,
                     createdBy: user.uid,
                     inspeccionadoCalidad: false,
@@ -189,22 +220,66 @@ export default function ProductionPage() {
             }
 
             forceRefresh();
-            setIsDialogOpen(false);
+            setIsProdDialogOpen(false);
 
         } catch (error) {
              const contextualError = new FirestorePermissionError({
                 path: 'production',
                 operation: 'write',
-                requestResourceData: quantities,
+                requestResourceData: prodQuantities,
             });
             errorEmitter.emit('permission-error', contextualError);
         } finally {
             setIsSaving(false);
         }
     };
+
+    const handleSavePressing = async () => {
+        if (!firestore || !selectedLotForPressing) return;
+
+        const { pressedQty, scrapQty } = pressingQuantities;
+        const totalProcessed = pressedQty + scrapQty;
+        const totalAvailableToPress = (selectedLotForPressing.qtySinPrensar || 0) + (selectedLotForPressing.qtyAptaSinPrensarCalidad || 0);
+        
+        if (totalProcessed > totalAvailableToPress) {
+            toast({ title: "Error", description: "La cantidad procesada no puede superar la cantidad sin prensar disponible.", variant: "destructive" });
+            return;
+        }
+
+        setIsSaving(true);
+
+        const docRef = doc(firestore, 'production', selectedLotForPressing.id);
+        const currentSinPrensar = selectedLotForPressing.qtySinPrensar || 0;
+        
+        let remainingSinPrensar = currentSinPrensar - totalProcessed;
+        let remainingAptaSinPrensar = (selectedLotForPressing.qtyAptaSinPrensarCalidad || 0);
+
+        if (currentSinPrensar < totalProcessed) {
+            remainingAptaSinPrensar -= (totalProcessed - currentSinPrensar);
+        }
+
+        const updateData = {
+            qtyFinalizada: (selectedLotForPressing.qtyFinalizada || 0) + pressedQty,
+            qtyScrap: (selectedLotForPressing.qtyScrap || 0) + scrapQty,
+            qtySinPrensar: Math.max(0, remainingSinPrensar),
+            qtyAptaSinPrensarCalidad: Math.max(0, remainingAptaSinPrensar),
+        };
+
+        try {
+            await updateDoc(docRef, updateData);
+            toast({ title: "Éxito", description: "Declaración de prensado guardada correctamente." });
+            setIsPressingDialogOpen(false);
+            forceRefresh();
+        } catch (error) {
+             const contextualError = new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: updateData });
+             errorEmitter.emit('permission-error', contextualError);
+        } finally {
+            setIsSaving(false);
+        }
+    };
     
     const isStep1Valid = turno && machineId && moldId;
-    const totalDeclaredInSession = quantities.qtyFinalizada + quantities.qtySinPrensar + quantities.qtyScrap;
+    const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap;
     const totalSegregada = (existingProduction?.qtySegregada || 0);
     const totalDeclared = totalDeclaredInSession + totalSegregada;
 
@@ -219,9 +294,14 @@ export default function ProductionPage() {
           <h1 className="text-3xl font-headline font-bold">Producción</h1>
           <p className="text-muted-foreground">Monitoriza y declara el progreso de la producción real.</p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)} className="h-10 px-6 text-base">
-            <PlusCircle className="mr-2 h-5 w-5" /> Declarar Producción
-        </Button>
+        <div className="flex items-center gap-2">
+            <Button onClick={() => setIsPressingDialogOpen(true)} variant="outline" className="h-10 px-6 text-base">
+                Declarar Prensado
+            </Button>
+            <Button onClick={() => setIsProdDialogOpen(true)} className="h-10 px-6 text-base">
+                <PlusCircle className="mr-2 h-5 w-5" /> Declarar Producción
+            </Button>
+        </div>
       </div>
 
       <Card>
@@ -254,12 +334,12 @@ export default function ProductionPage() {
                 </TableRow>
               )}
               {production?.map((p) => {
-                const totalUnits = (p.qtyFinalizada || 0) + (p.qtySinPrensar || 0) + (p.qtyScrap || 0) + (p.qtySegregada || 0) + (p.qtyAptaCalidad || 0) + (p.qtyAptaSinPrensarCalidad || 0) + (p.qtyScrapCalidad || 0);
-                const scrapTotal = (p.qtyScrap || 0) + (p.qtyScrapCalidad || 0);
-                const scrapPct = totalUnits > 0 ? scrapTotal / totalUnits : 0;
-                const isScrapHigh = scrapPct > 0.05;
                 const unidadesOK = (p.qtyFinalizada || 0) + (p.qtyAptaCalidad || 0);
                 const unidadesSinPrensar = (p.qtySinPrensar || 0) + (p.qtyAptaSinPrensarCalidad || 0);
+                const scrapTotal = (p.qtyScrap || 0) + (p.qtyScrapCalidad || 0);
+                const totalUnits = unidadesOK + unidadesSinPrensar + scrapTotal + (p.qtySegregada || 0);
+                const scrapPct = totalUnits > 0 ? scrapTotal / totalUnits : 0;
+                const isScrapHigh = scrapPct > 0.05;
 
                 return (
                   <TableRow key={p.id}>
@@ -268,7 +348,7 @@ export default function ProductionPage() {
                     <TableCell>{getPieceCode(p.pieceId)}</TableCell>
                     <TableCell>{getMoldName(p.moldId)}</TableCell>
                     <TableCell className="capitalize">{p.turno}</TableCell>
-                    <TableCell className="text-right">{unidadesOK.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-semibold">{unidadesOK.toLocaleString()}</TableCell>
                     <TableCell className="text-right">{unidadesSinPrensar.toLocaleString()}</TableCell>
                     <TableCell className="text-right">{totalUnits.toLocaleString()}</TableCell>
                     <TableCell className={`text-right ${isScrapHigh ? 'text-destructive' : ''}`}>
@@ -300,7 +380,7 @@ export default function ProductionPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isProdDialogOpen} onOpenChange={setIsProdDialogOpen}>
           <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Producción</DialogTitle>
@@ -353,16 +433,16 @@ export default function ProductionPage() {
                             {declarationFields.map(({key, label}) => (
                                 <Button
                                     key={key}
-                                    variant={activeField === key ? "default" : "secondary"}
+                                    variant={prodActiveField === key ? "default" : "secondary"}
                                     className="h-20 text-xl justify-between"
                                     onClick={() => {
-                                        setActiveField(key);
-                                        const currentNewQty = quantities[key] - (existingProduction?.[key] || 0);
-                                        setCurrentInput(String(currentNewQty || ''));
+                                        setProdActiveField(key);
+                                        const currentNewQty = prodQuantities[key] - (existingProduction?.[key] || 0);
+                                        setProdCurrentInput(String(currentNewQty || ''));
                                     }}
                                 >
                                     <span>{label}</span>
-                                    <span className="font-bold text-2xl">{quantities[key].toLocaleString()}</span>
+                                    <span className="font-bold text-2xl">{prodQuantities[key].toLocaleString()}</span>
                                 </Button>
                             ))}
                              <div className="h-20 text-xl justify-between flex items-center px-4 py-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
@@ -372,11 +452,11 @@ export default function ProductionPage() {
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
-                                <Button key={n} variant="outline" className="h-full text-3xl font-bold" onClick={() => handleNumericButton(n)}>{n}</Button>
+                                <Button key={n} variant="outline" className="h-full text-3xl font-bold" onClick={() => handleProdNumericButton(n)}>{n}</Button>
                             ))}
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={handleClear}>C</Button>
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={() => handleNumericButton('0')}>0</Button>
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={handleBackspace}>←</Button>
+                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={handleProdClear}>C</Button>
+                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={() => handleProdNumericButton('0')}>0</Button>
+                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={handleProdBackspace}>←</Button>
                         </div>
                     </div>
                 )}
@@ -399,7 +479,7 @@ export default function ProductionPage() {
                                   <h4 className="font-semibold col-span-1 text-right">Nuevo Total</h4>
                                 {declarationFields.map(({key, label}) => {
                                     const previousQty = existingProduction?.[key] || 0;
-                                    const newQty = quantities[key];
+                                    const newQty = prodQuantities[key];
                                     return (
                                         <React.Fragment key={key}>
                                             <div className="col-span-1">{label}</div>
@@ -440,6 +520,108 @@ export default function ProductionPage() {
                 </DialogFooter>
           </DialogContent>
       </Dialog>
+
+      <Dialog open={isPressingDialogOpen} onOpenChange={setIsPressingDialogOpen}>
+          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+                <DialogHeader className="p-6 pb-2">
+                    <DialogTitle className="text-3xl font-bold">Declarar Prensado</DialogTitle>
+                     <DialogDescription className="text-base">Procesa las piezas que están pendientes de prensado y muévelas a inventario finalizado.</DialogDescription>
+                </DialogHeader>
+
+                {pressingStep === 'list' && (
+                    <div className="flex-grow p-6">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead>Máquina</TableHead>
+                                    <TableHead>Pieza</TableHead>
+                                    <TableHead className="text-right">Cantidad sin Prensar</TableHead>
+                                    <TableHead className="text-center">Acción</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {lotsToPress.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">No hay lotes pendientes de prensado.</TableCell></TableRow>}
+                                {lotsToPress.map(lot => (
+                                    <TableRow key={lot.id}>
+                                        <TableCell>{new Date(lot.fechaISO).toLocaleDateString()}</TableCell>
+                                        <TableCell>{getMachineName(lot.machineId)}</TableCell>
+                                        <TableCell>{getPieceCode(lot.pieceId)}</TableCell>
+                                        <TableCell className="text-right font-bold">
+                                            {((lot.qtySinPrensar || 0) + (lot.qtyAptaSinPrensarCalidad || 0)).toLocaleString()}
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Button size="sm" onClick={() => {
+                                                setSelectedLotForPressing(lot);
+                                                setPressingStep('declaration');
+                                            }}>
+                                                Procesar
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+                
+                {pressingStep === 'declaration' && selectedLotForPressing && (
+                    <div className="flex-grow p-6 grid grid-cols-2 gap-8">
+                         <div className="flex flex-col gap-4">
+                            <Card>
+                                <CardHeader><CardTitle>Lote a Procesar</CardTitle></CardHeader>
+                                <CardContent className="space-y-1">
+                                    <p><strong>Pieza:</strong> {getPieceCode(selectedLotForPressing.pieceId)}</p>
+                                    <p><strong>Fecha Lote:</strong> {new Date(selectedLotForPressing.fechaISO).toLocaleString()}</p>
+                                    <p><strong>Cantidad Disponible:</strong> <span className="font-bold text-lg">{((selectedLotForPressing.qtySinPrensar || 0) + (selectedLotForPressing.qtyAptaSinPrensarCalidad || 0)).toLocaleString()}</span></p>
+                                </CardContent>
+                            </Card>
+                            <Button
+                                variant={pressingActiveField === 'pressedQty' ? "default" : "secondary"}
+                                className="h-20 text-xl justify-between"
+                                onClick={() => setPressingActiveField('pressedQty')}
+                            >
+                                <span>Piezas Prensadas (OK)</span>
+                                <span className="font-bold text-2xl">{pressingQuantities.pressedQty.toLocaleString()}</span>
+                            </Button>
+                             <Button
+                                variant={pressingActiveField === 'scrapQty' ? "destructive" : "secondary"}
+                                className={`h-20 text-xl justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
+                                onClick={() => setPressingActiveField('scrapQty')}
+                            >
+                                <span>Scrap de Prensado</span>
+                                <span className="font-bold text-2xl">{pressingQuantities.scrapQty.toLocaleString()}</span>
+                            </Button>
+                         </div>
+                         <div className="grid grid-cols-3 gap-2">
+                            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
+                                <Button key={n} variant="outline" className="h-full text-3xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + n)}>{n}</Button>
+                            ))}
+                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={() => setPressingCurrentInput('')}>C</Button>
+                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + '0')}>0</Button>
+                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={() => setPressingCurrentInput(p => p.slice(0, -1))}>←</Button>
+                        </div>
+                    </div>
+                )}
+
+
+                <DialogFooter className="p-6 pt-2 bg-muted border-t">
+                   {pressingStep === 'list' && (
+                        <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={() => setIsPressingDialogOpen(false)}>Cerrar</Button>
+                   )}
+                   {pressingStep === 'declaration' && (
+                        <>
+                            <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={() => setPressingStep('list')}>Volver a la Lista</Button>
+                             <Button type="button" className="w-48 h-12 text-lg" onClick={handleSavePressing} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                {isSaving ? "Guardando..." : "Confirmar"}
+                            </Button>
+                        </>
+                   )}
+                </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
     </main>
   );
 }
