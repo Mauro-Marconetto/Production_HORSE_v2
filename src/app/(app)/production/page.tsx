@@ -337,7 +337,7 @@ export default function ProductionPage() {
                             ))}
                              <div className="h-20 text-xl justify-between flex items-center px-4 py-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
                                 <span>Segregada (Calidad)</span>
-                                <span className="font-bold text-2xl">0</span>
+                                <span className="font-bold text-2xl">{(existingProduction?.qtySegregada || 0).toLocaleString()}</span>
                              </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
@@ -372,7 +372,7 @@ export default function ProductionPage() {
                                 ))}
                                 <div className="flex justify-between text-muted-foreground">
                                     <span>Segregada (Calidad):</span>
-                                    <span className="font-bold">0</span>
+                                    <span className="font-bold">{(existingProduction?.qtySegregada || 0).toLocaleString()}</span>
                                 </div>
                                 <hr className="col-span-2"/>
                                  <div className="flex justify-between col-span-2 font-bold text-xl">
