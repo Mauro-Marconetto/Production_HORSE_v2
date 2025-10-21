@@ -55,7 +55,7 @@ export default function QualityPage() {
     // Client-side filtering for pending inspections
     const pendingInspection = useMemo(() => {
         if (!allProduction) return [];
-        return allProduction.filter(p => p.qtySegregada > 0 && p.inspeccionadoCalidad === false);
+        return allProduction.filter(p => (p.qtySegregada || 0) > 0);
     }, [allProduction]);
 
     // Client-side filtering for history
