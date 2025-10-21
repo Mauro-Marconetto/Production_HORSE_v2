@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, doc, addDoc, serverTimestamp, Timestamp, query, orderBy, where, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, serverTimestamp, Timestamp, query, orderBy, where, getDocs, writeBatch, updateDoc, Firestore } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle, PlusCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Production, Machine, Mold, Piece } from "@/lib/types";
-import { startOfDay, endOfDay } from "date-fns";
+import { startOfDay, endOfDay, isToday } from "date-fns";
 
 type ProductionStep = 'selection' | 'declaration' | 'summary';
 type DeclarationField = 'qtyFinalizada' | 'qtySinPrensar' | 'qtyScrap';
@@ -23,6 +23,24 @@ const declarationFields: { key: DeclarationField, label: string }[] = [
     { key: 'qtySinPrensar', label: 'Sin Prensar' },
     { key: 'qtyScrap', label: 'Scrap' },
 ];
+
+async function findExistingProduction(
+    firestore: Firestore,
+    allProduction: Production[] | null,
+    machineId: string,
+    turno: string
+): Promise<Production | null> {
+    if (!allProduction) return null;
+
+    const todayProduction = allProduction.filter(p => isToday(new Date(p.fechaISO)));
+
+    const existing = todayProduction.find(
+        p => p.machineId === machineId && p.turno === turno
+    );
+    
+    return existing || null;
+}
+
 
 export default function ProductionPage() {
     const firestore = useFirestore();
@@ -96,29 +114,16 @@ export default function ProductionPage() {
         setIsSaving(true);
         
         try {
-            const todayStart = startOfDay(new Date()).toISOString();
-            const todayEnd = endOfDay(new Date()).toISOString();
+            const existingDoc = await findExistingProduction(firestore, production, machineId, turno);
 
-            const q = query(
-                collection(firestore, "production"),
-                where("machineId", "==", machineId),
-                where("turno", "==", turno),
-                where("fechaISO", ">=", todayStart),
-                where("fechaISO", "<=", todayEnd)
-            );
-
-            const querySnapshot = await getDocs(q);
-            
-            if (!querySnapshot.empty) {
+            if (existingDoc) {
                 // Update existing document
-                const existingDoc = querySnapshot.docs[0];
-                const existingData = existingDoc.data() as Production;
-                const docRef = existingDoc.ref;
+                const docRef = doc(firestore, 'production', existingDoc.id);
 
                 const updatedData = {
-                    qtyFinalizada: (existingData.qtyFinalizada || 0) + quantities.qtyFinalizada,
-                    qtySinPrensar: (existingData.qtySinPrensar || 0) + quantities.qtySinPrensar,
-                    qtyScrap: (existingData.qtyScrap || 0) + quantities.qtyScrap,
+                    qtyFinalizada: (existingDoc.qtyFinalizada || 0) + quantities.qtyFinalizada,
+                    qtySinPrensar: (existingDoc.qtySinPrensar || 0) + quantities.qtySinPrensar,
+                    qtyScrap: (existingDoc.qtyScrap || 0) + quantities.qtyScrap,
                 };
                 
                 await updateDoc(docRef, updatedData);
