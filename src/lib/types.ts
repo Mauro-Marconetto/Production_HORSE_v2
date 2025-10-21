@@ -133,6 +133,7 @@ export interface Production {
   // Quality Inspection fields
   inspeccionadoCalidad: boolean;
   qtyAptaCalidad?: number;
+  qtyAptaSinPrensarCalidad?: number; // New field for "Apta - Sin Prensar (OK)" from quality inspection
   qtyScrapCalidad?: number;
   inspectedBy?: string; // UID of user who inspected
   inspectionDate?: string; // ISO date of inspection

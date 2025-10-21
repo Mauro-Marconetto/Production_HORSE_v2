@@ -20,10 +20,11 @@ import { addDays, format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 
-type QualityInspectionField = 'qtyAptaCalidad' | 'qtyScrapCalidad';
+type QualityInspectionField = 'qtyAptaCalidad' | 'qtyAptaSinPrensarCalidad' | 'qtyScrapCalidad';
 
 const inspectionFields: { key: QualityInspectionField, label: string }[] = [
     { key: 'qtyAptaCalidad', label: 'Apta (OK)' },
+    { key: 'qtyAptaSinPrensarCalidad', label: 'Apta - Sin Prensar (OK)'},
     { key: 'qtyScrapCalidad', label: 'Scrap' },
 ];
 
@@ -80,7 +81,11 @@ export default function QualityPage() {
 
     // Inspection Dialog State
     const [activeField, setActiveField] = useState<QualityInspectionField>('qtyAptaCalidad');
-    const [quantities, setQuantities] = useState<{qtyAptaCalidad: number, qtyScrapCalidad: number}>({ qtyAptaCalidad: 0, qtyScrapCalidad: 0 });
+    const [quantities, setQuantities] = useState({ 
+        qtyAptaCalidad: 0, 
+        qtyAptaSinPrensarCalidad: 0,
+        qtyScrapCalidad: 0,
+    });
     const [currentInput, setCurrentInput] = useState('');
     
     // Segregation Dialog State
@@ -96,7 +101,7 @@ export default function QualityPage() {
 
     useEffect(() => {
         if (selectedProduction) {
-            setQuantities({ qtyAptaCalidad: 0, qtyScrapCalidad: 0 });
+            setQuantities({ qtyAptaCalidad: 0, qtyAptaSinPrensarCalidad: 0, qtyScrapCalidad: 0 });
             setCurrentInput('');
             setActiveField('qtyAptaCalidad');
             setIsInspectionDialogOpen(true);
@@ -129,7 +134,7 @@ export default function QualityPage() {
     const handleBackspace = () => setCurrentInput(prev => prev.slice(0, -1));
     const handleClear = () => setCurrentInput('');
 
-    const totalInspectedInSession = quantities.qtyAptaCalidad + quantities.qtyScrapCalidad;
+    const totalInspectedInSession = quantities.qtyAptaCalidad + quantities.qtyAptaSinPrensarCalidad + quantities.qtyScrapCalidad;
     const isInspectionAmountValid = totalInspectedInSession <= (selectedProduction?.qtySegregada || 0);
 
     const handleSaveInspection = async () => {
@@ -149,11 +154,13 @@ export default function QualityPage() {
         setIsSaving(true);
         const prodDocRef = doc(firestore, 'production', selectedProduction.id);
         const currentApta = selectedProduction.qtyAptaCalidad || 0;
+        const currentAptaSinPrensar = selectedProduction.qtyAptaSinPrensarCalidad || 0;
         const currentScrap = selectedProduction.qtyScrapCalidad || 0;
         const remainingSegregada = (selectedProduction.qtySegregada || 0) - totalInspectedInSession;
         
         const updatedData = {
             qtyAptaCalidad: currentApta + quantities.qtyAptaCalidad,
+            qtyAptaSinPrensarCalidad: currentAptaSinPrensar + quantities.qtyAptaSinPrensarCalidad,
             qtyScrapCalidad: currentScrap + quantities.qtyScrapCalidad,
             qtySegregada: remainingSegregada,
             inspectedBy: user.uid,
@@ -346,16 +353,18 @@ export default function QualityPage() {
                             </TableCell>
                         </TableRow>
                     )}
-                    {!isLoading && inspectedHistory.map((p) => (
+                    {!isLoading && inspectedHistory.map((p) => {
+                        const aptaTotal = (p.qtyAptaCalidad || 0) + (p.qtyAptaSinPrensarCalidad || 0);
+                        return (
                         <TableRow key={p.id}>
                             <TableCell>{new Date(p.inspectionDate || p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                             <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
                             <TableCell>{getPieceCode(p.pieceId)} / {getMoldName(p.moldId)}</TableCell>
-                            <TableCell className="text-right font-medium">{(p.qtyAptaCalidad || 0) + (p.qtyScrapCalidad || 0)}</TableCell>
-                            <TableCell className="text-right text-green-600 font-bold">{(p.qtyAptaCalidad || 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-medium">{(aptaTotal) + (p.qtyScrapCalidad || 0)}</TableCell>
+                            <TableCell className="text-right text-green-600 font-bold">{aptaTotal.toLocaleString()}</TableCell>
                             <TableCell className="text-right text-destructive font-bold">{(p.qtyScrapCalidad || 0).toLocaleString()}</TableCell>
                         </TableRow>
-                    ))}
+                    )})}
                     {!isLoading && inspectedHistory.length === 0 && (
                         <TableRow>
                             <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">

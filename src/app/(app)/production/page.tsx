@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
@@ -227,11 +228,11 @@ export default function ProductionPage() {
                 </TableRow>
               )}
               {production?.map((p) => {
-                const totalUnits = (p.qtyFinalizada || 0) + (p.qtySinPrensar || 0) + (p.qtyScrap || 0) + (p.qtySegregada || 0) + (p.qtyAptaCalidad || 0) + (p.qtyScrapCalidad || 0);
+                const totalUnits = (p.qtyFinalizada || 0) + (p.qtySinPrensar || 0) + (p.qtyScrap || 0) + (p.qtySegregada || 0) + (p.qtyAptaCalidad || 0) + (p.qtyAptaSinPrensarCalidad || 0) + (p.qtyScrapCalidad || 0);
                 const scrapTotal = (p.qtyScrap || 0) + (p.qtyScrapCalidad || 0);
                 const scrapPct = totalUnits > 0 ? scrapTotal / totalUnits : 0;
                 const isScrapHigh = scrapPct > 0.05;
-                const unidadesOK = (p.qtyFinalizada || 0) + (p.qtyAptaCalidad || 0) + (p.qtySinPrensar || 0);
+                const unidadesOK = (p.qtyFinalizada || 0) + (p.qtyAptaCalidad || 0) + (p.qtySinPrensar || 0) + (p.qtyAptaSinPrensarCalidad || 0);
 
                 return (
                   <TableRow key={p.id}>
