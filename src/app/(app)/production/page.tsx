@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, doc, addDoc, serverTimestamp, Timestamp, query, orderBy } from 'firebase/firestore';
+import { collection, doc, addDoc, serverTimestamp, Timestamp, query, orderBy, where, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle, PlusCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Production, Machine, Mold, Piece } from "@/lib/types";
+import { startOfDay, endOfDay } from "date-fns";
 
 type ProductionStep = 'selection' | 'declaration' | 'summary';
 type DeclarationField = 'qtyFinalizada' | 'qtySinPrensar' | 'qtyScrap';
@@ -29,7 +30,7 @@ export default function ProductionPage() {
     const { toast } = useToast();
 
     const prodQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'production'), orderBy('fechaISO', 'desc')) : null, [firestore]);
-    const { data: production, isLoading: isLoadingProd } = useCollection<Production>(prodQuery);
+    const { data: production, isLoading: isLoadingProd, forceRefresh } = useCollection<Production>(prodQuery);
 
     const machinesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]);
     const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(machinesCollection);
@@ -84,8 +85,8 @@ export default function ProductionPage() {
         if (!firestore || !user) {
             toast({ title: "Error", description: "No has iniciado sesión.", variant: "destructive" });
             return;
-        };
-        
+        }
+
         const pieceId = molds?.find(m => m.id === moldId)?.pieces[0];
         if (!pieceId) {
             toast({ title: "Error", description: "El molde seleccionado no tiene una pieza asociada.", variant: "destructive" });
@@ -93,34 +94,69 @@ export default function ProductionPage() {
         }
 
         setIsSaving(true);
-        const productionData: Omit<Production, 'id' > = {
-            turno,
-            machineId,
-            moldId,
-            pieceId,
-            ...quantities,
-            qtySegregada: 0, // This is now handled by Quality
-            createdBy: user.uid,
-            inspeccionadoCalidad: false,
-            fechaISO: new Date().toISOString(),
-        };
+        
+        try {
+            const todayStart = startOfDay(new Date()).toISOString();
+            const todayEnd = endOfDay(new Date()).toISOString();
 
-        addDoc(collection(firestore, "production"), productionData)
-            .then(() => {
+            const q = query(
+                collection(firestore, "production"),
+                where("machineId", "==", machineId),
+                where("turno", "==", turno),
+                where("fechaISO", ">=", todayStart),
+                where("fechaISO", "<=", todayEnd)
+            );
+
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                // Update existing document
+                const existingDoc = querySnapshot.docs[0];
+                const existingData = existingDoc.data() as Production;
+                const docRef = existingDoc.ref;
+
+                const updatedData = {
+                    qtyFinalizada: (existingData.qtyFinalizada || 0) + quantities.qtyFinalizada,
+                    qtySinPrensar: (existingData.qtySinPrensar || 0) + quantities.qtySinPrensar,
+                    qtyScrap: (existingData.qtyScrap || 0) + quantities.qtyScrap,
+                };
+                
+                await updateDoc(docRef, updatedData);
+
+                 toast({ title: "Éxito", description: "Producción actualizada correctamente." });
+
+            } else {
+                // Create new document
+                const productionData: Omit<Production, 'id'> = {
+                    turno,
+                    machineId,
+                    moldId,
+                    pieceId,
+                    ...quantities,
+                    qtySegregada: 0,
+                    createdBy: user.uid,
+                    inspeccionadoCalidad: false,
+                    fechaISO: new Date().toISOString(),
+                };
+                
+                await addDoc(collection(firestore, "production"), productionData);
+
                 toast({ title: "Éxito", description: "Producción declarada correctamente." });
-                setIsDialogOpen(false);
-            })
-            .catch((error) => {
-                const contextualError = new FirestorePermissionError({
-                    path: 'production',
-                    operation: 'create',
-                    requestResourceData: productionData,
-                });
-                errorEmitter.emit('permission-error', contextualError);
-            })
-            .finally(() => {
-                setIsSaving(false);
+            }
+
+            forceRefresh();
+            setIsDialogOpen(false);
+
+        } catch (error) {
+             const contextualError = new FirestorePermissionError({
+                path: 'production',
+                operation: 'write',
+                requestResourceData: quantities,
             });
+            errorEmitter.emit('permission-error', contextualError);
+        } finally {
+            setIsSaving(false);
+        }
     };
     
     const isStep1Valid = turno && machineId && moldId;
