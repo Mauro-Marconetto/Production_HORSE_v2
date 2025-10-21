@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { collection, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -30,9 +30,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { MoreHorizontal, PlusCircle, Loader2, Trash2, CalendarDays } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Loader2, Trash2, CalendarDays, Edit } from 'lucide-react';
 import type { Machine, Mold, MoldAssignment, Piece } from '@/lib/types';
-import { productionCapacities } from "@/lib/data"; // Capacities still from static data
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { addDays, format, isWithinInterval } from 'date-fns';
@@ -59,8 +58,9 @@ export default function AdminMachinesPage() {
 
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   
-  const [newAssignmentDate, setNewAssignmentDate] = useState<DateRange | undefined>();
-  const [newAssignmentMoldId, setNewAssignmentMoldId] = useState<string>("");
+  const [assignmentDate, setAssignmentDate] = useState<DateRange | undefined>();
+  const [assignmentMoldId, setAssignmentMoldId] = useState<string>("");
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
 
   const openNewMachineDialog = () => {
     setSelectedMachine(null);
@@ -74,9 +74,23 @@ export default function AdminMachinesPage() {
 
   const openSchedulerDialog = (machine: Machine) => {
     setSelectedMachine(machine);
-    setNewAssignmentDate(undefined);
-    setNewAssignmentMoldId("");
+    resetSchedulerForm();
     setIsSchedulerOpen(true);
+  }
+
+  const resetSchedulerForm = () => {
+    setAssignmentDate(undefined);
+    setAssignmentMoldId("");
+    setEditingAssignmentId(null);
+  }
+
+  const handleEditAssignmentClick = (assignment: MoldAssignment) => {
+    setEditingAssignmentId(assignment.id);
+    setAssignmentMoldId(assignment.moldId);
+    setAssignmentDate({
+        from: new Date(assignment.startDate),
+        to: new Date(assignment.endDate),
+    });
   }
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -135,33 +149,47 @@ export default function AdminMachinesPage() {
     }
   };
   
-  const handleAddAssignment = async () => {
-    if (!firestore || !selectedMachine || !newAssignmentMoldId || !newAssignmentDate?.from || !newAssignmentDate?.to) {
+  const handleSaveAssignment = async () => {
+    if (!firestore || !selectedMachine || !assignmentMoldId || !assignmentDate?.from || !assignmentDate?.to) {
         toast({ title: "Error", description: "Completa todos los campos para añadir la programación.", variant: "destructive"});
         return;
     }
 
     setIsSaving(true);
-    const newAssignment: MoldAssignment = {
-        id: `ASGN-${Date.now()}`,
-        moldId: newAssignmentMoldId,
-        startDate: newAssignmentDate.from.toISOString(),
-        endDate: newAssignmentDate.to.toISOString(),
-    };
-
     const machineDocRef = doc(firestore, 'machines', selectedMachine.id);
-    const existingAssignments = selectedMachine.moldAssignments || [];
+    let updatedAssignments = [...(selectedMachine.moldAssignments || [])];
+
+    if (editingAssignmentId) {
+        // Update existing assignment
+        const assignmentIndex = updatedAssignments.findIndex(a => a.id === editingAssignmentId);
+        if (assignmentIndex > -1) {
+            updatedAssignments[assignmentIndex] = {
+                ...updatedAssignments[assignmentIndex],
+                moldId: assignmentMoldId,
+                startDate: assignmentDate.from.toISOString(),
+                endDate: assignmentDate.to.toISOString(),
+            }
+        }
+    } else {
+        // Add new assignment
+        const newAssignment: MoldAssignment = {
+            id: `ASGN-${Date.now()}`,
+            moldId: assignmentMoldId,
+            startDate: assignmentDate.from.toISOString(),
+            endDate: assignmentDate.to.toISOString(),
+        };
+        updatedAssignments.push(newAssignment);
+    }
 
     try {
         await updateDoc(machineDocRef, {
-            moldAssignments: [...existingAssignments, newAssignment]
+            moldAssignments: updatedAssignments
         });
-        toast({ title: "Éxito", description: "Programación de molde añadida."});
-        setNewAssignmentDate(undefined);
-        setNewAssignmentMoldId("");
-        refreshMachines(); // Re-fetch machine data to update UI
+        toast({ title: "Éxito", description: `Programación de molde ${editingAssignmentId ? 'actualizada' : 'añadida'}.`});
+        resetSchedulerForm();
+        refreshMachines();
     } catch (error: any) {
-        toast({ title: "Error", description: error.message || "No se pudo añadir la programación.", variant: "destructive"});
+        toast({ title: "Error", description: error.message || "No se pudo guardar la programación.", variant: "destructive"});
     } finally {
         setIsSaving(false);
     }
@@ -176,6 +204,9 @@ export default function AdminMachinesPage() {
     try {
         await updateDoc(machineDocRef, { moldAssignments: updatedAssignments });
         toast({ title: "Éxito", description: "Programación eliminada." });
+        if (editingAssignmentId === assignmentId) {
+            resetSchedulerForm();
+        }
         refreshMachines();
     } catch (error: any) {
         toast({ title: "Error", description: error.message || "No se pudo eliminar la programación.", variant: "destructive"});
@@ -186,16 +217,14 @@ export default function AdminMachinesPage() {
   
   const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
 
-  const currentMoldForMachine = (machine: Machine) => {
+  const currentAssignmentForMachine = (machine: Machine): MoldAssignment | null => {
     if (!machine.moldAssignments) return null;
     const today = new Date();
     const currentAssignment = machine.moldAssignments.find(a => 
         isWithinInterval(today, { start: new Date(a.startDate), end: new Date(a.endDate) })
     );
-    if (!currentAssignment) return null;
-    return molds?.find(m => m.id === currentAssignment.moldId);
+    return currentAssignment || null;
   }
-
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -216,14 +245,23 @@ export default function AdminMachinesPage() {
             </div>
         )}
         {!isLoadingMachines && machines?.map((machine) => {
-          const currentMold = currentMoldForMachine(machine);
+          const currentAssignment = currentAssignmentForMachine(machine);
+          const currentMold = currentAssignment ? molds?.find(m => m.id === currentAssignment.moldId) : null;
+          
           return (
             <Card key={machine.id}>
               <CardHeader className="flex flex-row items-start justify-between">
                 <div>
                   <CardTitle className="text-2xl">{machine.nombre}</CardTitle>
                   <CardDescription>
-                    {currentMold ? `Molde actual: ${currentMold.nombre}` : 'Sin molde programado'}
+                    {currentMold ? (
+                        <>
+                        Molde actual: {currentMold.nombre}
+                        <span className="text-xs ml-2">
+                            (del {format(new Date(currentAssignment!.startDate), 'dd/MM/yy')} al {format(new Date(currentAssignment!.endDate), 'dd/MM/yy')})
+                        </span>
+                        </>
+                    ) : 'Sin molde programado'}
                   </CardDescription>
                 </div>
                 <div className="flex items-center">
@@ -334,15 +372,15 @@ export default function AdminMachinesPage() {
             <DialogHeader>
                 <DialogTitle>Programador de Moldes para {selectedMachine?.nombre}</DialogTitle>
                 <DialogDescription>
-                    Asigna qué molde estará en esta máquina y durante qué fechas.
+                    Asigna qué molde estará en esta máquina y durante qué fechas. Haz clic en una programación existente para editarla.
                 </DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-8 py-4">
                 <div className="space-y-4">
-                    <h4 className="font-semibold text-lg border-b pb-2">Nueva Programación</h4>
+                    <h4 className="font-semibold text-lg border-b pb-2">{editingAssignmentId ? 'Editar Programación' : 'Nueva Programación'}</h4>
                     <div className="space-y-2">
                         <Label>1. Selecciona un Molde</Label>
-                         <Select value={newAssignmentMoldId} onValueChange={setNewAssignmentMoldId}>
+                         <Select value={assignmentMoldId} onValueChange={setAssignmentMoldId}>
                             <SelectTrigger><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
                             <SelectContent>
                                 {molds?.filter(m => m.compatibilidad.includes(selectedMachine?.id || '')).map(m => (
@@ -360,18 +398,18 @@ export default function AdminMachinesPage() {
                                 variant={"outline"}
                                 className={cn(
                                 "w-full justify-start text-left font-normal",
-                                !newAssignmentDate && "text-muted-foreground"
+                                !assignmentDate && "text-muted-foreground"
                                 )}
                             >
                                 <CalendarDays className="mr-2 h-4 w-4" />
-                                {newAssignmentDate?.from ? (
-                                newAssignmentDate.to ? (
+                                {assignmentDate?.from ? (
+                                assignmentDate.to ? (
                                     <>
-                                    {format(newAssignmentDate.from, "LLL dd, y")} -{" "}
-                                    {format(newAssignmentDate.to, "LLL dd, y")}
+                                    {format(assignmentDate.from, "LLL dd, y")} -{" "}
+                                    {format(assignmentDate.to, "LLL dd, y")}
                                     </>
                                 ) : (
-                                    format(newAssignmentDate.from, "LLL dd, y")
+                                    format(assignmentDate.from, "LLL dd, y")
                                 )
                                 ) : (
                                 <span>Elige un rango</span>
@@ -382,18 +420,25 @@ export default function AdminMachinesPage() {
                             <Calendar
                                 initialFocus
                                 mode="range"
-                                defaultMonth={newAssignmentDate?.from}
-                                selected={newAssignmentDate}
-                                onSelect={setNewAssignmentDate}
+                                defaultMonth={assignmentDate?.from}
+                                selected={assignmentDate}
+                                onSelect={setAssignmentDate}
                                 numberOfMonths={2}
                             />
                             </PopoverContent>
                         </Popover>
                     </div>
-                    <Button onClick={handleAddAssignment} disabled={isSaving}>
-                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                        Añadir Programación
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button onClick={handleSaveAssignment} disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                            {editingAssignmentId ? 'Guardar Cambios' : 'Añadir Programación'}
+                        </Button>
+                        {editingAssignmentId && (
+                             <Button variant="outline" onClick={resetSchedulerForm}>
+                                Cancelar Edición
+                             </Button>
+                        )}
+                    </div>
                 </div>
                 <div className="space-y-4">
                      <h4 className="font-semibold text-lg border-b pb-2">Programaciones Activas</h4>
@@ -402,14 +447,21 @@ export default function AdminMachinesPage() {
                             selectedMachine.moldAssignments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).map(assignment => {
                                 const mold = molds?.find(m => m.id === assignment.moldId);
                                 return (
-                                    <div key={assignment.id} className="flex items-center justify-between p-2 border rounded-md">
+                                    <div 
+                                        key={assignment.id} 
+                                        className={cn(
+                                            "flex items-center justify-between p-2 border rounded-md cursor-pointer hover:bg-muted/50",
+                                            editingAssignmentId === assignment.id && "bg-muted ring-2 ring-primary"
+                                        )}
+                                        onClick={() => handleEditAssignmentClick(assignment)}
+                                    >
                                         <div>
                                             <p className="font-semibold">{mold?.nombre}</p>
                                             <p className="text-sm text-muted-foreground">
                                                 {format(new Date(assignment.startDate), 'dd/MM/yy')} - {format(new Date(assignment.endDate), 'dd/MM/yy')}
                                             </p>
                                         </div>
-                                        <Button variant="ghost" size="icon" onClick={() => handleRemoveAssignment(assignment.id)}>
+                                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(assignment.id); }}>
                                             <Trash2 className="h-4 w-4 text-destructive"/>
                                         </Button>
                                     </div>
@@ -429,3 +481,5 @@ export default function AdminMachinesPage() {
     </main>
   );
 }
+
+    
