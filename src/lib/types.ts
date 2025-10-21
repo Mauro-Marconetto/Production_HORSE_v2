@@ -158,9 +158,10 @@ export interface ScrapEntry {
     causa: string;
 }
 
-export interface MachiningEntry {
+export interface SubprocessEntry {
   id: string;
   pieceId: string;
+  proceso: 'mecanizado' | 'granallado';
   qty: number;
   proveedor: string;
   fechaEnvio: string;

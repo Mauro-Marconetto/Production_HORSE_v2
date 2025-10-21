@@ -1,6 +1,6 @@
 
 
-import type { Machine, Mold, Piece, Demand, CurrentInventory, Production, Plan, PlanAssignment, PlaceholderImage, ScrapEntry, CalendarEvent, Client, ProductionCapacity, MachiningEntry } from './types';
+import type { Machine, Mold, Piece, Demand, CurrentInventory, Production, Plan, PlanAssignment, PlaceholderImage, ScrapEntry, CalendarEvent, Client, ProductionCapacity, SubprocessEntry } from './types';
 
 export const placeholderImages: PlaceholderImage[] = [
     {
@@ -152,12 +152,12 @@ export const calendarEvents: CalendarEvent[] = [
     { id: 'evt-3', machineId: "all", date: '2024-08-15', type: 'feriado', description: 'Asunción de la Virgen' },
 ]
 
-export const machining: MachiningEntry[] = [
-    { id: 'mach-1', pieceId: 'P4001', qty: 350, proveedor: 'Mecanizados Precisos S.L.', fechaEnvio: '2024-07-01', status: 'pendiente' },
-    { id: 'mach-2', pieceId: 'P4002', qty: 350, proveedor: 'Mecanizados Precisos S.L.', fechaEnvio: '2024-07-01', status: 'pendiente' },
-    { id: 'mach-3', pieceId: 'P5001', qty: 280, proveedor: 'TornoTech', fechaEnvio: '2024-06-28', status: 'validacion' },
-    { id: 'mach-4', pieceId: 'P5002', qty: 280, proveedor: 'TornoTech', fechaEnvio: '2024-06-20', fechaRetorno: '2024-06-27', status: 'finalizada' },
-    { id: 'mach-5', pieceId: 'P5003', qty: 300, proveedor: 'TornoTech', fechaEnvio: '2024-06-15', fechaRetorno: '2024-06-22', status: 'finalizada' },
-    { id: 'mach-6', pieceId: 'P4001', qty: 25, proveedor: 'Mecanizados Precisos S.L.', fechaEnvio: '2024-06-25', status: 'segregada' },
+export const subprocesses: SubprocessEntry[] = [
+    { id: 'sub-1', pieceId: 'P4001', proceso: 'mecanizado', qty: 350, proveedor: 'Mecanizados Precisos S.L.', fechaEnvio: '2024-07-01', status: 'pendiente' },
+    { id: 'sub-2', pieceId: 'P4002', proceso: 'mecanizado', qty: 350, proveedor: 'Mecanizados Precisos S.L.', fechaEnvio: '2024-07-01', status: 'pendiente' },
+    { id: 'sub-3', pieceId: 'P5001', proceso: 'mecanizado', qty: 280, proveedor: 'TornoTech', fechaEnvio: '2024-06-28', status: 'validacion' },
+    { id: 'sub-4', pieceId: 'P5002', proceso: 'granallado', qty: 280, proveedor: 'TornoTech', fechaEnvio: '2024-06-20', fechaRetorno: '2024-06-27', status: 'finalizada' },
+    { id: 'sub-5', pieceId: 'P5003', proceso: 'granallado', qty: 300, proveedor: 'TornoTech', fechaEnvio: '2024-06-15', fechaRetorno: '2024-06-22', status: 'finalizada' },
+    { id: 'sub-6', pieceId: 'P4001', proceso: 'mecanizado', qty: 25, proveedor: 'Mecanizados Precisos S.L.', fechaEnvio: '2024-06-25', status: 'segregada' },
 ];
     

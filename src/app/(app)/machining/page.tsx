@@ -1,10 +1,11 @@
 
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { machining, pieces } from "@/lib/data";
+import { subprocesses, pieces } from "@/lib/data";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,23 +16,23 @@ const statusConfig = {
     segregada: { label: "Segregada", color: "bg-red-500" },
 }
 
-export default function MachiningPage() {
+export default function SubprocessesPage() {
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Seguimiento de Mecanizado</h1>
-          <p className="text-muted-foreground">Trazabilidad de piezas en proveedores externos.</p>
+          <h1 className="text-3xl font-headline font-bold">Seguimiento de Subprocesos</h1>
+          <p className="text-muted-foreground">Trazabilidad de piezas en proveedores externos (mecanizado, granallado, etc.).</p>
         </div>
         <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Enviar Lote a Mecanizar
+          <PlusCircle className="mr-2 h-4 w-4" /> Enviar Lote
         </Button>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Lotes en Mecanizado</CardTitle>
+          <CardTitle>Lotes en Procesos Externos</CardTitle>
           <CardDescription>
-            Piezas que se encuentran actualmente en un proceso de mecanizado externo.
+            Piezas que se encuentran actualmente en un proceso externo.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -39,6 +40,7 @@ export default function MachiningPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Pieza</TableHead>
+                <TableHead>Proceso</TableHead>
                 <TableHead className="text-right">Cantidad</TableHead>
                 <TableHead>Proveedor</TableHead>
                 <TableHead>Fecha Envío</TableHead>
@@ -48,12 +50,13 @@ export default function MachiningPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {machining.map((entry) => {
+              {subprocesses.map((entry) => {
                 const piece = pieces.find(p => p.id === entry.pieceId);
                 const { label, color } = statusConfig[entry.status];
                 return (
                   <TableRow key={entry.id}>
                     <TableCell className="font-medium">{piece?.codigo || 'N/A'}</TableCell>
+                    <TableCell className="capitalize">{entry.proceso}</TableCell>
                     <TableCell className="text-right">{entry.qty.toLocaleString()}</TableCell>
                     <TableCell>{entry.proveedor}</TableCell>
                     <TableCell>{new Date(entry.fechaEnvio).toLocaleDateString()}</TableCell>
@@ -88,4 +91,3 @@ export default function MachiningPage() {
     </main>
   );
 }
-
