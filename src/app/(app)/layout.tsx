@@ -56,11 +56,11 @@ const allNavItems = [
   { href: "/production", icon: LineChart, label: "Producción" },
   { href: "/downtime", icon: Wrench, label: "Inactividad" },
   { href: "/quality", icon: ShieldCheck, label: "Calidad" },
+  { href: "/admin/machines", icon: Cog, label: "Máquinas" },
 ];
 
 const adminNavItems = [
   { href: "/admin/pieces", icon: Package, label: "Piezas" },
-  { href: "/admin/machines", icon: Cog, label: "Máquinas" },
   { href: "/admin/clients", icon: Building, label: "Clientes" },
   { href: "/admin/users", icon: Users, label: "Usuarios" },
   { href: "/admin/roles", icon: Shield, label: "Roles" },
