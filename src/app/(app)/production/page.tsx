@@ -180,7 +180,7 @@ export default function ProductionPage() {
     };
     
     const isStep1Valid = turno && machineId && moldId;
-    const totalDeclared = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
+    const totalDeclared = Object.values(quantities).reduce((sum, qty) => sum + qty, 0) + (existingProduction?.qtySegregada || 0);
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
