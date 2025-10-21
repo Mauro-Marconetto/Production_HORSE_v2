@@ -87,9 +87,12 @@ export default function AdminPiecesPage() {
 
         setIsSaving(true);
         const formData = new FormData(e.currentTarget);
-        const pieceId = selectedPiece ? selectedPiece.id : `P${'(' + ')'}Date.now()}`;
+        const pieceId = selectedPiece ? selectedPiece.id : `P${Date.now()}`;
         const codigo = formData.get('codigo') as string;
         const moldNameFromInput = (formData.get('moldName') as string).trim();
+        const stockMin = Number(formData.get('stockMin'));
+        const stockMax = Number(formData.get('stockMax'));
+
 
         if (!codigo || !moldNameFromInput) {
             toast({ title: 'Error', description: 'El código de la pieza y el nombre del molde son obligatorios.', variant: 'destructive' });
@@ -102,7 +105,14 @@ export default function AdminPiecesPage() {
 
             // 1. Create or update the piece document
             const pieceDocRef = doc(firestore, 'pieces', pieceId);
-            batch.set(pieceDocRef, { id: pieceId, codigo }, { merge: true });
+            const pieceData: Piece = { 
+                id: pieceId, 
+                codigo, 
+                clienteId: selectedPiece?.clienteId || '', // preserve client if exists
+                stockMin: stockMin || 0,
+                stockMax: stockMax || 0
+            };
+            batch.set(pieceDocRef, pieceData, { merge: true });
 
             // 2. Find original mold if editing
             const originalMold = selectedPiece ? molds?.find(m => m.pieces.includes(selectedPiece.id)) : undefined;
@@ -120,7 +130,7 @@ export default function AdminPiecesPage() {
                 newMoldData = existingMoldDoc.data() as Mold;
             } else {
                 // Mold doesn't exist, create a new one
-                const newMoldId = `MOLD-${'(' + ')'}Date.now()}`;
+                const newMoldId = `MOLD-${Date.now()}`;
                 newMoldRef = doc(firestore, 'molds', newMoldId);
                 newMoldData = {
                     id: newMoldId,
@@ -158,7 +168,7 @@ export default function AdminPiecesPage() {
             
             toast({
                 title: 'Éxito',
-                description: `Pieza ${'(' + ')'}selectedPiece ? 'actualizada' : 'creada'} y molde asociado correctamente.`,
+                description: `Pieza ${selectedPiece ? 'actualizada' : 'creada'} y molde asociado correctamente.`,
             });
             setIsDialogOpen(false);
             if (querySnapshot.empty) {
@@ -226,13 +236,15 @@ export default function AdminPiecesPage() {
                         <TableHead>Pieza</TableHead>
                         <TableHead>Molde Asociado</TableHead>
                         <TableHead>Máquinas Compatibles</TableHead>
+                        <TableHead className="text-right">Stock Mín.</TableHead>
+                        <TableHead className="text-right">Stock Máx.</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading && (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center">
+                                <TableCell colSpan={6} className="h-24 text-center">
                                     <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                                 </TableCell>
                             </TableRow>
@@ -264,6 +276,8 @@ export default function AdminPiecesPage() {
                                             )}
                                         </div>
                                    </TableCell>
+                                    <TableCell className="text-right">{(piece.stockMin || 0).toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{(piece.stockMax || 0).toLocaleString()}</TableCell>
                                     <TableCell className="text-right">
                                         <AlertDialog>
                                             <DropdownMenu>
@@ -311,7 +325,7 @@ export default function AdminPiecesPage() {
                         })}
                          {!isLoading && (!pieces || pieces.length === 0) && (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center">
+                                <TableCell colSpan={6} className="h-24 text-center">
                                     No se encontraron piezas.
                                 </TableCell>
                             </TableRow>
@@ -341,6 +355,15 @@ export default function AdminPiecesPage() {
                            <Input id="moldName" name="moldName" defaultValue={currentMoldName} className="col-span-3" required />
                         </div>
 
+                         <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="stockMin" className="text-right">Stock Mínimo</Label>
+                            <Input id="stockMin" name="stockMin" type="number" defaultValue={selectedPiece?.stockMin || ''} className="col-span-3" />
+                        </div>
+                         <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="stockMax" className="text-right">Stock Máximo</Label>
+                            <Input id="stockMax" name="stockMax" type="number" defaultValue={selectedPiece?.stockMax || ''} className="col-span-3" />
+                        </div>
+
                         <div className="grid grid-cols-4 items-start gap-4">
                             <Label className="text-right pt-2">
                                 Máquinas Compatibles
@@ -349,7 +372,7 @@ export default function AdminPiecesPage() {
                                 {isLoadingMachines ? <p>Cargando máquinas...</p> : machines?.map(machine => (
                                     <div key={machine.id} className="flex items-center space-x-2">
                                         <Checkbox
-                                            id={`machine-${'(' + ')'}machine.id}`}
+                                            id={`machine-${machine.id}`}
                                             checked={compatibleMachines.includes(machine.id)}
                                             onCheckedChange={(checked) => {
                                                 setCompatibleMachines(prev => 
@@ -360,7 +383,7 @@ export default function AdminPiecesPage() {
                                             }}
                                         />
                                         <label
-                                            htmlFor={`machine-${'(' + ')'}machine.id}`}
+                                            htmlFor={`machine-${machine.id}`}
                                             className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                         >
                                             {machine.nombre}

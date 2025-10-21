@@ -9,6 +9,8 @@ export interface Piece {
   id: string;
   codigo: string;
   clienteId: string;
+  stockMin?: number;
+  stockMax?: number;
 }
 
 export interface Mold {

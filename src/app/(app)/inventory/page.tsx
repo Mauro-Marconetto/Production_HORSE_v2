@@ -1,9 +1,10 @@
 
 'use client';
 
-import { useState, useMemo } from "react";
-import { collection } from 'firebase/firestore';
+import { useState, useMemo, useEffect } from "react";
+import { collection, doc, updateDoc } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useToast } from "@/hooks/use-toast";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,21 +12,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, TrendingUp, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle, TrendingUp, Loader2, Save } from "lucide-react";
 import type { Piece, Production } from "@/lib/types";
 
 export default function InventoryPage() {
     const firestore = useFirestore();
+    const { toast } = useToast();
 
     const piecesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]);
-    const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesCollection);
+    const { data: pieces, isLoading: isLoadingPieces, forceRefresh: refreshPieces } = useCollection<Piece>(piecesCollection);
 
     const productionCollection = useMemoFirebase(() => firestore ? collection(firestore, 'production') : null, [firestore]);
     const { data: allProduction, isLoading: isLoadingProduction } = useCollection<Production>(productionCollection);
 
     const [editablePieces, setEditablePieces] = useState<Piece[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
 
-    useMemo(() => {
+    useEffect(() => {
         if (pieces) {
             setEditablePieces(pieces);
         }
@@ -41,6 +44,51 @@ export default function InventoryPage() {
             )
         );
     };
+
+    const handleSaveStockLevels = async () => {
+        if (!firestore) return;
+        setIsSaving(true);
+        const batch = firestore ? writeBatch(firestore) : null;
+        if (!batch) return;
+
+        let changes = 0;
+        editablePieces.forEach(editable => {
+            const original = pieces?.find(p => p.id === editable.id);
+            if (original && (original.stockMin !== editable.stockMin || original.stockMax !== editable.stockMax)) {
+                const pieceRef = doc(firestore, "pieces", editable.id);
+                batch.update(pieceRef, { 
+                    stockMin: editable.stockMin || 0,
+                    stockMax: editable.stockMax || 0
+                });
+                changes++;
+            }
+        });
+
+        if (changes > 0) {
+            try {
+                await batch.commit();
+                toast({
+                    title: "Éxito",
+                    description: "Niveles de stock actualizados correctamente."
+                });
+                refreshPieces();
+            } catch (error: any) {
+                toast({
+                    title: "Error",
+                    description: "No se pudieron actualizar los niveles de stock.",
+                    variant: "destructive"
+                });
+            }
+        } else {
+             toast({
+                title: "Sin cambios",
+                description: "No se detectaron cambios en los niveles de stock.",
+            });
+        }
+
+
+        setIsSaving(false);
+    }
     
     const inventoryData = useMemo(() => {
         if (!pieces || !allProduction) return [];
@@ -74,6 +122,10 @@ export default function InventoryPage() {
                     <h1 className="text-3xl font-headline font-bold">Inventario</h1>
                     <p className="text-muted-foreground">Monitoriza y gestiona los niveles de stock en tiempo real.</p>
                 </div>
+                 <Button onClick={handleSaveStockLevels} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Guardar Cambios
+                </Button>
             </div>
             <Card>
                 <CardHeader>
