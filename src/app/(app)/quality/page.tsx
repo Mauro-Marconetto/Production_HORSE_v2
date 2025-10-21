@@ -50,7 +50,11 @@ export default function QualityPage() {
 
     const [isInspectionDialogOpen, setIsInspectionDialogOpen] = useState(false);
     const [isSegregateDialogOpen, setIsSegregateDialogOpen] = useState(false);
+    const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+    
     const [selectedProduction, setSelectedProduction] = useState<Production | null>(null);
+    const [lotToEdit, setLotToEdit] = useState<Production | null>(null);
+
     const [isSaving, setIsSaving] = useState(false);
     
     const [date, setDate] = useState<DateRange | undefined>({
@@ -107,6 +111,12 @@ export default function QualityPage() {
             setIsInspectionDialogOpen(true);
         }
     }, [selectedProduction]);
+
+    useEffect(() => {
+        if(lotToEdit) {
+            setIsDetailDialogOpen(true);
+        }
+    }, [lotToEdit])
     
     useEffect(() => {
         if (!isInspectionDialogOpen) {
@@ -216,6 +226,45 @@ export default function QualityPage() {
             .finally(() => { setIsSaving(false); });
     };
 
+    const handleUpdateSegregation = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!firestore || !user || !lotToEdit) return;
+
+        const formData = new FormData(e.currentTarget);
+        
+        const pieceId = molds?.find(m => m.id === (formData.get('moldId') as string))?.pieces[0];
+        if (!pieceId) {
+            toast({ title: "Error", description: "El molde seleccionado no tiene una pieza asociada.", variant: "destructive" });
+            return;
+        }
+        
+        setIsSaving(true);
+        const updatedData = {
+            turno: formData.get('turno') as string,
+            machineId: formData.get('machineId') as string,
+            moldId: formData.get('moldId') as string,
+            nroRack: formData.get('nroRack') as string,
+            defecto: formData.get('defecto') as string,
+            tipoControl: formData.get('tipoControl') as string,
+            qtySegregada: Number(formData.get('qtySegregada')),
+            pieceId: pieceId,
+        };
+
+        const lotDocRef = doc(firestore, 'production', lotToEdit.id);
+        
+        updateDoc(lotDocRef, updatedData)
+            .then(() => {
+                toast({ title: "Éxito", description: "Lote segregado actualizado correctamente." });
+                setIsDetailDialogOpen(false);
+                setLotToEdit(null);
+            })
+            .catch((error) => {
+                const contextualError = new FirestorePermissionError({ path: lotDocRef.path, operation: 'update', requestResourceData: updatedData });
+                errorEmitter.emit('permission-error', contextualError);
+            })
+            .finally(() => { setIsSaving(false); });
+    }
+
     const isLoading = isLoadingProd || isLoadingMachines || isLoadingMolds || isLoadingPieces;
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
@@ -268,6 +317,9 @@ export default function QualityPage() {
                     <TableCell>{p.nroRack}</TableCell>
                     <TableCell className="text-right font-bold text-lg">{p.qtySegregada.toLocaleString()}</TableCell>
                     <TableCell className="text-center">
+                       <Button variant="outline" size="sm" className="mr-2" onClick={() => setLotToEdit(p)}>
+                           <Edit className="mr-2 h-4 w-4" /> Detalles
+                       </Button>
                       <Button onClick={() => setSelectedProduction(p)}>
                         <Check className="mr-2 h-4 w-4" /> Inspeccionar
                       </Button>
@@ -504,6 +556,78 @@ export default function QualityPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isDetailDialogOpen} onOpenChange={(isOpen) => { if(!isOpen) { setLotToEdit(null); setIsDetailDialogOpen(false); }}}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Detalles del Lote Segregado</DialogTitle>
+            <DialogDescription>
+              Edita la información del lote que fue enviado a inspección.
+            </DialogDescription>
+          </DialogHeader>
+          {lotToEdit && (
+            <form onSubmit={handleUpdateSegregation} className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-turno">Turno</Label>
+                        <Select required name="turno" defaultValue={lotToEdit.turno}>
+                            <SelectTrigger id="edit-turno"><SelectValue placeholder="Selecciona turno..." /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="mañana">Mañana</SelectItem>
+                                <SelectItem value="tarde">Tarde</SelectItem>
+                                <SelectItem value="noche">Noche</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-rack">Número de Rack</Label>
+                        <Input id="edit-rack" name="nroRack" required defaultValue={lotToEdit.nroRack} />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="edit-machine">Máquina</Label>
+                    <Select required name="machineId" defaultValue={lotToEdit.machineId}>
+                        <SelectTrigger id="edit-machine"><SelectValue placeholder="Selecciona máquina..." /></SelectTrigger>
+                        <SelectContent>{machines?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="edit-mold">Molde</Label>
+                    <Select required name="moldId" defaultValue={lotToEdit.moldId}>
+                        <SelectTrigger id="edit-mold"><SelectValue placeholder="Selecciona molde..." /></SelectTrigger>
+                        <SelectContent>{molds?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-defecto">Defecto</Label>
+                        <Select required name="defecto" defaultValue={lotToEdit.defecto}>
+                            <SelectTrigger id="edit-defecto"><SelectValue placeholder="Selecciona defecto..." /></SelectTrigger>
+                            <SelectContent>{defectOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-control">Tipo de Control</Label>
+                        <Select required name="tipoControl" defaultValue={lotToEdit.tipoControl}>
+                            <SelectTrigger id="edit-control"><SelectValue placeholder="Selecciona control..." /></SelectTrigger>
+                            <SelectContent>{controlTypeOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="edit-qty">Cantidad Segregada</Label>
+                    <Input id="edit-qty" name="qtySegregada" type="number" required defaultValue={lotToEdit.qtySegregada} />
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => { setIsDetailDialogOpen(false); setLotToEdit(null); }}>Cancelar</Button>
+                    <Button type="submit" disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Guardar Cambios
+                    </Button>
+                </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
