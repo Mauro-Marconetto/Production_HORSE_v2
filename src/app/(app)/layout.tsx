@@ -52,11 +52,10 @@ const allNavItems = [
   { href: "/calendar", icon: CalendarDays, label: "Calendario" },
   { href: "/demand", icon: Truck, label: "Demanda" },
   { href: "/inventory", icon: Warehouse, label: "Inventario" },
-  { href: "/machining", icon: Factory, label: "Mecanizado" },
+  { href: "/machines", icon: Factory, label: "Máquinas" },
   { href: "/production", icon: LineChart, label: "Producción" },
   { href: "/downtime", icon: Wrench, label: "Inactividad" },
   { href: "/quality", icon: ShieldCheck, label: "Calidad" },
-  { href: "/admin/machines", icon: Cog, label: "Máquinas" },
 ];
 
 const adminNavItems = [
