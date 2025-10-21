@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, TrendingUp, Loader2, PlusCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind } from "lucide-react";
 import type { Piece, Production } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 
@@ -57,9 +57,14 @@ export default function StockPage() {
                     <h1 className="text-3xl font-headline font-bold">Stock</h1>
                     <p className="text-muted-foreground">Monitoriza los niveles de stock en tiempo real.</p>
                 </div>
-                <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Enviar Lote
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline">
+                        <Wrench className="mr-2 h-4 w-4" /> Enviar para Mecanizado
+                    </Button>
+                    <Button variant="outline">
+                        <Wind className="mr-2 h-4 w-4" /> Enviar para Granallado
+                    </Button>
+                </div>
             </div>
             <Card>
                 <CardHeader>
