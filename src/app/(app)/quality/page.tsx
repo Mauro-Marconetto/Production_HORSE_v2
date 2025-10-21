@@ -110,10 +110,10 @@ export default function QualityPage() {
     }, [isInspectionDialogOpen]);
     
     useEffect(() => {
-        if (activeField) {
+        if (activeField && isInspectionDialogOpen) {
             setCurrentInput(String(quantities[activeField] || ''));
         }
-    }, [activeField]);
+    }, [activeField, isInspectionDialogOpen]);
 
     useEffect(() => {
         const parsedInput = Number(currentInput) || 0;
@@ -239,6 +239,7 @@ export default function QualityPage() {
                 <TableHead>Máquina</TableHead>
                 <TableHead>Pieza / Molde</TableHead>
                 <TableHead>Turno</TableHead>
+                <TableHead>Nro. Rack</TableHead>
                 <TableHead className="text-right">Cantidad Pendiente</TableHead>
                 <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
@@ -246,7 +247,7 @@ export default function QualityPage() {
             <TableBody>
               {isLoading && (
                 <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={7} className="h-24 text-center">
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                     </TableCell>
                 </TableRow>
@@ -257,6 +258,7 @@ export default function QualityPage() {
                     <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
                     <TableCell>{getPieceCode(p.pieceId)} / {getMoldName(p.moldId)}</TableCell>
                     <TableCell className="capitalize">{p.turno}</TableCell>
+                    <TableCell>{p.nroRack}</TableCell>
                     <TableCell className="text-right font-bold text-lg">{p.qtySegregada.toLocaleString()}</TableCell>
                     <TableCell className="text-center">
                       <Button onClick={() => setSelectedProduction(p)}>
@@ -267,7 +269,7 @@ export default function QualityPage() {
               ))}
                {!isLoading && pendingInspection.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                         No hay lotes pendientes de inspección.
                     </TableCell>
                 </TableRow>
