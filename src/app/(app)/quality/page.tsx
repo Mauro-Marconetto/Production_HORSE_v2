@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, doc, updateDoc, query, orderBy, where } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy, addDoc } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { Check, Edit, Loader2, Calendar as CalendarIcon } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Check, Edit, Loader2, Calendar as CalendarIcon, PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Production, Machine, Mold, Piece } from "@/lib/types";
 import { addDays, format } from "date-fns";
@@ -25,12 +27,14 @@ const inspectionFields: { key: QualityInspectionField, label: string }[] = [
     { key: 'qtyScrapCalidad', label: 'Scrap' },
 ];
 
+const defectOptions = ["Porosidad", "Rebaba", "Falta de material", "Golpe", "Marca de expulsor"];
+const controlTypeOptions = ["Visual", "Dimensional", "Estanqueidad"];
+
 export default function QualityPage() {
     const firestore = useFirestore();
     const { user } = useUser();
     const { toast } = useToast();
 
-    // Query for all production data, let client-side filtering handle the logic
     const productionQuery = useMemoFirebase(() => 
         firestore 
             ? query(collection(firestore, 'production'), orderBy('fechaISO', 'desc'))
@@ -43,7 +47,8 @@ export default function QualityPage() {
     const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]));
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]));
 
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isInspectionDialogOpen, setIsInspectionDialogOpen] = useState(false);
+    const [isSegregateDialogOpen, setIsSegregateDialogOpen] = useState(false);
     const [selectedProduction, setSelectedProduction] = useState<Production | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     
@@ -55,7 +60,7 @@ export default function QualityPage() {
     // Client-side filtering for pending inspections
     const pendingInspection = useMemo(() => {
         if (!allProduction) return [];
-        return allProduction.filter(p => (p.qtySegregada || 0) > 0);
+        return allProduction.filter(p => (p.qtySegregada || 0) > 0 && !p.inspeccionadoCalidad);
     }, [allProduction]);
 
     // Client-side filtering for history
@@ -77,26 +82,47 @@ export default function QualityPage() {
     const [activeField, setActiveField] = useState<QualityInspectionField>('qtyAptaCalidad');
     const [quantities, setQuantities] = useState<{qtyAptaCalidad: number, qtyScrapCalidad: number}>({ qtyAptaCalidad: 0, qtyScrapCalidad: 0 });
     const [currentInput, setCurrentInput] = useState('');
+    
+    // Segregation Dialog State
+    const [segregateForm, setSegregateForm] = useState({
+        turno: '',
+        machineId: '',
+        moldId: '',
+        nroRack: '',
+        defecto: '',
+        tipoControl: '',
+        qtySegregada: ''
+    });
 
     useEffect(() => {
         if (selectedProduction) {
-            // Reset state for new inspection
             setQuantities({ qtyAptaCalidad: 0, qtyScrapCalidad: 0 });
             setCurrentInput('');
             setActiveField('qtyAptaCalidad');
-            setIsDialogOpen(true);
+            setIsInspectionDialogOpen(true);
         }
     }, [selectedProduction]);
     
+    useEffect(() => {
+        if (!isInspectionDialogOpen) {
+            setSelectedProduction(null);
+        }
+    }, [isInspectionDialogOpen]);
+    
+    useEffect(() => {
+        if (activeField) {
+            setCurrentInput(String(quantities[activeField] || ''));
+        }
+    }, [activeField]);
+
     useEffect(() => {
         const parsedInput = Number(currentInput) || 0;
         setQuantities(q => ({ ...q, [activeField]: parsedInput }));
     }, [currentInput, activeField]);
 
 
-    const handleCloseDialog = () => {
-        setIsDialogOpen(false);
-        setSelectedProduction(null);
+    const handleCloseInspectionDialog = () => {
+        setIsInspectionDialogOpen(false);
     }
     
     const handleNumericButton = (value: string) => setCurrentInput(prev => prev + value);
@@ -121,9 +147,7 @@ export default function QualityPage() {
         }
 
         setIsSaving(true);
-        
         const prodDocRef = doc(firestore, 'production', selectedProduction.id);
-
         const currentApta = selectedProduction.qtyAptaCalidad || 0;
         const currentScrap = selectedProduction.qtyScrapCalidad || 0;
         const remainingSegregada = (selectedProduction.qtySegregada || 0) - totalInspectedInSession;
@@ -134,25 +158,55 @@ export default function QualityPage() {
             qtySegregada: remainingSegregada,
             inspectedBy: user.uid,
             inspectionDate: new Date().toISOString(),
-            inspeccionadoCalidad: remainingSegregada === 0, // Mark as fully inspected only if nothing remains
+            inspeccionadoCalidad: remainingSegregada === 0,
         };
 
         updateDoc(prodDocRef, updatedData)
             .then(() => {
                 toast({ title: "Éxito", description: "Inspección de calidad guardada correctamente." });
-                handleCloseDialog();
+                handleCloseInspectionDialog();
             })
             .catch((error) => {
-                const contextualError = new FirestorePermissionError({
-                    path: prodDocRef.path,
-                    operation: 'update',
-                    requestResourceData: updatedData,
-                });
+                const contextualError = new FirestorePermissionError({ path: prodDocRef.path, operation: 'update', requestResourceData: updatedData });
                 errorEmitter.emit('permission-error', contextualError);
             })
-            .finally(() => {
-                setIsSaving(false);
-            });
+            .finally(() => { setIsSaving(false); });
+    };
+
+    const handleSaveSegregation = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!firestore || !user) return;
+        
+        const pieceId = molds?.find(m => m.id === segregateForm.moldId)?.pieces[0];
+        if (!pieceId) {
+            toast({ title: "Error", description: "El molde seleccionado no tiene una pieza asociada.", variant: "destructive" });
+            return;
+        }
+
+        setIsSaving(true);
+        const segregationData: Omit<Production, 'id' > = {
+            ...segregateForm,
+            qtySegregada: Number(segregateForm.qtySegregada),
+            pieceId: pieceId,
+            qtyFinalizada: 0,
+            qtySinPrensar: 0,
+            qtyScrap: 0,
+            createdBy: user.uid,
+            inspeccionadoCalidad: false,
+            fechaISO: new Date().toISOString(),
+        };
+
+        addDoc(collection(firestore, "production"), segregationData)
+            .then(() => {
+                toast({ title: "Éxito", description: "Lote segregado correctamente." });
+                setIsSegregateDialogOpen(false);
+                setSegregateForm({ turno: '', machineId: '', moldId: '', nroRack: '', defecto: '', tipoControl: '', qtySegregada: '' });
+            })
+            .catch((error) => {
+                const contextualError = new FirestorePermissionError({ path: 'production', operation: 'create', requestResourceData: segregationData });
+                errorEmitter.emit('permission-error', contextualError);
+            })
+            .finally(() => { setIsSaving(false); });
     };
 
     const isLoading = isLoadingProd || isLoadingMachines || isLoadingMolds || isLoadingPieces;
@@ -166,6 +220,9 @@ export default function QualityPage() {
           <h1 className="text-3xl font-headline font-bold">Gestión de Calidad</h1>
           <p className="text-muted-foreground">Inspecciona las piezas segregadas durante la producción.</p>
         </div>
+         <Button onClick={() => setIsSegregateDialogOpen(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Segregar Lote
+        </Button>
       </div>
       <Card>
         <CardHeader>
@@ -310,7 +367,7 @@ export default function QualityPage() {
       </Card>
 
 
-      <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
+      <Dialog open={isInspectionDialogOpen} onOpenChange={setIsInspectionDialogOpen}>
           <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Inspección de Calidad</DialogTitle>
@@ -337,10 +394,7 @@ export default function QualityPage() {
                                 key={key}
                                 variant={activeField === key ? "default" : "secondary"}
                                 className="h-24 text-2xl justify-between"
-                                onClick={() => {
-                                    setActiveField(key);
-                                    setCurrentInput(String(quantities[key] || ''));
-                                }}
+                                onClick={() => setActiveField(key)}
                             >
                                 <span>{label}</span>
                                 <span className="font-bold text-3xl">{quantities[key].toLocaleString()}</span>
@@ -358,7 +412,7 @@ export default function QualityPage() {
                 </div>
 
                 <DialogFooter className="p-6 pt-2 bg-muted border-t">
-                    <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={handleCloseDialog}>Cancelar</Button>
+                    <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={handleCloseInspectionDialog}>Cancelar</Button>
                     <Button type="button" className="w-48 h-12 text-lg" onClick={handleSaveInspection} disabled={isSaving || totalInspectedInSession === 0 || !isInspectionAmountValid}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {isSaving ? "Guardando..." : "Confirmar"}
@@ -366,8 +420,79 @@ export default function QualityPage() {
                 </DialogFooter>
           </DialogContent>
       </Dialog>
+      
+       <Dialog open={isSegregateDialogOpen} onOpenChange={setIsSegregateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Segregar Lote para Inspección</DialogTitle>
+            <DialogDescription>
+              Crea un nuevo lote de piezas que requieren inspección de calidad.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveSegregation} className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="seg-turno">Turno</Label>
+                    <Select required value={segregateForm.turno} onValueChange={(v) => setSegregateForm(s => ({...s, turno: v}))}>
+                        <SelectTrigger id="seg-turno"><SelectValue placeholder="Selecciona turno..." /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="mañana">Mañana</SelectItem>
+                            <SelectItem value="tarde">Tarde</SelectItem>
+                            <SelectItem value="noche">Noche</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="seg-rack">Número de Rack</Label>
+                    <Input id="seg-rack" required value={segregateForm.nroRack} onChange={(e) => setSegregateForm(s => ({...s, nroRack: e.target.value}))} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="seg-machine">Máquina</Label>
+                <Select required value={segregateForm.machineId} onValueChange={(v) => setSegregateForm(s => ({...s, machineId: v}))}>
+                    <SelectTrigger id="seg-machine"><SelectValue placeholder="Selecciona máquina..." /></SelectTrigger>
+                    <SelectContent>{machines?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="seg-mold">Molde</Label>
+                <Select required value={segregateForm.moldId} onValueChange={(v) => setSegregateForm(s => ({...s, moldId: v}))}>
+                    <SelectTrigger id="seg-mold"><SelectValue placeholder="Selecciona molde..." /></SelectTrigger>
+                    <SelectContent>{molds?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <Label htmlFor="seg-defecto">Defecto</Label>
+                    <Select required value={segregateForm.defecto} onValueChange={(v) => setSegregateForm(s => ({...s, defecto: v}))}>
+                        <SelectTrigger id="seg-defecto"><SelectValue placeholder="Selecciona defecto..." /></SelectTrigger>
+                        <SelectContent>{defectOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="seg-control">Tipo de Control</Label>
+                    <Select required value={segregateForm.tipoControl} onValueChange={(v) => setSegregateForm(s => ({...s, tipoControl: v}))}>
+                        <SelectTrigger id="seg-control"><SelectValue placeholder="Selecciona control..." /></SelectTrigger>
+                        <SelectContent>{controlTypeOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+              </div>
+             <div className="space-y-2">
+                <Label htmlFor="seg-qty">Cantidad a Segregar</Label>
+                <Input id="seg-qty" type="number" required value={segregateForm.qtySegregada} onChange={(e) => setSegregateForm(s => ({...s, qtySegregada: e.target.value}))} />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsSegregateDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Guardar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
     </main>
   );
 }
-
-    

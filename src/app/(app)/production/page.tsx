@@ -15,13 +15,12 @@ import { useToast } from "@/hooks/use-toast";
 import type { Production, Machine, Mold, Piece } from "@/lib/types";
 
 type ProductionStep = 'selection' | 'declaration' | 'summary';
-type DeclarationField = 'qtyFinalizada' | 'qtySinPrensar' | 'qtyScrap' | 'qtySegregada';
+type DeclarationField = 'qtyFinalizada' | 'qtySinPrensar' | 'qtyScrap';
 
 const declarationFields: { key: DeclarationField, label: string }[] = [
     { key: 'qtyFinalizada', label: 'Finalizada' },
     { key: 'qtySinPrensar', label: 'Sin Prensar' },
     { key: 'qtyScrap', label: 'Scrap' },
-    { key: 'qtySegregada', label: 'Segregada (Calidad)' },
 ];
 
 export default function ProductionPage() {
@@ -56,7 +55,6 @@ export default function ProductionPage() {
         qtyFinalizada: 0,
         qtySinPrensar: 0,
         qtyScrap: 0,
-        qtySegregada: 0,
     });
     const [currentInput, setCurrentInput] = useState('');
     
@@ -67,7 +65,7 @@ export default function ProductionPage() {
             setTurno('');
             setMachineId('');
             setMoldId('');
-            setQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtySegregada: 0 });
+            setQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
             setCurrentInput('');
             setActiveField('qtyFinalizada');
         }
@@ -101,6 +99,7 @@ export default function ProductionPage() {
             moldId,
             pieceId,
             ...quantities,
+            qtySegregada: 0, // This is now handled by Quality
             createdBy: user.uid,
             inspeccionadoCalidad: false,
             fechaISO: new Date().toISOString(),
@@ -191,7 +190,7 @@ export default function ProductionPage() {
                       {(scrapPct * 100).toFixed(1)}%
                     </TableCell>
                     <TableCell className="text-center">
-                      {p.qtySegregada > 0 ? (
+                      {(p.qtySegregada || 0) > 0 ? (
                         p.inspeccionadoCalidad ? (
                           <Badge variant="secondary">Inspeccionado</Badge>
                         ) : (
@@ -273,6 +272,10 @@ export default function ProductionPage() {
                                     <span className="font-bold text-2xl">{quantities[key].toLocaleString()}</span>
                                 </Button>
                             ))}
+                             <div className="h-20 text-xl justify-between flex items-center px-4 py-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
+                                <span>Segregada (Calidad)</span>
+                                <span className="font-bold text-2xl">0</span>
+                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
@@ -304,6 +307,10 @@ export default function ProductionPage() {
                                         <span className="font-bold">{quantities[key].toLocaleString()}</span>
                                     </div>
                                 ))}
+                                <div className="flex justify-between text-muted-foreground">
+                                    <span>Segregada (Calidad):</span>
+                                    <span className="font-bold">0</span>
+                                </div>
                                 <hr className="col-span-2"/>
                                  <div className="flex justify-between col-span-2 font-bold text-xl">
                                     <span>Total Declarado:</span>
@@ -341,5 +348,3 @@ export default function ProductionPage() {
     </main>
   );
 }
-
-    

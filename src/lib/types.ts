@@ -125,6 +125,11 @@ export interface Production {
   qtySegregada: number;
   createdBy?: string; // UID of user who declared production
   
+  // Quality Segregation fields
+  nroRack?: string;
+  defecto?: string;
+  tipoControl?: string;
+
   // Quality Inspection fields
   inspeccionadoCalidad: boolean;
   qtyAptaCalidad?: number;
