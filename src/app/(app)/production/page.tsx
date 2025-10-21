@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle, PlusCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Production, Machine, Mold, Piece } from "@/lib/types";
-import { startOfDay, endOfDay, isToday } from "date-fns";
+import { isToday } from "date-fns";
 
 type ProductionStep = 'selection' | 'declaration' | 'summary';
 type DeclarationField = 'qtyFinalizada' | 'qtySinPrensar' | 'qtyScrap';
@@ -67,6 +67,7 @@ export default function ProductionPage() {
     const [turno, setTurno] = useState<'mañana' | 'tarde' | 'noche' | ''>('');
     const [machineId, setMachineId] = useState('');
     const [moldId, setMoldId] = useState('');
+    const [existingProduction, setExistingProduction] = useState<Production | null>(null);
 
     // Step 2 State
     const [activeField, setActiveField] = useState<DeclarationField>('qtyFinalizada');
@@ -84,11 +85,27 @@ export default function ProductionPage() {
             setTurno('');
             setMachineId('');
             setMoldId('');
+            setExistingProduction(null);
             setQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
             setCurrentInput('');
             setActiveField('qtyFinalizada');
         }
     }, [isDialogOpen])
+    
+    useEffect(() => {
+        async function checkForExisting() {
+            if (turno && machineId && firestore && production) {
+                const existing = await findExistingProduction(firestore, production, machineId, turno);
+                setExistingProduction(existing);
+                if (existing) {
+                    setMoldId(existing.moldId);
+                }
+            } else {
+                setExistingProduction(null);
+            }
+        }
+        checkForExisting();
+    }, [turno, machineId, firestore, production]);
 
     useEffect(() => {
         // Update quantity for active field when currentInput changes
@@ -114,16 +131,14 @@ export default function ProductionPage() {
         setIsSaving(true);
         
         try {
-            const existingDoc = await findExistingProduction(firestore, production, machineId, turno);
-
-            if (existingDoc) {
+             if (existingProduction) {
                 // Update existing document
-                const docRef = doc(firestore, 'production', existingDoc.id);
+                const docRef = doc(firestore, 'production', existingProduction.id);
 
                 const updatedData = {
-                    qtyFinalizada: (existingDoc.qtyFinalizada || 0) + quantities.qtyFinalizada,
-                    qtySinPrensar: (existingDoc.qtySinPrensar || 0) + quantities.qtySinPrensar,
-                    qtyScrap: (existingDoc.qtyScrap || 0) + quantities.qtyScrap,
+                    qtyFinalizada: (existingProduction.qtyFinalizada || 0) + quantities.qtyFinalizada,
+                    qtySinPrensar: (existingProduction.qtySinPrensar || 0) + quantities.qtySinPrensar,
+                    qtyScrap: (existingProduction.qtyScrap || 0) + quantities.qtyScrap,
                 };
                 
                 await updateDoc(docRef, updatedData);
@@ -263,36 +278,43 @@ export default function ProductionPage() {
                 </DialogHeader>
 
                 {step === 'selection' && (
-                    <div className="flex-grow p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div className="flex flex-col gap-4">
-                            <h3 className="text-xl font-semibold text-center">1. Selecciona Turno</h3>
-                             <Select onValueChange={(v) => setTurno(v as any)} value={turno}>
-                                <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un turno..." /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="mañana" className="text-lg h-12">Mañana</SelectItem>
-                                    <SelectItem value="tarde" className="text-lg h-12">Tarde</SelectItem>
-                                    <SelectItem value="noche" className="text-lg h-12">Noche</SelectItem>
-                                </SelectContent>
-                            </Select>
+                    <div className="flex-grow p-6 flex flex-col gap-8">
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div className="flex flex-col gap-4">
+                                <h3 className="text-xl font-semibold text-center">1. Selecciona Turno</h3>
+                                <Select onValueChange={(v) => setTurno(v as any)} value={turno}>
+                                    <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un turno..." /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="mañana" className="text-lg h-12">Mañana</SelectItem>
+                                        <SelectItem value="tarde" className="text-lg h-12">Tarde</SelectItem>
+                                        <SelectItem value="noche" className="text-lg h-12">Noche</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex flex-col gap-4">
+                                <h3 className="text-xl font-semibold text-center">2. Selecciona Máquina</h3>
+                                <Select onValueChange={setMachineId} value={machineId}>
+                                    <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige una máquina..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {machines?.map(m => <SelectItem key={m.id} value={m.id} className="text-lg h-12">{m.nombre}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex flex-col gap-4">
+                                <h3 className="text-xl font-semibold text-center">3. Selecciona Molde</h3>
+                                <Select onValueChange={setMoldId} value={moldId} disabled={!!existingProduction}>
+                                    <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {molds?.map(m => <SelectItem key={m.id} value={m.id} className="text-lg h-12">{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                         <div className="flex flex-col gap-4">
-                            <h3 className="text-xl font-semibold text-center">2. Selecciona Máquina</h3>
-                             <Select onValueChange={setMachineId} value={machineId}>
-                                <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige una máquina..." /></SelectTrigger>
-                                <SelectContent>
-                                    {machines?.map(m => <SelectItem key={m.id} value={m.id} className="text-lg h-12">{m.nombre}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                         <div className="flex flex-col gap-4">
-                            <h3 className="text-xl font-semibold text-center">3. Selecciona Molde</h3>
-                             <Select onValueChange={setMoldId} value={moldId}>
-                                <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
-                                <SelectContent>
-                                    {molds?.map(m => <SelectItem key={m.id} value={m.id} className="text-lg h-12">{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        {existingProduction && (
+                            <div className="text-center bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-md text-yellow-800 dark:text-yellow-200">
+                                <p>Ya existe una declaración para este turno. Se añadirán las nuevas cantidades.</p>
+                            </div>
+                        )}
                     </div>
                 )}
                 
