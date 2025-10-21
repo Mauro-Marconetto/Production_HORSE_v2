@@ -24,9 +24,6 @@ export default function SubprocessesPage() {
           <h1 className="text-3xl font-headline font-bold">Seguimiento de Subprocesos</h1>
           <p className="text-muted-foreground">Trazabilidad de piezas en proveedores externos (mecanizado, granallado, etc.).</p>
         </div>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Enviar Lote
-        </Button>
       </div>
       <Card>
         <CardHeader>

@@ -52,7 +52,7 @@ const allNavItems = [
   { href: "/planner", icon: GanttChartSquare, label: "Planificador" },
   { href: "/calendar", icon: CalendarDays, label: "Calendario" },
   { href: "/demand", icon: Truck, label: "Demanda" },
-  { href: "/inventory", icon: Warehouse, label: "Inventario" },
+  { href: "/stock", icon: Warehouse, label: "Stock" },
   { href: "/machines", icon: Factory, label: "Máquinas" },
   { href: "/pieces", icon: Package, label: "Piezas" },
   { href: "/clients", icon: Building, label: "Clientes" },
