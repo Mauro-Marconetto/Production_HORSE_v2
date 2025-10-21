@@ -2,29 +2,19 @@
 'use client';
 
 import { useMemo } from "react";
-import { collection, query } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2 } from "lucide-react";
+import { scrap, pieces, clients } from "@/lib/data";
 import type { ScrapEntry, Piece, Client } from "@/lib/types";
 
 
 export default function ScrapHistoryPage() {
-    const firestore = useFirestore();
-
-    const scrapQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'scrap')) : null, [firestore]);
-    const { data: scrap, isLoading: isLoadingScrap } = useCollection<ScrapEntry>(scrapQuery);
-
-    const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]));
-    const { data: clients, isLoading: isLoadingClients } = useCollection<Client>(useMemoFirebase(() => firestore ? collection(firestore, 'clients') : null, [firestore]));
-
-    const isLoading = isLoadingScrap || isLoadingPieces || isLoadingClients;
     
     const sortedScrap = useMemo(() => {
         if (!scrap) return [];
         return [...scrap].sort((a,b) => b.periodoYYYYMM.localeCompare(a.periodoYYYYMM));
-    }, [scrap]);
+    }, []);
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getClientName = (pieceId: string) => {
@@ -60,14 +50,7 @@ export default function ScrapHistoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && (
-                 <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
-                    </TableCell>
-                </TableRow>
-              )}
-              {!isLoading && sortedScrap.map((entry) => {
+              {sortedScrap.map((entry) => {
                 return (
                   <TableRow key={entry.id}>
                     <TableCell>{entry.periodoYYYYMM.slice(0,4)}-{entry.periodoYYYYMM.slice(4)}</TableCell>
@@ -78,7 +61,7 @@ export default function ScrapHistoryPage() {
                   </TableRow>
                 );
               })}
-               {!isLoading && (!sortedScrap || sortedScrap.length === 0) && (
+               {(!sortedScrap || sortedScrap.length === 0) && (
                  <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                         No hay registros de scrap.
