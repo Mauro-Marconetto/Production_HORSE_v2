@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, doc, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, setDoc, writeBatch, deleteDoc } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -144,18 +144,21 @@ export default function AdminClientsPage() {
         }
 
         try {
-        await writeBatch(firestore).delete(doc(firestore, 'clients', clientId)).commit();
-        toast({
-            title: 'Cliente Eliminado',
-            description: 'El cliente ha sido eliminado correctamente.',
-        });
+            const batch = writeBatch(firestore);
+            batch.delete(doc(firestore, 'clients', clientId));
+            await batch.commit();
+            
+            toast({
+                title: 'Cliente Eliminado',
+                description: 'El cliente ha sido eliminado correctamente.',
+            });
         } catch (error: any) {
-        console.error('Error deleting client:', error);
-        toast({
-            title: 'Error',
-            description: 'No se pudo eliminar el cliente.',
-            variant: 'destructive',
-        });
+            console.error('Error deleting client:', error);
+            toast({
+                title: 'Error',
+                description: 'No se pudo eliminar el cliente.',
+                variant: 'destructive',
+            });
         }
     };
 
