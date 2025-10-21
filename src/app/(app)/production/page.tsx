@@ -79,17 +79,20 @@ export default function ProductionPage() {
     });
     const [currentInput, setCurrentInput] = useState('');
     
+    const resetDialogState = () => {
+        setStep('selection');
+        setTurno('');
+        setMachineId('');
+        setMoldId('');
+        setExistingProduction(null);
+        setQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
+        setCurrentInput('');
+        setActiveField('qtyFinalizada');
+    }
+
     useEffect(() => {
         if(isDialogOpen) {
-            // Reset state when dialog opens
-            setStep('selection');
-            setTurno('');
-            setMachineId('');
-            setMoldId('');
-            setExistingProduction(null);
-            setQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
-            setCurrentInput('');
-            setActiveField('qtyFinalizada');
+            resetDialogState();
         }
     }, [isDialogOpen])
     
@@ -100,8 +103,14 @@ export default function ProductionPage() {
                 setExistingProduction(existing);
                 if (existing) {
                     setMoldId(existing.moldId);
+                    setQuantities({
+                        qtyFinalizada: existing.qtyFinalizada || 0,
+                        qtySinPrensar: existing.qtySinPrensar || 0,
+                        qtyScrap: existing.qtyScrap || 0,
+                    });
                 } else {
                     const machine = machines?.find(m => m.id === machineId);
+                     setQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 }); // Reset quantities if no existing
                     if (machine?.moldAssignments) {
                         const today = new Date();
                         const currentAssignment = machine.moldAssignments.find(a => 
@@ -118,7 +127,7 @@ export default function ProductionPage() {
                 }
             } else {
                 setExistingProduction(null);
-                 setMoldId('');
+                setMoldId('');
             }
         }
         checkForExisting();
@@ -126,12 +135,20 @@ export default function ProductionPage() {
 
     useEffect(() => {
         // Update quantity for active field when currentInput changes
-        setQuantities(q => ({ ...q, [activeField]: Number(currentInput) || 0 }));
-    }, [currentInput, activeField]);
+        const existingQty = existingProduction ? (existingProduction[activeField] || 0) : 0;
+        setQuantities(q => ({ ...q, [activeField]: existingQty + (Number(currentInput) || 0) }));
+    }, [currentInput, activeField, existingProduction]);
+
 
     const handleNumericButton = (value: string) => setCurrentInput(prev => prev + value);
     const handleBackspace = () => setCurrentInput(prev => prev.slice(0, -1));
     const handleClear = () => setCurrentInput('');
+    
+    const handleGoToDeclaration = () => {
+        setCurrentInput(''); // Reset keyboard input when moving to declaration step
+        setActiveField('qtyFinalizada'); // Set default active field
+        setStep('declaration');
+    }
 
     const handleSaveProduction = async () => {
         if (!firestore || !user) {
@@ -151,17 +168,8 @@ export default function ProductionPage() {
              if (existingProduction) {
                 // Update existing document
                 const docRef = doc(firestore, 'production', existingProduction.id);
-
-                const updatedData = {
-                    qtyFinalizada: (existingProduction.qtyFinalizada || 0) + quantities.qtyFinalizada,
-                    qtySinPrensar: (existingProduction.qtySinPrensar || 0) + quantities.qtySinPrensar,
-                    qtyScrap: (existingProduction.qtyScrap || 0) + quantities.qtyScrap,
-                };
-                
-                await updateDoc(docRef, updatedData);
-
-                 toast({ title: "Éxito", description: "Producción actualizada correctamente." });
-
+                await updateDoc(docRef, quantities);
+                toast({ title: "Éxito", description: "Producción actualizada correctamente." });
             } else {
                 // Create new document
                 const productionData: Omit<Production, 'id'> = {
@@ -177,7 +185,6 @@ export default function ProductionPage() {
                 };
                 
                 await addDoc(collection(firestore, "production"), productionData);
-
                 toast({ title: "Éxito", description: "Producción declarada correctamente." });
             }
 
@@ -197,7 +204,9 @@ export default function ProductionPage() {
     };
     
     const isStep1Valid = turno && machineId && moldId;
-    const totalDeclared = Object.values(quantities).reduce((sum, qty) => sum + qty, 0) + (existingProduction?.qtySegregada || 0);
+    const totalDeclaredInSession = quantities.qtyFinalizada + quantities.qtySinPrensar + quantities.qtyScrap;
+    const totalSegregada = (existingProduction?.qtySegregada || 0);
+    const totalDeclared = totalDeclaredInSession + totalSegregada;
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
@@ -329,7 +338,7 @@ export default function ProductionPage() {
                         </div>
                         {existingProduction && (
                             <div className="text-center bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-md text-yellow-800 dark:text-yellow-200">
-                                <p>Ya existe una declaración para este turno. Se añadirán las nuevas cantidades.</p>
+                                <p>Ya existe una declaración para este turno. Se añadirán las nuevas cantidades a las existentes.</p>
                             </div>
                         )}
                     </div>
@@ -345,7 +354,8 @@ export default function ProductionPage() {
                                     className="h-20 text-xl justify-between"
                                     onClick={() => {
                                         setActiveField(key);
-                                        setCurrentInput(String(quantities[key] || ''));
+                                        const currentNewQty = quantities[key] - (existingProduction?.[key] || 0);
+                                        setCurrentInput(String(currentNewQty || ''));
                                     }}
                                 >
                                     <span>{label}</span>
@@ -370,7 +380,7 @@ export default function ProductionPage() {
 
                 {step === 'summary' && (
                     <div className="flex-grow p-6 flex flex-col items-center justify-center gap-6">
-                        <Card className="w-full max-w-2xl">
+                        <Card className="w-full max-w-3xl">
                             <CardHeader>
                                 <CardTitle className="text-2xl">Resumen de la Declaración</CardTitle>
                                 <CardDescription>Confirma los datos antes de guardar.</CardDescription>
@@ -380,22 +390,24 @@ export default function ProductionPage() {
                                <p><strong>Máquina:</strong> {getMachineName(machineId)}</p>
                                <p><strong>Molde:</strong> {getMoldName(moldId)} ({getPieceCode(molds?.find(m=>m.id === moldId)?.pieces[0] || '')})</p>
                                <hr/>
-                               <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                                {declarationFields.map(({key, label}) => (
-                                    <div key={key} className="flex justify-between">
-                                        <span>{label}:</span>
-                                        <span className="font-bold">{quantities[key].toLocaleString()}</span>
-                                    </div>
-                                ))}
-                                <div className="flex justify-between text-muted-foreground">
-                                    <span>Segregada (Calidad):</span>
-                                    <span className="font-bold">{(existingProduction?.qtySegregada || 0).toLocaleString()}</span>
-                                </div>
-                                <hr className="col-span-2"/>
-                                 <div className="flex justify-between col-span-2 font-bold text-xl">
-                                    <span>Total Declarado:</span>
-                                    <span>{totalDeclared.toLocaleString()}</span>
-                                </div>
+                               <div className="grid grid-cols-3 gap-x-8 gap-y-2 text-base">
+                                  <h4 className="font-semibold col-span-1">Categoría</h4>
+                                  <h4 className="font-semibold col-span-1 text-right">Cant. Anterior</h4>
+                                  <h4 className="font-semibold col-span-1 text-right">Nuevo Total</h4>
+                                {declarationFields.map(({key, label}) => {
+                                    const previousQty = existingProduction?.[key] || 0;
+                                    const newQty = quantities[key];
+                                    return (
+                                        <React.Fragment key={key}>
+                                            <div className="col-span-1">{label}</div>
+                                            <div className="col-span-1 text-right text-muted-foreground">{previousQty.toLocaleString()}</div>
+                                            <div className="col-span-1 text-right font-bold">{newQty.toLocaleString()}</div>
+                                        </React.Fragment>
+                                    );
+                                })}
+                                <hr className="col-span-3 my-2"/>
+                                 <div className="col-span-1 font-bold text-lg">Total Declarado</div>
+                                 <div className="col-span-2 text-right font-bold text-lg">{totalDeclared.toLocaleString()}</div>
                                </div>
                             </CardContent>
                         </Card>
@@ -405,7 +417,7 @@ export default function ProductionPage() {
 
                 <DialogFooter className="p-6 pt-2 bg-muted border-t">
                     {step === 'selection' && (
-                        <Button type="button" className="w-48 h-12 text-lg" onClick={() => setStep('declaration')} disabled={!isStep1Valid}>Siguiente</Button>
+                        <Button type="button" className="w-48 h-12 text-lg" onClick={handleGoToDeclaration} disabled={!isStep1Valid}>Siguiente</Button>
                     )}
                      {step === 'declaration' && (
                         <>
