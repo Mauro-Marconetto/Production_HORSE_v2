@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -30,20 +30,37 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { MoreHorizontal, PlusCircle, Loader2, Trash2 } from 'lucide-react';
-import type { Machine } from '@/lib/types';
-import { productionCapacities, pieces, molds } from "@/lib/data"; // Capacities still from static data
+import { MoreHorizontal, PlusCircle, Loader2, Trash2, CalendarDays } from 'lucide-react';
+import type { Machine, Mold, MoldAssignment, Piece } from '@/lib/types';
+import { productionCapacities } from "@/lib/data"; // Capacities still from static data
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { addDays, format, isWithinInterval } from 'date-fns';
+import { DateRange } from 'react-day-picker';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 export default function AdminMachinesPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const machinesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]);
-  const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(machinesCollection);
+  const { data: machines, isLoading: isLoadingMachines, forceRefresh: refreshMachines } = useCollection<Machine>(machinesCollection);
+
+  const moldsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]);
+  const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(moldsCollection);
+  
+  const piecesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]);
+  const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesCollection);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
+
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+  
+  const [newAssignmentDate, setNewAssignmentDate] = useState<DateRange | undefined>();
+  const [newAssignmentMoldId, setNewAssignmentMoldId] = useState<string>("");
 
   const openNewMachineDialog = () => {
     setSelectedMachine(null);
@@ -55,6 +72,13 @@ export default function AdminMachinesPage() {
     setIsDialogOpen(true);
   };
 
+  const openSchedulerDialog = (machine: Machine) => {
+    setSelectedMachine(machine);
+    setNewAssignmentDate(undefined);
+    setNewAssignmentMoldId("");
+    setIsSchedulerOpen(true);
+  }
+
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!firestore) return;
@@ -63,7 +87,7 @@ export default function AdminMachinesPage() {
     const formData = new FormData(e.currentTarget);
     
     const machineId = selectedMachine ? selectedMachine.id : `M${Date.now()}`;
-    const machineData: Machine = {
+    const machineData: Omit<Machine, 'moldAssignments'> = {
       id: machineId,
       nombre: formData.get('nombre') as string,
       tonelaje: Number(formData.get('tonelaje')),
@@ -110,6 +134,68 @@ export default function AdminMachinesPage() {
       });
     }
   };
+  
+  const handleAddAssignment = async () => {
+    if (!firestore || !selectedMachine || !newAssignmentMoldId || !newAssignmentDate?.from || !newAssignmentDate?.to) {
+        toast({ title: "Error", description: "Completa todos los campos para añadir la programación.", variant: "destructive"});
+        return;
+    }
+
+    setIsSaving(true);
+    const newAssignment: MoldAssignment = {
+        id: `ASGN-${Date.now()}`,
+        moldId: newAssignmentMoldId,
+        startDate: newAssignmentDate.from.toISOString(),
+        endDate: newAssignmentDate.to.toISOString(),
+    };
+
+    const machineDocRef = doc(firestore, 'machines', selectedMachine.id);
+    const existingAssignments = selectedMachine.moldAssignments || [];
+
+    try {
+        await updateDoc(machineDocRef, {
+            moldAssignments: [...existingAssignments, newAssignment]
+        });
+        toast({ title: "Éxito", description: "Programación de molde añadida."});
+        setNewAssignmentDate(undefined);
+        setNewAssignmentMoldId("");
+        refreshMachines(); // Re-fetch machine data to update UI
+    } catch (error: any) {
+        toast({ title: "Error", description: error.message || "No se pudo añadir la programación.", variant: "destructive"});
+    } finally {
+        setIsSaving(false);
+    }
+  }
+  
+  const handleRemoveAssignment = async (assignmentId: string) => {
+    if (!firestore || !selectedMachine) return;
+    setIsSaving(true);
+    const machineDocRef = doc(firestore, 'machines', selectedMachine.id);
+    const updatedAssignments = selectedMachine.moldAssignments?.filter(a => a.id !== assignmentId) || [];
+
+    try {
+        await updateDoc(machineDocRef, { moldAssignments: updatedAssignments });
+        toast({ title: "Éxito", description: "Programación eliminada." });
+        refreshMachines();
+    } catch (error: any) {
+        toast({ title: "Error", description: error.message || "No se pudo eliminar la programación.", variant: "destructive"});
+    } finally {
+        setIsSaving(false);
+    }
+  }
+  
+  const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
+
+  const currentMoldForMachine = (machine: Machine) => {
+    if (!machine.moldAssignments) return null;
+    const today = new Date();
+    const currentAssignment = machine.moldAssignments.find(a => 
+        isWithinInterval(today, { start: new Date(a.startDate), end: new Date(a.endDate) })
+    );
+    if (!currentAssignment) return null;
+    return molds?.find(m => m.id === currentAssignment.moldId);
+  }
+
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -123,93 +209,78 @@ export default function AdminMachinesPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6">
-        {isLoadingMachines && (
-            <div className="flex items-center justify-center py-12">
+      <div className="grid gap-6 md:grid-cols-2">
+        {(isLoadingMachines || isLoadingMolds) && (
+            <div className="flex items-center justify-center py-12 col-span-2">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
         )}
         {!isLoadingMachines && machines?.map((machine) => {
-          const capacities = productionCapacities.filter(c => c.machineId === machine.id);
+          const currentMold = currentMoldForMachine(machine);
           return (
             <Card key={machine.id}>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-row items-start justify-between">
                 <div>
                   <CardTitle className="text-2xl">{machine.nombre}</CardTitle>
                   <CardDescription>
-                    Tonelaje: {machine.tonelaje}T | Turnos/Semana: {machine.turnosSemana} | OEE Objetivo: {machine.OEE_obj * 100}%
+                    {currentMold ? `Molde actual: ${currentMold.nombre}` : 'Sin molde programado'}
                   </CardDescription>
                 </div>
-                <AlertDialog>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Abrir menú</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => openEditMachineDialog(machine)}>
-                        Editar Máquina
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <AlertDialogTrigger asChild>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Eliminar Máquina
+                <div className="flex items-center">
+                    <Button variant="outline" size="sm" onClick={() => openSchedulerDialog(machine)}>
+                        <CalendarDays className="mr-2 h-4 w-4"/>
+                        Programar
+                    </Button>
+                    <AlertDialog>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Abrir menú</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => openEditMachineDialog(machine)}>
+                            Editar Máquina
                         </DropdownMenuItem>
-                      </AlertDialogTrigger>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                   <AlertDialogContent>
-                        <AlertDialogHeader>
-                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Esta acción no se puede deshacer. Esto eliminará permanentemente la máquina
-                            y sus datos asociados.
-                        </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                            className="bg-destructive hover:bg-destructive/90"
-                            onClick={() => handleDelete(machine.id)}
-                        >
-                            Sí, eliminar
-                        </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                        <DropdownMenuSeparator />
+                        <AlertDialogTrigger asChild>
+                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar Máquina
+                            </DropdownMenuItem>
+                        </AlertDialogTrigger>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <AlertDialogContent>
+                            <AlertDialogHeader>
+                            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Esta acción no se puede deshacer. Esto eliminará permanentemente la máquina
+                                y sus datos asociados.
+                            </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90"
+                                onClick={() => handleDelete(machine.id)}
+                            >
+                                Sí, eliminar
+                            </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
               </CardHeader>
               <CardContent>
-                <h4 className="mb-2 font-semibold text-muted-foreground">Capacidades de Producción (Datos Estáticos)</h4>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Pieza/Molde</TableHead>
-                      <TableHead className="text-right">Producción por Hora</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {capacities.length > 0 ? capacities.map((cap) => {
-                      const piece = pieces.find(p => p.id === cap.pieceId);
-                      const mold = molds.find(m => m.id === cap.moldId);
-                      return (
-                        <TableRow key={`${cap.machineId}-${cap.pieceId}-${cap.moldId}`}>
-                          <TableCell className="font-mono">{piece?.codigo}/{mold?.nombre}</TableCell>
-                          <TableCell className="text-right font-medium">{cap.produccionHora.toLocaleString()} uds./hr</TableCell>
-                        </TableRow>
-                      );
-                    }) : (
-                      <TableRow>
-                        <TableCell colSpan={2} className="text-center text-muted-foreground">
-                          No hay capacidades de producción definidas para esta máquina.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                <h4 className="mb-2 font-semibold text-muted-foreground">Datos Operativos</h4>
+                 <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div><span className="font-medium">Tonelaje:</span> {machine.tonelaje}T</div>
+                    <div><span className="font-medium">Turnos/Semana:</span> {machine.turnosSemana}</div>
+                    <div><span className="font-medium">OEE Obj.:</span> {machine.OEE_obj * 100}%</div>
+                 </div>
               </CardContent>
             </Card>
           )
@@ -257,8 +328,104 @@ export default function AdminMachinesPage() {
           </form>
         </DialogContent>
       </Dialog>
+      
+      <Dialog open={isSchedulerOpen} onOpenChange={setIsSchedulerOpen}>
+        <DialogContent className="max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Programador de Moldes para {selectedMachine?.nombre}</DialogTitle>
+                <DialogDescription>
+                    Asigna qué molde estará en esta máquina y durante qué fechas.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-8 py-4">
+                <div className="space-y-4">
+                    <h4 className="font-semibold text-lg border-b pb-2">Nueva Programación</h4>
+                    <div className="space-y-2">
+                        <Label>1. Selecciona un Molde</Label>
+                         <Select value={newAssignmentMoldId} onValueChange={setNewAssignmentMoldId}>
+                            <SelectTrigger><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
+                            <SelectContent>
+                                {molds?.filter(m => m.compatibilidad.includes(selectedMachine?.id || '')).map(m => (
+                                    <SelectItem key={m.id} value={m.id}>{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="space-y-2">
+                        <Label>2. Selecciona un Rango de Fechas</Label>
+                         <Popover>
+                            <PopoverTrigger asChild>
+                            <Button
+                                id="date"
+                                variant={"outline"}
+                                className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !newAssignmentDate && "text-muted-foreground"
+                                )}
+                            >
+                                <CalendarDays className="mr-2 h-4 w-4" />
+                                {newAssignmentDate?.from ? (
+                                newAssignmentDate.to ? (
+                                    <>
+                                    {format(newAssignmentDate.from, "LLL dd, y")} -{" "}
+                                    {format(newAssignmentDate.to, "LLL dd, y")}
+                                    </>
+                                ) : (
+                                    format(newAssignmentDate.from, "LLL dd, y")
+                                )
+                                ) : (
+                                <span>Elige un rango</span>
+                                )}
+                            </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                initialFocus
+                                mode="range"
+                                defaultMonth={newAssignmentDate?.from}
+                                selected={newAssignmentDate}
+                                onSelect={setNewAssignmentDate}
+                                numberOfMonths={2}
+                            />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                    <Button onClick={handleAddAssignment} disabled={isSaving}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                        Añadir Programación
+                    </Button>
+                </div>
+                <div className="space-y-4">
+                     <h4 className="font-semibold text-lg border-b pb-2">Programaciones Activas</h4>
+                     <div className="max-h-60 overflow-y-auto pr-2 space-y-2">
+                        {selectedMachine?.moldAssignments && selectedMachine.moldAssignments.length > 0 ? (
+                            selectedMachine.moldAssignments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).map(assignment => {
+                                const mold = molds?.find(m => m.id === assignment.moldId);
+                                return (
+                                    <div key={assignment.id} className="flex items-center justify-between p-2 border rounded-md">
+                                        <div>
+                                            <p className="font-semibold">{mold?.nombre}</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {format(new Date(assignment.startDate), 'dd/MM/yy')} - {format(new Date(assignment.endDate), 'dd/MM/yy')}
+                                            </p>
+                                        </div>
+                                        <Button variant="ghost" size="icon" onClick={() => handleRemoveAssignment(assignment.id)}>
+                                            <Trash2 className="h-4 w-4 text-destructive"/>
+                                        </Button>
+                                    </div>
+                                )
+                            })
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center py-8">No hay programaciones para esta máquina.</p>
+                        )}
+                     </div>
+                </div>
+            </div>
+             <DialogFooter>
+              <Button type="button" variant="secondary" onClick={() => setIsSchedulerOpen(false)}>Cerrar</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
-
-    

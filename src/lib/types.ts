@@ -24,6 +24,13 @@ export interface Mold {
   status: 'ok' | 'mantenimiento';
 }
 
+export interface MoldAssignment {
+    id: string; // Unique ID for the assignment itself
+    moldId: string;
+    startDate: string; // ISO Date string
+    endDate: string; // ISO Date string
+}
+
 export interface Machine {
   id: string;
   nombre: string;
@@ -32,6 +39,7 @@ export interface Machine {
   horasTurno: number;
   OEE_obj: number;
   OEE_hist?: number;
+  moldAssignments?: MoldAssignment[];
 }
 
 export interface ProductionCapacity {

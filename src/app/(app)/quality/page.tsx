@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
@@ -16,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Check, Edit, Loader2, Calendar as CalendarIcon, PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Production, Machine, Mold, Piece } from "@/lib/types";
-import { addDays, format } from "date-fns";
+import { addDays, format, isWithinInterval } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 
@@ -134,6 +135,19 @@ export default function QualityPage() {
         const parsedInput = Number(currentInput) || 0;
         setQuantities(q => ({ ...q, [activeField]: parsedInput }));
     }, [currentInput, activeField]);
+
+    useEffect(() => {
+        const machine = machines?.find(m => m.id === segregateForm.machineId);
+        if (machine?.moldAssignments) {
+            const today = new Date();
+            const currentAssignment = machine.moldAssignments.find(a => 
+                isWithinInterval(today, { start: new Date(a.startDate), end: new Date(a.endDate) })
+            );
+            if (currentAssignment) {
+                setSegregateForm(s => ({ ...s, moldId: currentAssignment.moldId }));
+            }
+        }
+    }, [segregateForm.machineId, machines]);
 
 
     const handleCloseInspectionDialog = () => {
@@ -519,7 +533,7 @@ export default function QualityPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="seg-mold">Molde</Label>
-                <Select required value={segregateForm.moldId} onValueChange={(v) => setSegregateForm(s => ({...s, moldId: v}))}>
+                <Select required value={segregateForm.moldId} onValueChange={(v) => setSegregateForm(s => ({...s, moldId: v}))} disabled={!!machines?.find(m=>m.id === segregateForm.machineId)?.moldAssignments?.some(a => isWithinInterval(new Date(), { start: new Date(a.startDate), end: new Date(a.endDate) }))}>
                     <SelectTrigger id="seg-mold"><SelectValue placeholder="Selecciona molde..." /></SelectTrigger>
                     <SelectContent>{molds?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}</SelectContent>
                 </Select>

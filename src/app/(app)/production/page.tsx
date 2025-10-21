@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle, PlusCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Production, Machine, Mold, Piece } from "@/lib/types";
-import { isToday } from "date-fns";
+import { isToday, isWithinInterval } from "date-fns";
 
 type ProductionStep = 'selection' | 'declaration' | 'summary';
 type DeclarationField = 'qtyFinalizada' | 'qtySinPrensar' | 'qtyScrap';
@@ -100,13 +100,29 @@ export default function ProductionPage() {
                 setExistingProduction(existing);
                 if (existing) {
                     setMoldId(existing.moldId);
+                } else {
+                    const machine = machines?.find(m => m.id === machineId);
+                    if (machine?.moldAssignments) {
+                        const today = new Date();
+                        const currentAssignment = machine.moldAssignments.find(a => 
+                            isWithinInterval(today, { start: new Date(a.startDate), end: new Date(a.endDate) })
+                        );
+                        if (currentAssignment) {
+                            setMoldId(currentAssignment.moldId);
+                        } else {
+                            setMoldId('');
+                        }
+                    } else {
+                       setMoldId('');
+                    }
                 }
             } else {
                 setExistingProduction(null);
+                 setMoldId('');
             }
         }
         checkForExisting();
-    }, [turno, machineId, firestore, production]);
+    }, [turno, machineId, firestore, production, machines]);
 
     useEffect(() => {
         // Update quantity for active field when currentInput changes
@@ -303,7 +319,7 @@ export default function ProductionPage() {
                             </div>
                             <div className="flex flex-col gap-4">
                                 <h3 className="text-xl font-semibold text-center">3. Selecciona Molde</h3>
-                                <Select onValueChange={setMoldId} value={moldId} disabled={!!existingProduction}>
+                                <Select onValueChange={setMoldId} value={moldId} disabled={!!existingProduction || !!machines?.find(m=>m.id === machineId)?.moldAssignments?.some(a => isWithinInterval(new Date(), { start: new Date(a.startDate), end: new Date(a.endDate) }))}>
                                     <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
                                     <SelectContent>
                                         {molds?.map(m => <SelectItem key={m.id} value={m.id} className="text-lg h-12">{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}
