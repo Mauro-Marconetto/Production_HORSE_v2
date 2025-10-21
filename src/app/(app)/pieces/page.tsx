@@ -87,7 +87,7 @@ export default function AdminPiecesPage() {
 
         setIsSaving(true);
         const formData = new FormData(e.currentTarget);
-        const pieceId = selectedPiece ? selectedPiece.id : `P${Date.now()}`;
+        const pieceId = selectedPiece ? selectedPiece.id : `P${'(' + ')'}Date.now()}`;
         const codigo = formData.get('codigo') as string;
         const moldNameFromInput = (formData.get('moldName') as string).trim();
 
@@ -120,7 +120,7 @@ export default function AdminPiecesPage() {
                 newMoldData = existingMoldDoc.data() as Mold;
             } else {
                 // Mold doesn't exist, create a new one
-                const newMoldId = `MOLD-${Date.now()}`;
+                const newMoldId = `MOLD-${'(' + ')'}Date.now()}`;
                 newMoldRef = doc(firestore, 'molds', newMoldId);
                 newMoldData = {
                     id: newMoldId,
@@ -158,7 +158,7 @@ export default function AdminPiecesPage() {
             
             toast({
                 title: 'Éxito',
-                description: `Pieza ${selectedPiece ? 'actualizada' : 'creada'} y molde asociado correctamente.`,
+                description: `Pieza ${'(' + ')'}selectedPiece ? 'actualizada' : 'creada'} y molde asociado correctamente.`,
             });
             setIsDialogOpen(false);
             if (querySnapshot.empty) {
@@ -349,7 +349,7 @@ export default function AdminPiecesPage() {
                                 {isLoadingMachines ? <p>Cargando máquinas...</p> : machines?.map(machine => (
                                     <div key={machine.id} className="flex items-center space-x-2">
                                         <Checkbox
-                                            id={`machine-${machine.id}`}
+                                            id={`machine-${'(' + ')'}machine.id}`}
                                             checked={compatibleMachines.includes(machine.id)}
                                             onCheckedChange={(checked) => {
                                                 setCompatibleMachines(prev => 
@@ -360,7 +360,7 @@ export default function AdminPiecesPage() {
                                             }}
                                         />
                                         <label
-                                            htmlFor={`machine-${machine.id}`}
+                                            htmlFor={`machine-${'(' + ')'}machine.id}`}
                                             className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                         >
                                             {machine.nombre}
