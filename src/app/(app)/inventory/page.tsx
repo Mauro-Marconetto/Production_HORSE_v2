@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, TrendingUp, PlusCircle, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle, TrendingUp, Loader2 } from "lucide-react";
 import type { Piece, Production } from "@/lib/types";
 
 export default function InventoryPage() {
@@ -74,9 +74,6 @@ export default function InventoryPage() {
                     <h1 className="text-3xl font-headline font-bold">Inventario</h1>
                     <p className="text-muted-foreground">Monitoriza y gestiona los niveles de stock en tiempo real.</p>
                 </div>
-                <Button disabled>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Nueva Entrada de Stock
-                </Button>
             </div>
             <Card>
                 <CardHeader>
