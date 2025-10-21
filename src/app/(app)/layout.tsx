@@ -58,12 +58,12 @@ const allNavItems = [
   { href: "/production", icon: LineChart, label: "Producción" },
   { href: "/downtime", icon: Wrench, label: "Inactividad" },
   { href: "/quality", icon: ShieldCheck, label: "Calidad" },
+  { href: "/scrap-history", icon: History, label: "Historial Scrap" },
 ];
 
 const adminNavItems = [
   { href: "/admin/users", icon: Users, label: "Usuarios" },
   { href: "/admin/roles", icon: Shield, label: "Roles" },
-  { href: "/scrap-history", icon: History, label: "Historial Scrap" },
 ];
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
