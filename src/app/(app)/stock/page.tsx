@@ -6,12 +6,13 @@ import { useState, useMemo, useEffect } from "react";
 import { collection, addDoc, serverTimestamp, writeBatch, doc } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from 'next/navigation';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight } from "lucide-react";
 import type { Piece, Production, Supplier, Remito, RemitoItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -30,6 +31,7 @@ interface InventoryRow {
 
 export default function StockPage() {
     const firestore = useFirestore();
+    const router = useRouter();
     const { toast } = useToast();
 
     const piecesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]);
@@ -43,6 +45,7 @@ export default function StockPage() {
 
     const [allProduction, setAllProduction] = useState(initialProduction);
     const [isRemitoDialogOpen, setIsRemitoDialogOpen] = useState(false);
+    const [createdRemitoId, setCreatedRemitoId] = useState<string | null>(null);
     const [remitoForm, setRemitoForm] = useState({ supplierId: '', transportista: '', vehiculo: '' });
     const [remitoItems, setRemitoItems] = useState<RemitoItem[]>([]);
     const [isSaving, setIsSaving] = useState(false);
@@ -135,20 +138,14 @@ export default function StockPage() {
 
         try {
             const batch = writeBatch(firestore);
-
-            // 1. Create the remito document
-            const remitoRef = doc(collection(firestore, "remitos"));
+            const remitosCollectionRef = collection(firestore, "remitos");
+            const remitoRef = doc(remitosCollectionRef);
             batch.set(remitoRef, remitoData);
-
+            
             const productionRef = collection(firestore, "production");
 
-            // 2. For each item, create a negative production record to decrease "Listo" stock
-            // and a positive production record to increase "En Mecanizado" stock.
             remitoItems.forEach(item => {
-                const piece = pieces?.find(p => p.id === item.pieceId);
-
-                // Create positive record for "En Mecanizado"
-                 const positiveProdRef = doc(productionRef);
+                const positiveProdRef = doc(productionRef);
                 const positiveProdData = {
                     fechaISO: new Date().toISOString(),
                     machineId: 'subproceso-externo',
@@ -165,7 +162,6 @@ export default function StockPage() {
                 };
                 batch.set(positiveProdRef, positiveProdData);
 
-                // Create negative record for "Listo"
                 const negativeProdRef = doc(productionRef);
                 const negativeProdData = {
                      fechaISO: new Date().toISOString(),
@@ -186,6 +182,7 @@ export default function StockPage() {
             await batch.commit();
             
             toast({ title: "Éxito", description: "Remito creado y stock actualizado correctamente." });
+            setCreatedRemitoId(remitoRef.id);
             setIsRemitoDialogOpen(false);
             setRemitoForm({ supplierId: '', transportista: '', vehiculo: '' });
             setRemitoItems([]);
@@ -213,6 +210,9 @@ export default function StockPage() {
         setRemitoItems(remitoItems.filter((_, i) => i !== index));
     }
 
+    const closeSuccessDialog = () => {
+        setCreatedRemitoId(null);
+    };
 
     const getStateBadgeVariant = (state: InventoryRow['state']) => {
         switch(state) {
@@ -382,6 +382,27 @@ export default function StockPage() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={!!createdRemitoId} onOpenChange={(open) => !open && closeSuccessDialog()}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>¡Remito Creado con Éxito!</DialogTitle>
+                        <DialogDescription>
+                            El remito ha sido generado y el stock ha sido actualizado. ¿Qué deseas hacer a continuación?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="sm:justify-center pt-4 gap-2">
+                        <Button type="button" onClick={() => router.push(`/remito/${createdRemitoId}`)}>
+                            <Printer className="mr-2 h-4 w-4" />
+                            Imprimir Remito
+                        </Button>
+                        <Button type="button" variant="secondary" onClick={() => router.push('/machining')}>
+                             <ArrowRight className="mr-2 h-4 w-4" />
+                             Ir a Mecanizado
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </main>
     );
 }
@@ -389,3 +410,4 @@ export default function StockPage() {
     
 
     
+
