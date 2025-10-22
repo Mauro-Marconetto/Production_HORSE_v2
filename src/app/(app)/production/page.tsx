@@ -231,6 +231,10 @@ export default function ProductionPage() {
                 fechaISO: new Date().toISOString(),
              };
 
+             if (selectedMachine?.type === 'granalladora') {
+                productionData.subproceso = 'granallado';
+             }
+
              if (existingProduction) {
                 // Update existing document
                 const docRef = doc(firestore, 'production', existingProduction.id);

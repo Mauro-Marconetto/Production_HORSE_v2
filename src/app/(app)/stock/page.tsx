@@ -70,6 +70,14 @@ export default function StockPage() {
                 entry.stockInyectado += (prod.qtySinPrensar || 0) + (prod.qtyAptaSinPrensarCalidad || 0);
             }
         });
+        
+        // Subtract processed quantities from Inyectado
+        stockByState.forEach(entry => {
+            entry.stockInyectado -= (entry.stockMecanizado + entry.stockGranallado);
+             // Ensure it doesn't go below zero if data is inconsistent
+            entry.stockInyectado = Math.max(0, entry.stockInyectado);
+        });
+
 
         // Transform the map into an array of rows
         const rows: InventoryRow[] = [];
