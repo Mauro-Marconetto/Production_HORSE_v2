@@ -34,8 +34,7 @@ const RemitoCopy = ({ remito, supplier, pieces, settings, copyType }: { remito: 
                     </div>
                 </div>
                 <div className="text-right">
-                    <h1 className="text-xl font-bold">REMITO</h1>
-                    <p className="text-sm">N°: <span className="font-mono">{remitoNumber}</span></p>
+                    <h1 className="text-sm">N°: <span className="font-mono">{remitoNumber}</span></h1>
                     <p className="text-sm">Fecha: <span className="font-mono">{remitoDate}</span></p>
                     <div className="mt-4 text-xs">
                         <p>CUIT: 30-70828551-3</p>
@@ -97,9 +96,7 @@ const RemitoCopy = ({ remito, supplier, pieces, settings, copyType }: { remito: 
 
                     {/* First row of content */}
                     <div className="border-t border-r border-black h-20 flex justify-center items-center">
-                       <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg" className="h-16 w-32">
-                        <path d="M 6.33,118.59 C 21.99,66.86 42.48,51.81 57.06,44.91 C 70.08,38.67 87.21,39.69 100.99,49.19 C 117.38,60.42 121.78,79.80 120.37,97.77 C 118.82,117.65 113.63,131.76 102.66,134.11 C 94.20,135.91 87.05,131.54 81.65,125.04 C 64.08,103.55 60.18,92.54 57.51,75.47 C 54.19,54.10 65.57,36.56 81.08,24.89 C 96.06,13.62 114.93,10.02 132.84,15.22 C 160.77,23.36 181.82,47.28 194.20,74.52 C 205.15,98.98 206.59,124.93 200.28,149.73 C 219.00,123.00 223.00,100.00 250.00,80.00 C 260.00,73.00 275.00,73.00 285.00,83.00 C 295.00,93.00 297.00,105.00 293.00,115.00 C 310.58,95.53 315.65,77.79 328.76,64.68 C 341.62,51.82 359.39,45.86 376.62,49.19 C 391.89,52.11 400.00,65.00 400.00,65.00" fill="none" stroke="#000000" strokeWidth="2"/>
-                       </svg>
+                       <Image src="/firma-cambi.png" alt="Firma" width={128} height={64} className="h-16 w-32 object-contain" />
                     </div>
                     <div className="border-t border-r border-black grid grid-cols-2">
                         <div className="border-r border-black p-1">LEGAJO</div>
@@ -209,3 +206,5 @@ export default function RemitoPage() {
         </div>
     )
 }
+
+    
