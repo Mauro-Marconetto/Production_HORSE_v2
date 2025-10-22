@@ -192,11 +192,10 @@ export default function AdminMachinesPage() {
         // Update existing assignment
         const assignmentIndex = updatedAssignments.findIndex(a => a.id === editingAssignmentId);
         if (assignmentIndex > -1) {
+            const currentAssignment = updatedAssignments[assignmentIndex];
             updatedAssignments[assignmentIndex] = {
-                ...updatedAssignments[assignmentIndex],
-                moldId: isInjection ? assignmentMoldId : undefined,
-                pieceId: !isInjection ? assignmentPieceId : undefined,
-                qty: !isInjection ? assignmentQty : undefined,
+                ...currentAssignment,
+                ...(isInjection ? { moldId: assignmentMoldId, pieceId: null, qty: null } : { moldId: null, pieceId: assignmentPieceId, qty: assignmentQty }),
                 startDate: assignmentDate.from.toISOString(),
                 endDate: assignmentDate.to.toISOString(),
             }
@@ -205,11 +204,9 @@ export default function AdminMachinesPage() {
         // Add new assignment
         const newAssignment: ProductionAssignment = {
             id: `ASGN-${Date.now()}`,
-            moldId: isInjection ? assignmentMoldId : undefined,
-            pieceId: !isInjection ? assignmentPieceId : undefined,
-            qty: !isInjection ? assignmentQty : undefined,
             startDate: assignmentDate.from.toISOString(),
             endDate: assignmentDate.to.toISOString(),
+            ...(isInjection ? { moldId: assignmentMoldId, pieceId: null, qty: null } : { moldId: null, pieceId: assignmentPieceId, qty: assignmentQty }),
         };
         updatedAssignments.push(newAssignment);
     }
