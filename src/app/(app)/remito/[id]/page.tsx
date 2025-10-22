@@ -59,8 +59,8 @@ export default function RemitoPage() {
     const remitoNumber = `0008-${remitoNumberString}`;
 
     return (
-        <div className="min-h-screen bg-white text-black p-4 sm:p-8 print:p-0">
-             <div className="max-w-4xl mx-auto bg-white p-4 sm:p-8 border border-gray-300 rounded-md print:border-none print:shadow-none">
+        <div className="min-h-screen bg-gray-100 text-black p-4 sm:p-8 print:bg-white print:p-0">
+             <div className="max-w-4xl mx-auto bg-white p-4 sm:p-8 border border-gray-300 rounded-md print:border-none print:shadow-none flex flex-col h-[1056px]">
                 <header className="grid grid-cols-3 gap-4 pb-4 border-b border-gray-300">
                     <div className="flex flex-col">
                         <Image src="/logo.png" alt="ForgeFlow Logo" width={200} height={40} className="mb-4"/>
@@ -103,7 +103,7 @@ export default function RemitoPage() {
                     </div>
                 </section>
 
-                <section className="my-4">
+                <section className="my-4 flex-grow">
                     <table className="w-full text-sm">
                         <thead className="border-b border-gray-400">
                             <tr className="text-left">
@@ -112,11 +112,11 @@ export default function RemitoPage() {
                                 <th className="p-2 w-1/4 text-right">Cantidad</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="min-h-[500px]">
                             {remito.items.map((item, index) => {
                                 const piece = pieces?.find(p => p.id === item.pieceId);
                                 return (
-                                <tr key={index} className="border-b border-gray-200">
+                                <tr key={index} className="border-b border-gray-200 align-top">
                                     <td className="p-2 font-mono">{piece?.codigo || 'N/A'}</td>
                                     <td className="p-2">{piece ? `Pieza ${piece.codigo}` : ''}</td>
                                     <td className="p-2 text-right font-mono">{item.qty.toLocaleString('es-AR')}</td>
@@ -127,9 +127,9 @@ export default function RemitoPage() {
                     </table>
                 </section>
 
-                 <footer className="mt-12 pt-4 text-xs">
+                 <footer className="mt-auto pt-4 text-xs">
                     <div className="border-t border-gray-400 pt-2 text-center">
-                        <p><span className="font-bold">IMPORTANTE</span> CUALQUIER RECLAMO POR CANTIDAD, DETERIORO, ETC. DEBERA HACERSE EN FORMA INMEDIATA AL TRANSPORTISTA O A MAS TARDAR DENTRO DE LAS 24 HS. DE RECIBIDA LA MERCADERIA</p>
+                        <p><span className="font-bold">IMPORTANTE:</span> CUALQUIER RECLAMO POR CANTIDAD, DETERIORO, ETC. DEBERA HACERSE EN FORMA INMEDIATA AL TRANSPORTISTA O A MAS TARDAR DENTRO DE LAS 24 HS. DE RECIBIDA LA MERCADERIA</p>
                     </div>
                     <div className="mt-2 border-2 border-black grid grid-cols-4">
                         {/* Headers */}
