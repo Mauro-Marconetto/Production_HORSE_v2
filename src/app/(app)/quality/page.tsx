@@ -29,7 +29,26 @@ const allInspectionFields: { key: QualityInspectionField, label: string }[] = [
     { key: 'qtyScrapCalidad', label: 'Scrap' },
 ];
 
-const defectOptions = ["Porosidad", "Rebaba", "Falta de material", "Golpe", "Marca de expulsor"];
+const defectOptions = [
+    "Zona fria",
+    "Mal llenado",
+    "Colada chica",
+    "Fuga material",
+    "Fisura",
+    "Rotura",
+    "Pieza pegada",
+    "Corte colada",
+    "Noyo cortado",
+    "Falla squezze pin",
+    "Pieza caida ABB",
+    "Arrastre",
+    "Pieza descartada",
+    "Ampolla",
+    "Manchada",
+    "Deformación",
+    "Pliegue",
+    "Otros",
+];
 const controlTypeOptions = ["Visual", "Dimensional", "Estanqueidad"];
 
 export default function QualityPage() {
@@ -100,6 +119,7 @@ export default function QualityPage() {
         moldId: '',
         nroRack: '',
         defecto: '',
+        defectoOtro: '',
         tipoControl: '',
         qtySegregada: ''
     });
@@ -244,7 +264,7 @@ export default function QualityPage() {
             .then(() => {
                 toast({ title: "Éxito", description: "Lote segregado correctamente." });
                 setIsSegregateDialogOpen(false);
-                setSegregateForm({ turno: '', machineId: '', moldId: '', nroRack: '', defecto: '', tipoControl: '', qtySegregada: '' });
+                setSegregateForm({ turno: '', machineId: '', moldId: '', nroRack: '', defecto: '', defectoOtro: '', tipoControl: '', qtySegregada: '' });
             })
             .catch((error) => {
                 const contextualError = new FirestorePermissionError({ path: 'production', operation: 'create', requestResourceData: segregationData });
@@ -272,6 +292,7 @@ export default function QualityPage() {
             moldId: formData.get('moldId') as string,
             nroRack: formData.get('nroRack') as string,
             defecto: formData.get('defecto') as string,
+            defectoOtro: formData.get('defecto') === 'Otros' ? formData.get('defectoOtro') as string : '',
             tipoControl: formData.get('tipoControl') as string,
             qtySegregada: Number(formData.get('qtySegregada')),
             pieceId: pieceId,
@@ -554,7 +575,7 @@ export default function QualityPage() {
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
                     <Label htmlFor="seg-defecto">Defecto</Label>
-                    <Select required value={segregateForm.defecto} onValueChange={(v) => setSegregateForm(s => ({...s, defecto: v}))}>
+                    <Select required value={segregateForm.defecto} onValueChange={(v) => setSegregateForm(s => ({...s, defecto: v, defectoOtro: ''}))}>
                         <SelectTrigger id="seg-defecto"><SelectValue placeholder="Selecciona defecto..." /></SelectTrigger>
                         <SelectContent>{defectOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                     </Select>
@@ -567,6 +588,12 @@ export default function QualityPage() {
                     </Select>
                 </div>
               </div>
+              {segregateForm.defecto === 'Otros' && (
+                <div className="space-y-2">
+                    <Label htmlFor="seg-defecto-otro">Defecto (Otros)</Label>
+                    <Input id="seg-defecto-otro" required value={segregateForm.defectoOtro} onChange={(e) => setSegregateForm(s => ({...s, defectoOtro: e.target.value}))} />
+                </div>
+              )}
              <div className="space-y-2">
                 <Label htmlFor="seg-qty">Cantidad a Segregar</Label>
                 <Input id="seg-qty" type="number" required value={segregateForm.qtySegregada} onChange={(e) => setSegregateForm(s => ({...s, qtySegregada: e.target.value}))} />
@@ -627,7 +654,7 @@ export default function QualityPage() {
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="edit-defecto">Defecto</Label>
-                        <Select required name="defecto" defaultValue={lotToEdit.defecto}>
+                        <Select required name="defecto" defaultValue={lotToEdit.defecto} onValueChange={(v) => setLotToEdit(p => p ? {...p, defecto: v, defectoOtro: ''} : null)}>
                             <SelectTrigger id="edit-defecto"><SelectValue placeholder="Selecciona defecto..." /></SelectTrigger>
                             <SelectContent>{defectOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                         </Select>
@@ -640,6 +667,12 @@ export default function QualityPage() {
                         </Select>
                     </div>
                 </div>
+                 {lotToEdit.defecto === 'Otros' && (
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-defecto-otro">Defecto (Otros)</Label>
+                        <Input id="edit-defecto-otro" name="defectoOtro" required defaultValue={lotToEdit.defectoOtro} />
+                    </div>
+                )}
                 <div className="space-y-2">
                     <Label htmlFor="edit-qty">Cantidad Segregada</Label>
                     <Input id="edit-qty" name="qtySegregada" type="number" required defaultValue={lotToEdit.qtySegregada} />

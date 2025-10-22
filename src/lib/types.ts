@@ -145,6 +145,7 @@ export interface Production {
   
   // Quality Segregation fields
   defecto?: string;
+  defectoOtro?: string;
   tipoControl?: string;
 
   // Quality Inspection fields
