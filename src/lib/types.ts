@@ -138,6 +138,7 @@ export interface Production {
   qtyFinalizada: number;
   qtySinPrensar: number;
   qtyScrap: number;
+  qtyArranque?: number;
   qtySegregada: number;
   subproceso?: 'mecanizado' | 'granallado';
   createdBy?: string; // UID of user who declared production
