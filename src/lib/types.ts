@@ -206,3 +206,10 @@ export interface Role {
     name: string;
     allowedRoutes: string[];
 }
+
+export interface Supplier {
+  id: string;
+  nombre: string;
+  cuit: string;
+  direccion: string;
+}
