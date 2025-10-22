@@ -213,3 +213,20 @@ export interface Supplier {
   cuit: string;
   direccion: string;
 }
+
+export interface RemitoItem {
+  pieceId: string;
+  qty: number;
+}
+
+export interface Remito {
+  id: string;
+  fecha: string; // ISO Date
+  supplierId: string;
+  transportista: string;
+  vehiculo?: string;
+  status: 'enviado' | 'en_proceso' | 'retornado_parcial' | 'retornado_completo';
+  items: RemitoItem[];
+}
+
+    

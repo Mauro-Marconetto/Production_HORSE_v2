@@ -575,6 +575,90 @@
         "id",
         "nombre"
       ]
+    },
+    "Supplier": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Supplier",
+      "description": "Represents a supplier for external processes.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the supplier."
+        },
+        "nombre": {
+          "type": "string",
+          "description": "The name of the supplier."
+        },
+        "cuit": {
+          "type": "string",
+          "description": "The CUIT of the supplier."
+        },
+        "direccion": {
+          "type": "string",
+          "description": "The address of the supplier."
+        }
+      },
+      "required": [
+        "id",
+        "nombre",
+        "cuit"
+      ]
+    },
+    "Remito": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Remito",
+      "description": "Represents a dispatch note for sending pieces to a supplier.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the remito."
+        },
+        "fecha": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date the remito was issued."
+        },
+        "supplierId": {
+          "type": "string",
+          "description": "Reference to the supplier."
+        },
+        "transportista": {
+          "type": "string",
+          "description": "Name of the carrier."
+        },
+        "vehiculo": {
+          "type": "string",
+          "description": "Details of the vehicle."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["enviado", "en_proceso", "retornado_parcial", "retornado_completo"],
+          "description": "The status of the dispatch."
+        }
+      },
+      "required": [
+        "id",
+        "fecha",
+        "supplierId",
+        "transportista",
+        "status"
+      ]
+    },
+    "RemitoItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Remito Item",
+      "description": "An item within a remito.",
+      "type": "object",
+      "properties": {
+        "pieceId": {
+          "type": "string"
+        },
+        "qty": {
+          "type": "number"
+        }
+      }
     }
   },
   "auth": {
@@ -858,8 +942,42 @@
             }
           ]
         }
+      },
+       {
+        "path": "suppliers/{supplierId}",
+        "definition": {
+          "entityName": "Supplier",
+          "schema": {
+            "$ref": "#/backend/entities/Supplier"
+          },
+          "description": "Stores supplier information.",
+          "params": [
+            {
+              "name": "supplierId",
+              "description": "Unique identifier for the supplier."
+            }
+          ]
+        }
+      },
+      {
+        "path": "remitos/{remitoId}",
+        "definition": {
+          "entityName": "Remito",
+          "schema": {
+            "$ref": "#/backend/entities/Remito"
+          },
+          "description": "Stores dispatch notes (remitos) for external processes.",
+          "params": [
+            {
+              "name": "remitoId",
+              "description": "Unique identifier for the remito."
+            }
+          ]
+        }
       }
     ],
     "reasoning": "The Firestore data structure is designed to support the ForgeFlow application's production planning and execution features. It prioritizes authorization independence and QAPs by denormalizing data where necessary and using structural segregation. Path-based ownership is used for user-specific data, and membership maps are avoided since there's no collaborative data in the application. The structure enables secure list operations by ensuring that each collection has a homogeneous security posture.\n\n**Authorization Independence:** Data such as the Machines, Molds and Pieces collections are global, so they don't need any explicit authorization besides roles. User-specific collections like Assignments are secured via path-based ownership.\n\n**QAPs:** List operations are secured by structural segregation. For instance, listing assignments is only allowed within a specific plan (plans/{planId}/assignments/{assignmentId}).  This prevents unauthorized listing of assignments across different plans."
   }
 }
+
+    

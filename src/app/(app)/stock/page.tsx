@@ -3,16 +3,16 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind } from "lucide-react";
-import type { Piece, Production } from "@/lib/types";
+import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2 } from "lucide-react";
+import type { Piece, Production, Supplier, Remito, RemitoItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,10 +37,15 @@ export default function StockPage() {
 
     const productionCollection = useMemoFirebase(() => firestore ? collection(firestore, 'production') : null, [firestore]);
     const { data: initialProduction, isLoading: isLoadingProduction, forceRefresh } = useCollection<Production>(productionCollection);
+    
+    const suppliersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'suppliers') : null, [firestore]);
+    const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<Supplier>(suppliersCollection);
 
     const [allProduction, setAllProduction] = useState(initialProduction);
-    const [isSubprocessDialogOpen, setIsSubprocessDialogOpen] = useState(false);
-    const [subprocessForm, setSubprocessForm] = useState({ pieceId: '', process: 'mecanizado', quantity: '' });
+    const [isRemitoDialogOpen, setIsRemitoDialogOpen] = useState(false);
+    const [remitoForm, setRemitoForm] = useState({ supplierId: '', transportista: '', vehiculo: '' });
+    const [remitoItems, setRemitoItems] = useState<RemitoItem[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
 
      useMemo(() => {
         setAllProduction(initialProduction);
@@ -80,23 +85,6 @@ export default function StockPage() {
             }
         });
         
-        // Adjust for movements
-        allProduction.forEach(prod => {
-           if (prod.machineId === 'stock-transfer') {
-               const piece = pieces.find(p => p.id === prod.pieceId);
-               if (piece && stockByState.has(piece.codigo)) {
-                    const entry = stockByState.get(piece.codigo)!;
-                    // qtyFinalizada < 0 means it was moved OUT of 'Listo'
-                    if (prod.qtyFinalizada < 0) {
-                         if (prod.subproceso === 'mecanizado') {
-                            entry.stockMecanizado += Math.abs(prod.qtyFinalizada);
-                            entry.stockListo += prod.qtyFinalizada; // Decrease listo stock
-                         }
-                    }
-               }
-           }
-        });
-
         const rows: InventoryRow[] = [];
         stockByState.forEach((data) => {
             const totalStock = data.stockInyectado + data.stockMecanizado + data.stockGranallado + data.stockListo;
@@ -114,45 +102,73 @@ export default function StockPage() {
         return rows;
     }, [pieces, allProduction]);
     
-    const isLoading = isLoadingPieces || isLoadingProduction;
+    const isLoading = isLoadingPieces || isLoadingProduction || isLoadingSuppliers;
 
-    const handleSendToSubprocess = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleCreateRemito = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const { pieceId, process, quantity } = subprocessForm;
-        const qty = Number(quantity);
-
-        const pieceCode = pieces?.find(p => p.id === pieceId)?.codigo;
-        const listoRow = inventoryData.find(d => d.piece.id === pieceId && d.state === 'Listo');
-        const stockListo = listoRow?.stock || 0;
-
-        if (qty > stockListo) {
-            toast({ title: "Error de Stock", description: `No hay suficiente stock "Listo" para la pieza ${pieceCode}. Disponible: ${stockListo}`, variant: "destructive" });
+        if (!firestore) return;
+        
+        if (remitoItems.length === 0 || remitoItems.some(item => !item.pieceId || !item.qty || item.qty <= 0)) {
+            toast({ title: "Error", description: "Completa todos los ítems del remito con cantidades válidas.", variant: "destructive"});
             return;
         }
 
-        // This mock represents moving stock from 'Listo' to a subprocess
-        // A negative production record for 'Listo' stock
-        const mockProdSalida: Production = {
-            id: `mock-out-${Date.now()}`,
-            fechaISO: new Date().toISOString(),
-            machineId: 'stock-transfer', // Special ID to identify this as a manual transfer
-            pieceId: pieceId,
-            moldId: '',
-            turno: '',
-            qtyFinalizada: -qty, // Negative quantity to decrease stock "Listo"
-            qtySinPrensar: 0,
-            qtyScrap: 0,
-            qtySegregada: 0,
-            subproceso: process as 'mecanizado', // The target subprocess
-            inspeccionadoCalidad: true,
+        // Validate stock for each item
+        for (const item of remitoItems) {
+            const listoRow = inventoryData.find(d => d.piece.id === item.pieceId && d.state === 'Listo');
+            const stockListo = listoRow?.stock || 0;
+            if (item.qty > stockListo) {
+                const pieceCode = pieces?.find(p => p.id === item.pieceId)?.codigo;
+                toast({ title: "Error de Stock", description: `No hay suficiente stock "Listo" para la pieza ${pieceCode}. Disponible: ${stockListo}`, variant: "destructive" });
+                return;
+            }
+        }
+
+        setIsSaving(true);
+
+        const remitoData: Omit<Remito, 'id'> = {
+            ...remitoForm,
+            fecha: new Date().toISOString(),
+            status: 'enviado',
+            items: remitoItems,
         };
 
-        setAllProduction(prev => [...(prev || []), mockProdSalida]);
-        
-        toast({ title: "Éxito", description: `${qty.toLocaleString()} unidades de ${pieceCode} enviadas a ${process}.`});
-        setIsSubprocessDialogOpen(false);
-        setSubprocessForm({ pieceId: '', process: 'mecanizado', quantity: '' });
+        try {
+            await addDoc(collection(firestore, "remitos"), remitoData);
+            
+            // Here you would also create the negative production parts to update stock,
+            // for now, we'll just show a success toast.
+            
+            toast({ title: "Éxito", description: "Remito creado correctamente." });
+            setIsRemitoDialogOpen(false);
+            setRemitoForm({ supplierId: '', transportista: '', vehiculo: '' });
+            setRemitoItems([]);
+        } catch (error) {
+            const contextualError = new FirestorePermissionError({
+                path: 'remitos',
+                operation: 'create',
+                requestResourceData: remitoData,
+            });
+            errorEmitter.emit('permission-error', contextualError);
+        } finally {
+            setIsSaving(false);
+        }
     };
+    
+    const addRemitoItem = () => {
+        setRemitoItems([...remitoItems, { pieceId: '', qty: 0 }]);
+    }
+    
+    const updateRemitoItem = (index: number, field: keyof RemitoItem, value: string | number) => {
+        const newItems = [...remitoItems];
+        (newItems[index] as any)[field] = value;
+        setRemitoItems(newItems);
+    }
+    
+    const removeRemitoItem = (index: number) => {
+        setRemitoItems(remitoItems.filter((_, i) => i !== index));
+    }
+
 
     const getStateBadgeVariant = (state: InventoryRow['state']) => {
         switch(state) {
@@ -172,8 +188,8 @@ export default function StockPage() {
                     <p className="text-muted-foreground">Monitoriza los niveles de stock en tiempo real en cada etapa del proceso.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setIsSubprocessDialogOpen(true)}>
-                        <Wrench className="mr-2 h-4 w-4" /> Enviar a Mecanizado
+                    <Button variant="outline" onClick={() => setIsRemitoDialogOpen(true)}>
+                        <Wrench className="mr-2 h-4 w-4" /> Crear Remito de Mecanizado
                     </Button>
                 </div>
             </div>
@@ -202,7 +218,7 @@ export default function StockPage() {
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!isLoading && inventoryData.map(({ piece, state, stock, totalStockForPiece }) => {
+                            {!isLoading && inventoryData.map(({ piece, state, stock, totalStockForPiece }, index) => {
                                 const stockMin = piece.stockMin || 0;
                                 const stockMax = piece.stockMax || 1;
 
@@ -211,7 +227,7 @@ export default function StockPage() {
                                 const statusText = status === 'critical' ? 'Crítico' : status === 'high' ? 'Alto' : 'Ok';
 
                                 return (
-                                    <TableRow key={`${piece.id}-${state}`}>
+                                    <TableRow key={`${piece.id}-${state}-${index}`}>
                                         <TableCell className="font-medium">
                                             <div className="flex items-center gap-2">
                                                 <span>{piece.codigo}</span>
@@ -256,32 +272,67 @@ export default function StockPage() {
                 </CardContent>
             </Card>
 
-            <Dialog open={isSubprocessDialogOpen} onOpenChange={setIsSubprocessDialogOpen}>
-                <DialogContent>
+            <Dialog open={isRemitoDialogOpen} onOpenChange={setIsRemitoDialogOpen}>
+                <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Enviar Stock a Mecanizado</DialogTitle>
-                        <DialogDescription>Mueve unidades del stock "Listo" al proceso externo de mecanizado.</DialogDescription>
+                        <DialogTitle>Crear Remito de Mecanizado</DialogTitle>
+                        <DialogDescription>Genera un nuevo remito para enviar piezas a un proveedor externo.</DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={handleSendToSubprocess}>
+                    <form onSubmit={handleCreateRemito}>
                         <div className="grid gap-4 py-4">
                             <div className="space-y-2">
-                                <Label htmlFor="sp-piece">Pieza a Mover</Label>
-                                <Select required value={subprocessForm.pieceId} onValueChange={(v) => setSubprocessForm(s => ({...s, pieceId: v}))}>
-                                    <SelectTrigger id="sp-piece"><SelectValue placeholder="Selecciona una pieza..." /></SelectTrigger>
+                                <Label htmlFor="rem-supplier">Proveedor</Label>
+                                <Select required value={remitoForm.supplierId} onValueChange={(v) => setRemitoForm(s => ({...s, supplierId: v}))}>
+                                    <SelectTrigger id="rem-supplier"><SelectValue placeholder="Selecciona un proveedor..." /></SelectTrigger>
                                     <SelectContent>
-                                        {pieces?.filter(p => p.requiereMecanizado).map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
+                                        {suppliers?.map(s => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
-                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="rem-transportista">Transportista</Label>
+                                    <Input id="rem-transportista" required value={remitoForm.transportista} onChange={(e) => setRemitoForm(s => ({...s, transportista: e.target.value}))} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="rem-vehiculo">Vehículo</Label>
+                                    <Input id="rem-vehiculo" value={remitoForm.vehiculo} onChange={(e) => setRemitoForm(s => ({...s, vehiculo: e.target.value}))} />
+                                </div>
+                            </div>
+
                             <div className="space-y-2">
-                                <Label htmlFor="sp-quantity">Cantidad a Mover</Label>
-                                <Input id="sp-quantity" type="number" required value={subprocessForm.quantity} onChange={(e) => setSubprocessForm(s => ({...s, quantity: e.target.value}))} />
+                                <Label>Ítems del Remito</Label>
+                                <div className="space-y-2 rounded-md border p-2">
+                                    {remitoItems.map((item, index) => (
+                                        <div key={index} className="flex items-center gap-2">
+                                            <Select value={item.pieceId} onValueChange={(v) => updateRemitoItem(index, 'pieceId', v)}>
+                                                <SelectTrigger className="flex-1"><SelectValue placeholder="Selecciona pieza..." /></SelectTrigger>
+                                                <SelectContent>
+                                                    {pieces?.filter(p => p.requiereMecanizado).map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                            <Input 
+                                                type="number" 
+                                                placeholder="Cantidad" 
+                                                className="w-32" 
+                                                value={item.qty || ''} 
+                                                onChange={(e) => updateRemitoItem(index, 'qty', Number(e.target.value))}
+                                            />
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeRemitoItem(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                        </div>
+                                    ))}
+                                     <Button type="button" variant="outline" size="sm" onClick={addRemitoItem} className="w-full">
+                                        <Plus className="mr-2 h-4 w-4" /> Añadir Ítem
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setIsSubprocessDialogOpen(false)}>Cancelar</Button>
-                            <Button type="submit">Confirmar Envío</Button>
+                            <Button type="button" variant="outline" onClick={() => setIsRemitoDialogOpen(false)}>Cancelar</Button>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                Crear Remito
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
@@ -290,3 +341,5 @@ export default function StockPage() {
         </main>
     );
 }
+
+    
