@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { collection } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
@@ -40,7 +40,7 @@ export default function StockPage() {
 
     const [allProduction, setAllProduction] = useState(initialProduction);
     const [isSubprocessDialogOpen, setIsSubprocessDialogOpen] = useState(false);
-    const [subprocessForm, setSubprocessForm] = useState({ pieceId: '', process: '', quantity: '' });
+    const [subprocessForm, setSubprocessForm] = useState({ pieceId: '', process: 'mecanizado', quantity: '' });
 
      useMemo(() => {
         setAllProduction(initialProduction);
@@ -79,6 +79,23 @@ export default function StockPage() {
                 entry.stockInyectado += (prod.qtySinPrensar || 0) + (prod.qtyAptaSinPrensarCalidad || 0);
             }
         });
+        
+        // Adjust for movements
+        allProduction.forEach(prod => {
+           if (prod.machineId === 'stock-transfer') {
+               const piece = pieces.find(p => p.id === prod.pieceId);
+               if (piece && stockByState.has(piece.codigo)) {
+                    const entry = stockByState.get(piece.codigo)!;
+                    // qtyFinalizada < 0 means it was moved OUT of 'Listo'
+                    if (prod.qtyFinalizada < 0) {
+                         if (prod.subproceso === 'mecanizado') {
+                            entry.stockMecanizado += Math.abs(prod.qtyFinalizada);
+                            entry.stockListo += prod.qtyFinalizada; // Decrease listo stock
+                         }
+                    }
+               }
+           }
+        });
 
         const rows: InventoryRow[] = [];
         stockByState.forEach((data) => {
@@ -113,40 +130,28 @@ export default function StockPage() {
             return;
         }
 
+        // This mock represents moving stock from 'Listo' to a subprocess
+        // A negative production record for 'Listo' stock
         const mockProdSalida: Production = {
             id: `mock-out-${Date.now()}`,
             fechaISO: new Date().toISOString(),
-            machineId: 'stock-transfer',
+            machineId: 'stock-transfer', // Special ID to identify this as a manual transfer
             pieceId: pieceId,
             moldId: '',
             turno: '',
-            qtyFinalizada: -qty, // Negative quantity to decrease stock
+            qtyFinalizada: -qty, // Negative quantity to decrease stock "Listo"
             qtySinPrensar: 0,
             qtyScrap: 0,
             qtySegregada: 0,
+            subproceso: process as 'mecanizado', // The target subprocess
             inspeccionadoCalidad: true,
         };
 
-        const mockProdEntrada: Production = {
-            id: `mock-in-${Date.now()}`,
-            fechaISO: new Date().toISOString(),
-            machineId: 'stock-transfer',
-            pieceId: pieceId,
-            moldId: '',
-            turno: '',
-            qtyFinalizada: qty, // Positive quantity for the new state
-            qtySinPrensar: 0,
-            qtyScrap: 0,
-            qtySegregada: 0,
-            subproceso: process as 'mecanizado' | 'granallado',
-            inspeccionadoCalidad: true,
-        };
-
-        setAllProduction(prev => [...(prev || []), mockProdSalida, mockProdEntrada]);
+        setAllProduction(prev => [...(prev || []), mockProdSalida]);
         
         toast({ title: "Éxito", description: `${qty.toLocaleString()} unidades de ${pieceCode} enviadas a ${process}.`});
         setIsSubprocessDialogOpen(false);
-        setSubprocessForm({ pieceId: '', process: '', quantity: '' });
+        setSubprocessForm({ pieceId: '', process: 'mecanizado', quantity: '' });
     };
 
     const getStateBadgeVariant = (state: InventoryRow['state']) => {
@@ -168,7 +173,7 @@ export default function StockPage() {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => setIsSubprocessDialogOpen(true)}>
-                        <Wrench className="mr-2 h-4 w-4" /> Enviar a Subproceso
+                        <Wrench className="mr-2 h-4 w-4" /> Enviar a Mecanizado
                     </Button>
                 </div>
             </div>
@@ -254,8 +259,8 @@ export default function StockPage() {
             <Dialog open={isSubprocessDialogOpen} onOpenChange={setIsSubprocessDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Enviar Stock a Subproceso</DialogTitle>
-                        <DialogDescription>Mueve unidades del stock "Listo" a un proceso secundario como mecanizado o granallado.</DialogDescription>
+                        <DialogTitle>Enviar Stock a Mecanizado</DialogTitle>
+                        <DialogDescription>Mueve unidades del stock "Listo" al proceso externo de mecanizado.</DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleSendToSubprocess}>
                         <div className="grid gap-4 py-4">
@@ -264,20 +269,11 @@ export default function StockPage() {
                                 <Select required value={subprocessForm.pieceId} onValueChange={(v) => setSubprocessForm(s => ({...s, pieceId: v}))}>
                                     <SelectTrigger id="sp-piece"><SelectValue placeholder="Selecciona una pieza..." /></SelectTrigger>
                                     <SelectContent>
-                                        {pieces?.map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
+                                        {pieces?.filter(p => p.requiereMecanizado).map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="sp-process">Subproceso de Destino</Label>
-                                <Select required value={subprocessForm.process} onValueChange={(v) => setSubprocessForm(s => ({...s, process: v}))}>
-                                    <SelectTrigger id="sp-process"><SelectValue placeholder="Selecciona un proceso..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="mecanizado">Mecanizado</SelectItem>
-                                        <SelectItem value="granallado">Granallado</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                            
                             <div className="space-y-2">
                                 <Label htmlFor="sp-quantity">Cantidad a Mover</Label>
                                 <Input id="sp-quantity" type="number" required value={subprocessForm.quantity} onChange={(e) => setSubprocessForm(s => ({...s, quantity: e.target.value}))} />
