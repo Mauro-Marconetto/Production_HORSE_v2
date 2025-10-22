@@ -55,7 +55,7 @@ export default function RemitoPage() {
         );
     }
     
-    const remitoNumberString = remito.numero?.toString().padStart(8, '0') || '00000000';
+    const remitoNumberString = remito.numero ? remito.numero.toString().padStart(8, '0') : 'N/A';
     const remitoNumber = `0008-${remitoNumberString}`;
 
     return (
@@ -65,7 +65,7 @@ export default function RemitoPage() {
                     <div className="flex flex-col">
                         <Image src="/logo.png" alt="ForgeFlow Logo" width={200} height={40} className="mb-4"/>
                         <div className="text-xs">
-                            <p className="font-bold">HORSE S.A.</p>
+                            <p className="font-bold">HORSE ARGENTINA S.A.</p>
                             <p>Parque Industrial</p>
                             <p>Rafaela (S2300), Santa Fe, Argentina</p>
                             <p>Tel: +54 3492 440315</p>
@@ -127,29 +127,62 @@ export default function RemitoPage() {
                     </table>
                 </section>
 
-                 <footer className="mt-12 pt-8 text-xs text-gray-600">
-                     <div className="grid grid-cols-2 gap-8">
-                         <div className="flex flex-col justify-between">
-                            <p>DUPLICADO</p>
-                            <div className="pt-12">
-                                 <div className="border-t border-gray-400 pt-1">Firma del transportista</div>
+                 <footer className="mt-12 pt-4 text-xs">
+                    <div className="border-t border-gray-400 pt-2 text-center">
+                        <p><span className="font-bold">IMPORTANTE</span> CUALQUIER RECLAMO POR CANTIDAD, DETERIORO, ETC. DEBERA HACERSE EN FORMA INMEDIATA AL TRANSPORTISTA O A MAS TARDAR DENTRO DE LAS 24 HS. DE RECIBIDA LA MERCADERIA</p>
+                    </div>
+                    <div className="mt-2 border-2 border-black grid grid-cols-4">
+                        {/* Headers */}
+                        <div className="border-r border-black text-center font-bold p-1">AUTORIZADO POR</div>
+                        <div className="border-r border-black text-center font-bold p-1">DESPACHADO POR</div>
+                        <div className="border-r border-black text-center font-bold p-1">CONTROL PROTECCION PLANTA</div>
+                        <div className="text-center font-bold p-1">RECIBO AUTORIZADO</div>
+
+                        {/* First row of content */}
+                        <div className="border-t border-r border-black h-20"></div>
+                        <div className="border-t border-r border-black grid grid-cols-2">
+                            <div className="border-r border-black p-1">LEGAJO</div>
+                            <div className="p-1">FIRMA</div>
+                        </div>
+                        <div className="border-t border-r border-black grid grid-cols-2">
+                            <div className="border-r border-black p-1">LEGAJO</div>
+                            <div className="p-1">FIRMA</div>
+                        </div>
+                        <div className="border-t border-black grid grid-cols-2">
+                            <div className="border-r border-black p-1">DOC.ID.</div>
+                            <div className="p-1">FIRMA</div>
+                        </div>
+                        
+                        {/* Second row of content */}
+                        <div className="border-t border-r border-black grid grid-cols-2 h-20">
+                            <div className="border-r border-black p-1">ACLARACION</div>
+                            <div className="p-1">FECHA</div>
+                        </div>
+                        <div className="border-t border-r border-black grid grid-cols-2">
+                            <div className="border-r border-black p-1">FECHA</div>
+                            <div className="p-1">ACLARACION</div>
+                        </div>
+                        <div className="border-t border-r border-black grid grid-cols-2">
+                            <div className="border-r border-black p-1">FECHA</div>
+                            <div className="p-1">ACLARACION</div>
+                        </div>
+                        <div className="border-t border-black grid grid-cols-2">
+                            <div className="border-r border-black p-1">FECHA</div>
+                            <div className="p-1">ACLARACION</div>
+                        </div>
+                    </div>
+                    <div className="flex justify-between mt-1">
+                        <div>
+                            <span className="font-bold">F-66-1</span>
+                            <span className="ml-4">ORIGINAL</span>
+                        </div>
+                        {settings && (
+                            <div className="text-right">
+                                <p>C.A.I. N°: {settings.cai}</p>
+                                <p>Fecha Vencimiento: {new Date(settings.caiExpiration).toLocaleDateString('es-AR')}</p>
                             </div>
-                         </div>
-                         <div className="flex flex-col justify-between">
-                             <div>
-                                <p>Documento no válido como factura.</p>
-                                {settings && (
-                                    <div className="mt-4">
-                                        <p>C.A.I. N°: {settings.cai}</p>
-                                        <p>Fecha Vencimiento: {new Date(settings.caiExpiration).toLocaleDateString('es-AR')}</p>
-                                    </div>
-                                )}
-                             </div>
-                             <div className="pt-12">
-                                <div className="border-t border-gray-400 pt-1">Firma del receptor</div>
-                            </div>
-                         </div>
-                     </div>
+                        )}
+                    </div>
                 </footer>
              </div>
              <div className="max-w-4xl mx-auto mt-4 flex justify-end print:hidden">
