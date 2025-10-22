@@ -3,7 +3,7 @@
 
 import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { doc } from 'firebase/firestore';
+import { doc, collection } from 'firebase/firestore';
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import type { Remito, Supplier, Piece } from '@/lib/types';
 import { Loader2, Printer } from 'lucide-react';
@@ -25,7 +25,7 @@ export default function RemitoPage() {
     [firestore, supplierId]);
     const { data: supplier, isLoading: isLoadingSupplier } = useDoc<Supplier>(supplierRef);
     
-    const piecesRef = useMemoFirebase(() => firestore ? doc(firestore, 'pieces') : null, [firestore]);
+    const piecesRef = useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]);
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesRef);
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
@@ -141,4 +141,3 @@ export default function RemitoPage() {
         </div>
     )
 }
-
