@@ -1,31 +1,41 @@
 
 'use client';
 
-import { useMemo } from "react";
-import { collection } from "firebase/firestore";
+import { useMemo, useState } from "react";
+import { collection, query, orderBy, where } from "firebase/firestore";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, Loader2 } from "lucide-react";
+import { MoreHorizontal, Loader2, Calendar as CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import type { Remito, Piece, Supplier } from "@/lib/types";
-
-const statusConfig: { [key: string]: { label: string, color: string } } = {
-    enviado: { label: "Enviado", color: "bg-yellow-500" },
-    en_proceso: { label: "En Proceso", color: "bg-blue-500" },
-    retornado_parcial: { label: "Retornado Parcial", color: "bg-purple-500" },
-    retornado_completo: { label: "Retornado Completo", color: "bg-green-500" },
-};
+import { addDays, format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 
 export default function RemitosPage() {
     const firestore = useFirestore();
     const router = useRouter();
+    
+    const [date, setDate] = useState<DateRange | undefined>();
 
-    const remitosQuery = useMemoFirebase(() => firestore ? collection(firestore, "remitos") : null, [firestore]);
+    const remitosQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        let q = query(collection(firestore, "remitos"), orderBy("fecha", "desc"));
+
+        if (date?.from && date?.to) {
+            q = query(q, where("fecha", ">=", date.from.toISOString()), where("fecha", "<=", addDays(date.to, 1).toISOString()));
+        } else {
+             // If no date range, limit to last 10
+             q = query(collection(firestore, "remitos"), orderBy("fecha", "desc"));
+        }
+        return q;
+    }, [firestore, date]);
+    
     const { data: remitos, isLoading: isLoadingRemitos } = useCollection<Remito>(remitosQuery);
 
     const suppliersQuery = useMemoFirebase(() => firestore ? collection(firestore, "suppliers") : null, [firestore]);
@@ -35,6 +45,14 @@ export default function RemitosPage() {
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesQuery);
 
     const isLoading = isLoadingRemitos || isLoadingSuppliers || isLoadingPieces;
+    
+    const displayedRemitos = useMemo(() => {
+        if (!remitos) return [];
+        if (date?.from && date?.to) {
+            return remitos;
+        }
+        return remitos.slice(0, 10);
+    }, [remitos, date]);
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -46,10 +64,50 @@ export default function RemitosPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Remitos Enviados</CardTitle>
-          <CardDescription>
-            Envíos a procesos externos registrados en el sistema.
-          </CardDescription>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle>Historial de Remitos</CardTitle>
+              <CardDescription>
+                Envíos a procesos externos registrados. Por defecto, se muestran los últimos 10.
+              </CardDescription>
+            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id="date"
+                  variant={"outline"}
+                  className={cn(
+                    "w-[260px] justify-start text-left font-normal",
+                    !date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date?.from ? (
+                    date.to ? (
+                      <>
+                        {format(date.from, "LLL dd, y")} -{" "}
+                        {format(date.to, "LLL dd, y")}
+                      </>
+                    ) : (
+                      format(date.from, "LLL dd, y")
+                    )
+                  ) : (
+                    <span>Filtrar por fecha</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={date?.from}
+                  selected={date}
+                  onSelect={setDate}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -60,21 +118,19 @@ export default function RemitosPage() {
                 <TableHead>Proveedor</TableHead>
                 <TableHead>Transportista</TableHead>
                 <TableHead>Piezas</TableHead>
-                <TableHead className="text-center">Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
                 <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                     </TableCell>
                 </TableRow>
               )}
-              {!isLoading && remitos?.map((remito) => {
+              {!isLoading && displayedRemitos.map((remito) => {
                 const supplier = suppliers?.find(s => s.id === remito.supplierId);
-                const { label, color } = statusConfig[remito.status] || { label: 'Desconocido', color: 'bg-gray-500' };
                 return (
                   <TableRow key={remito.id}>
                     <TableCell className="font-mono text-xs">{remito.numero ? `0008-${String(remito.numero).padStart(8, '0')}` : remito.id.slice(-6)}</TableCell>
@@ -89,11 +145,6 @@ export default function RemitosPage() {
                             })}
                         </div>
                     </TableCell>
-                    <TableCell className="text-center">
-                        <Badge className={cn("text-white", color)}>
-                            {label}
-                        </Badge>
-                    </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -103,17 +154,16 @@ export default function RemitosPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
                           <DropdownMenuItem onClick={() => router.push(`/remito/${remito.id}`)}>Imprimir Remito</DropdownMenuItem>
-                          <DropdownMenuItem>Registrar Retorno</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 );
               })}
-              {!isLoading && (!remitos || remitos.length === 0) && (
+              {!isLoading && (!displayedRemitos || displayedRemitos.length === 0) && (
                 <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                        No se encontraron remitos.
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                        No se encontraron remitos para el filtro seleccionado.
                     </TableCell>
                 </TableRow>
               )}
