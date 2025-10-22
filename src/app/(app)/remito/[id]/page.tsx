@@ -34,8 +34,8 @@ const RemitoCopy = ({ remito, supplier, pieces, settings, copyType }: { remito: 
                     </div>
                 </div>
                 <div className="text-right">
-                    <h1 className="text-sm">N°: <span className="font-mono">{remitoNumber}</span></h1>
-                    <p className="text-sm">Fecha: <span className="font-mono">{remitoDate}</span></p>
+                    <h2>N°:{remitoNumber}</h2>
+                    <p className="mt-4 text-sm">Fecha: <span className="font-mono">{remitoDate}</span></p>
                     <div className="mt-4 text-xs">
                         <p>CUIT: 30-70828551-3</p>
                         <p>Ing. Brutos: 20-70828551-0</p>
