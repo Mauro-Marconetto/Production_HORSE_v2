@@ -45,7 +45,7 @@ export default function StockPage() {
     const [allProduction, setAllProduction] = useState(initialProduction);
     const [isRemitoDialogOpen, setIsRemitoDialogOpen] = useState(false);
     const [createdRemitoId, setCreatedRemitoId] = useState<string | null>(null);
-    const [remitoForm, setRemitoForm] = useState({ supplierId: '', transportista: '', vehiculo: '' });
+    const [remitoForm, setRemitoForm] = useState({ supplierId: '' });
     const [remitoItems, setRemitoItems] = useState<RemitoItem[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -135,11 +135,17 @@ export default function StockPage() {
             const batch = writeBatch(firestore);
             const settingsRef = doc(firestore, "settings", "remitos");
             const settingsSnap = await getDoc(settingsRef);
+            if (!settingsSnap.exists()) {
+                throw new Error("La configuración de remitos no existe.");
+            }
             const remitoSettings = settingsSnap.data() as RemitoSettings;
             const currentRemitoNumber = remitoSettings.nextRemitoNumber || 1;
             
             const remitoData: Omit<Remito, 'id'> = {
-                ...remitoForm,
+                supplierId: remitoForm.supplierId,
+                transportista: 'CAT ARGENTINA SA - CARGO UTE',
+                vehiculo: 'Camilo Henriquez N° 2808-Santa Isabel 3º Seccion, 5017 CÓRDOBA - ARGENTINA',
+                transportistaCuit: '30-69847536-2',
                 numero: currentRemitoNumber,
                 fecha: new Date().toISOString(),
                 status: 'enviado',
@@ -200,7 +206,7 @@ export default function StockPage() {
             toast({ title: "Éxito", description: "Remito creado y stock actualizado correctamente." });
             setCreatedRemitoId(remitoRef.id);
             setIsRemitoDialogOpen(false);
-            setRemitoForm({ supplierId: '', transportista: '', vehiculo: '' });
+            setRemitoForm({ supplierId: '' });
             setRemitoItems([]);
             forceRefresh();
 
@@ -360,17 +366,7 @@ export default function StockPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="rem-transportista">Transportista</Label>
-                                    <Input id="rem-transportista" required value={remitoForm.transportista} onChange={(e) => setRemitoForm(s => ({...s, transportista: e.target.value}))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="rem-vehiculo">Vehículo</Label>
-                                    <Input id="rem-vehiculo" value={remitoForm.vehiculo} onChange={(e) => setRemitoForm(s => ({...s, vehiculo: e.target.value}))} />
-                                </div>
-                            </div>
-
+                            
                             <div className="space-y-2">
                                 <Label>Ítems del Remito</Label>
                                 <div className="space-y-2 rounded-md border p-2">

@@ -225,6 +225,7 @@ export interface Remito {
   fecha: string; // ISO Date
   supplierId: string;
   transportista: string;
+  transportistaCuit?: string;
   vehiculo?: string;
   status: 'enviado' | 'en_proceso' | 'retornado_parcial' | 'retornado_completo';
   items: RemitoItem[];

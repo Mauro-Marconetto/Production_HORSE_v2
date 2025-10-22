@@ -71,7 +71,7 @@ export default function RemitoPage() {
                             <p>Tel: +54 3492 440315</p>
                         </div>
                     </div>
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-center justify-start pt-4">
                          <div className="flex items-center justify-center h-16 w-16 border-2 border-black">
                             <span className="text-5xl font-bold">R</span>
                         </div>
@@ -96,9 +96,10 @@ export default function RemitoPage() {
                         <p>CUIT: {supplier?.cuit}</p>
                     </div>
                      <div>
-                        <h2 className="font-bold mb-1">Transporte:</h2>
-                        <p><span className="font-semibold">Razón Social:</span> {remito.transportista}</p>
-                        <p><span className="font-semibold">Vehículo:</span> {remito.vehiculo}</p>
+                        <h2 className="font-bold mb-1">Transportista:</h2>
+                        <p><span className="font-semibold">{remito.transportista}</span></p>
+                        <p>{remito.vehiculo}</p>
+                        {remito.transportistaCuit && <p>C.U.I.T.: {remito.transportistaCuit}</p>}
                     </div>
                 </section>
 
