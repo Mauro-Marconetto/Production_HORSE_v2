@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useMemo } from "react";
@@ -22,7 +21,7 @@ const statusConfig: { [key: string]: { label: string, color: string } } = {
     retornado_completo: { label: "Retornado Completo", color: "bg-green-500" },
 };
 
-export default function SubprocessesPage() {
+export default function RemitosPage() {
     const firestore = useFirestore();
     const router = useRouter();
 
@@ -41,15 +40,15 @@ export default function SubprocessesPage() {
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Producción en Mecanizado</h1>
-          <p className="text-muted-foreground">Declara la producción y el scrap de los lotes enviados a proveedores.</p>
+          <h1 className="text-3xl font-headline font-bold">Seguimiento de Remitos</h1>
+          <p className="text-muted-foreground">Trazabilidad de piezas en proveedores externos (mecanizado, etc.).</p>
         </div>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Lotes en Proveedor</CardTitle>
+          <CardTitle>Remitos Enviados</CardTitle>
           <CardDescription>
-            Piezas actualmente en procesos externos. Desde aquí puedes declarar la producción.
+            Envíos a procesos externos registrados en el sistema.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -57,9 +56,10 @@ export default function SubprocessesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Remito ID</TableHead>
-                <TableHead>Fecha de Envío</TableHead>
+                <TableHead>Fecha</TableHead>
                 <TableHead>Proveedor</TableHead>
-                <TableHead>Piezas Enviadas</TableHead>
+                <TableHead>Transportista</TableHead>
+                <TableHead>Piezas</TableHead>
                 <TableHead className="text-center">Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -67,12 +67,12 @@ export default function SubprocessesPage() {
             <TableBody>
               {isLoading && (
                 <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={7} className="h-24 text-center">
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                     </TableCell>
                 </TableRow>
               )}
-              {!isLoading && remitos?.filter(r => r.status === 'enviado' || r.status === 'en_proceso').map((remito) => {
+              {!isLoading && remitos?.map((remito) => {
                 const supplier = suppliers?.find(s => s.id === remito.supplierId);
                 const { label, color } = statusConfig[remito.status] || { label: 'Desconocido', color: 'bg-gray-500' };
                 return (
@@ -80,6 +80,7 @@ export default function SubprocessesPage() {
                     <TableCell className="font-mono text-xs">{remito.numero ? `0008-${String(remito.numero).padStart(8, '0')}` : remito.id.slice(-6)}</TableCell>
                     <TableCell>{new Date(remito.fecha).toLocaleDateString()}</TableCell>
                     <TableCell>{supplier?.nombre}</TableCell>
+                    <TableCell>{remito.transportista}</TableCell>
                     <TableCell>
                         <div className="flex flex-col">
                             {remito.items.map(item => {
@@ -94,15 +95,25 @@ export default function SubprocessesPage() {
                         </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button>Declarar Producción</Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => router.push(`/remito/${remito.id}`)}>Imprimir Remito</DropdownMenuItem>
+                          <DropdownMenuItem>Registrar Retorno</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 );
               })}
-              {!isLoading && (!remitos || remitos.filter(r => r.status === 'enviado' || r.status === 'en_proceso').length === 0) && (
+              {!isLoading && (!remitos || remitos.length === 0) && (
                 <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                        No hay lotes en proceso de mecanizado.
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                        No se encontraron remitos.
                     </TableCell>
                 </TableRow>
               )}
