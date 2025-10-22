@@ -4,6 +4,7 @@
 import { useMemo } from "react";
 import { collection } from "firebase/firestore";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ const statusConfig: { [key: string]: { label: string, color: string } } = {
 
 export default function SubprocessesPage() {
     const firestore = useFirestore();
+    const router = useRouter();
 
     const remitosQuery = useMemoFirebase(() => firestore ? collection(firestore, "remitos") : null, [firestore]);
     const { data: remitos, isLoading: isLoadingRemitos } = useCollection<Remito>(remitosQuery);
@@ -100,8 +102,7 @@ export default function SubprocessesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                          <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
-                          <DropdownMenuItem>Imprimir Remito</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/remito/${remito.id}`)}>Imprimir Remito</DropdownMenuItem>
                           <DropdownMenuItem>Registrar Retorno</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -124,4 +125,3 @@ export default function SubprocessesPage() {
   );
 }
 
-    
