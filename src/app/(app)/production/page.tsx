@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -72,7 +71,9 @@ export default function ProductionPage() {
     // Production Declaration State
     const [turno, setTurno] = useState<'mañana' | 'tarde' | 'noche' | ''>('');
     const [machineId, setMachineId] = useState('');
+    const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
     const [moldId, setMoldId] = useState('');
+    const [pieceId, setPieceId] = useState(''); // For granalladoras
     const [existingProduction, setExistingProduction] = useState<Production | null>(null);
     const [prodQuantities, setProdQuantities] = useState({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
     const [prodCurrentInput, setProdCurrentInput] = useState('');
@@ -95,7 +96,9 @@ export default function ProductionPage() {
         setStep('selection');
         setTurno('');
         setMachineId('');
+        setSelectedMachine(null);
         setMoldId('');
+        setPieceId('');
         setExistingProduction(null);
         setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
         setProdCurrentInput('');
@@ -122,42 +125,46 @@ export default function ProductionPage() {
         }
     }, [isPressingDialogOpen]);
     
+     useEffect(() => {
+        const machine = machines?.find(m => m.id === machineId) || null;
+        setSelectedMachine(machine);
+    }, [machineId, machines]);
+    
     useEffect(() => {
         async function checkForExisting() {
             if (turno && machineId && firestore && production) {
                 const existing = await findExistingProduction(firestore, production, machineId, turno);
                 setExistingProduction(existing);
                 if (existing) {
-                    setMoldId(existing.moldId);
+                    setMoldId(existing.moldId || '');
+                    setPieceId(existing.pieceId || '');
                     setProdQuantities({
                         qtyFinalizada: existing.qtyFinalizada || 0,
                         qtySinPrensar: existing.qtySinPrensar || 0,
                         qtyScrap: existing.qtyScrap || 0,
                     });
                 } else {
-                    const machine = machines?.find(m => m.id === machineId);
-                     setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 }); // Reset quantities if no existing
-                    if (machine?.moldAssignments) {
+                     setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 }); // Reset quantities
+                    if (selectedMachine?.type === 'inyectora' && selectedMachine.assignments) {
                         const today = new Date();
-                        const currentAssignment = machine.moldAssignments.find(a => 
-                            isWithinInterval(today, { start: new Date(a.startDate), end: new Date(a.endDate) })
+                        const currentAssignment = selectedMachine.assignments.find(a => 
+                            a.moldId && isWithinInterval(today, { start: new Date(a.startDate), end: new Date(a.endDate) })
                         );
-                        if (currentAssignment) {
-                            setMoldId(currentAssignment.moldId);
-                        } else {
-                            setMoldId('');
-                        }
+                        setMoldId(currentAssignment?.moldId || '');
+                        setPieceId('');
                     } else {
                        setMoldId('');
+                       setPieceId('');
                     }
                 }
             } else {
                 setExistingProduction(null);
                 setMoldId('');
+                setPieceId('');
             }
         }
         checkForExisting();
-    }, [turno, machineId, firestore, production, machines]);
+    }, [turno, machineId, firestore, production, selectedMachine]);
 
     useEffect(() => {
         // Update quantity for active field when currentInput changes
@@ -187,35 +194,42 @@ export default function ProductionPage() {
             return;
         }
 
-        const pieceId = molds?.find(m => m.id === moldId)?.pieces[0];
-        if (!pieceId) {
-            toast({ title: "Error", description: "El molde seleccionado no tiene una pieza asociada.", variant: "destructive" });
+        let finalPieceId = pieceId;
+        if (selectedMachine?.type === 'inyectora') {
+            finalPieceId = molds?.find(m => m.id === moldId)?.pieces[0] || '';
+        }
+
+        if (!finalPieceId) {
+            toast({ title: "Error", description: "La pieza no está asociada al molde/referencia seleccionado.", variant: "destructive" });
             return;
         }
 
         setIsSaving(true);
         
         try {
+             const productionData: Partial<Production> = {
+                ...prodQuantities,
+                turno: turno as Production['turno'],
+                machineId,
+                pieceId: finalPieceId,
+                moldId: selectedMachine?.type === 'inyectora' ? moldId : '', // Store moldId only for injection
+                createdBy: user.uid,
+                fechaISO: new Date().toISOString(),
+             };
+
              if (existingProduction) {
                 // Update existing document
                 const docRef = doc(firestore, 'production', existingProduction.id);
-                await updateDoc(docRef, prodQuantities);
+                await updateDoc(docRef, productionData);
                 toast({ title: "Éxito", description: "Producción actualizada correctamente." });
             } else {
                 // Create new document
-                const productionData: Omit<Production, 'id'> = {
-                    turno,
-                    machineId,
-                    moldId,
-                    pieceId,
-                    ...prodQuantities,
-                    qtySegregada: 0,
-                    createdBy: user.uid,
+                 const fullProductionData: Omit<Production, 'id'> = {
+                    ...productionData,
                     inspeccionadoCalidad: false,
-                    fechaISO: new Date().toISOString(),
-                };
-                
-                await addDoc(collection(firestore, "production"), productionData);
+                    qtySegregada: 0,
+                 } as Omit<Production, 'id'>;
+                await addDoc(collection(firestore, "production"), fullProductionData);
                 toast({ title: "Éxito", description: "Producción declarada correctamente." });
             }
 
@@ -278,7 +292,7 @@ export default function ProductionPage() {
         }
     };
     
-    const isStep1Valid = turno && machineId && moldId;
+    const isStep1Valid = turno && machineId && (selectedMachine?.type === 'inyectora' ? moldId : pieceId);
     const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap;
     const totalSegregada = (existingProduction?.qtySegregada || 0);
     const totalDeclared = totalDeclaredInSession + totalSegregada;
@@ -409,15 +423,31 @@ export default function ProductionPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="flex flex-col gap-4">
-                                <h3 className="text-xl font-semibold text-center">3. Selecciona Molde</h3>
-                                <Select onValueChange={setMoldId} value={moldId} disabled={!!existingProduction || !!machines?.find(m=>m.id === machineId)?.moldAssignments?.some(a => isWithinInterval(new Date(), { start: new Date(a.startDate), end: new Date(a.endDate) }))}>
-                                    <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
-                                    <SelectContent>
-                                        {molds?.map(m => <SelectItem key={m.id} value={m.id} className="text-lg h-12">{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+
+                            {selectedMachine?.type === 'inyectora' && (
+                                <div className="flex flex-col gap-4">
+                                    <h3 className="text-xl font-semibold text-center">3. Selecciona Molde</h3>
+                                    <Select onValueChange={setMoldId} value={moldId} disabled={!!existingProduction || !!selectedMachine?.assignments?.some(a => isWithinInterval(new Date(), { start: new Date(a.startDate), end: new Date(a.endDate) }))}>
+                                        <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
+                                        <SelectContent>
+                                            {molds?.map(m => <SelectItem key={m.id} value={m.id} className="text-lg h-12">{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+
+                             {selectedMachine?.type === 'granalladora' && (
+                                <div className="flex flex-col gap-4">
+                                    <h3 className="text-xl font-semibold text-center">3. Selecciona Referencia</h3>
+                                    <Select onValueChange={setPieceId} value={pieceId} disabled={!!existingProduction}>
+                                        <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige una referencia..." /></SelectTrigger>
+                                        <SelectContent>
+                                            {pieces?.filter(p => p.requiereGranallado).map(p => <SelectItem key={p.id} value={p.id} className="text-lg h-12">{p.codigo}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+
                         </div>
                         {existingProduction && (
                             <div className="text-center bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-md text-yellow-800 dark:text-yellow-200">
@@ -471,7 +501,11 @@ export default function ProductionPage() {
                             <CardContent className="text-lg space-y-4">
                                <p><strong>Turno:</strong> <span className="capitalize">{turno}</span></p>
                                <p><strong>Máquina:</strong> {getMachineName(machineId)}</p>
-                               <p><strong>Molde:</strong> {getMoldName(moldId)} ({getPieceCode(molds?.find(m=>m.id === moldId)?.pieces[0] || '')})</p>
+                               {selectedMachine?.type === 'inyectora' ? (
+                                    <p><strong>Molde:</strong> {getMoldName(moldId)} ({getPieceCode(molds?.find(m=>m.id === moldId)?.pieces[0] || '')})</p>
+                               ) : (
+                                    <p><strong>Referencia:</strong> {getPieceCode(pieceId)}</p>
+                               )}
                                <hr/>
                                <div className="grid grid-cols-3 gap-x-8 gap-y-2 text-base">
                                   <h4 className="font-semibold col-span-1">Categoría</h4>
