@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, writeBatch, doc } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 
@@ -137,8 +137,8 @@ export default function StockPage() {
             const batch = writeBatch(firestore);
 
             // 1. Create the remito document
-            const remitoRef = collection(firestore, "remitos");
-            const newRemitoRef = addDoc(remitoRef, remitoData);
+            const remitoRef = doc(collection(firestore, "remitos"));
+            batch.set(remitoRef, remitoData);
 
             const productionRef = collection(firestore, "production");
 
@@ -148,6 +148,7 @@ export default function StockPage() {
                 const piece = pieces?.find(p => p.id === item.pieceId);
 
                 // Create positive record for "En Mecanizado"
+                 const positiveProdRef = doc(productionRef);
                 const positiveProdData = {
                     fechaISO: new Date().toISOString(),
                     machineId: 'subproceso-externo',
@@ -162,9 +163,10 @@ export default function StockPage() {
                     subproceso: 'mecanizado',
                     createdBy: 'system',
                 };
-                batch.set(addDoc(productionRef, {}).ref, positiveProdData);
+                batch.set(positiveProdRef, positiveProdData);
 
                 // Create negative record for "Listo"
+                const negativeProdRef = doc(productionRef);
                 const negativeProdData = {
                      fechaISO: new Date().toISOString(),
                     machineId: 'subproceso-externo',
@@ -178,7 +180,7 @@ export default function StockPage() {
                     inspeccionadoCalidad: true,
                     createdBy: 'system',
                 };
-                batch.set(addDoc(productionRef, {}).ref, negativeProdData);
+                batch.set(negativeProdRef, negativeProdData);
             });
 
             await batch.commit();
@@ -317,7 +319,7 @@ export default function StockPage() {
             <Dialog open={isRemitoDialogOpen} onOpenChange={setIsRemitoDialogOpen}>
                 <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Crear Remito de Mecanizado</DialogTitle>
+                        <DialogTitle>Enviar a Mecanizado</DialogTitle>
                         <DialogDescription>Genera un nuevo remito para enviar piezas a un proveedor externo.</DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleCreateRemito}>
