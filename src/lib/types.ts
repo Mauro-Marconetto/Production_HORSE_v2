@@ -12,6 +12,7 @@ export interface Piece {
   stockMin?: number;
   stockMax?: number;
   requiereGranallado?: boolean;
+  requiereMecanizado?: boolean;
 }
 
 export interface Mold {
