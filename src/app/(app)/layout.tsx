@@ -57,7 +57,7 @@ const allNavItems = [
   { href: "/pieces", icon: Package, label: "Piezas" },
   { href: "/clients", icon: Building, label: "Clientes" },
   { href: "/production", icon: LineChart, label: "Producción" },
-  { href: "/subprocesses", icon: Workflow, label: "Subprocesos" },
+  { href: "/machining", icon: Wrench, label: "Mecanizado" },
   { href: "/downtime", icon: Wrench, label: "Inactividad" },
   { href: "/quality", icon: ShieldCheck, label: "Calidad" },
   { href: "/scrap-history", icon: History, label: "Historial Scrap" },
