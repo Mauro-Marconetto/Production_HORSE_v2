@@ -71,8 +71,8 @@ export default function RemitoPage() {
                             <p>Tel: +54 3492 440315</p>
                         </div>
                     </div>
-                    <div className="flex justify-center items-start">
-                        <div className="flex items-center justify-center h-16 w-16 border-2 border-black">
+                    <div className="flex flex-col items-center">
+                         <div className="flex items-center justify-center h-16 w-16 border-2 border-black">
                             <span className="text-5xl font-bold">R</span>
                         </div>
                     </div>
