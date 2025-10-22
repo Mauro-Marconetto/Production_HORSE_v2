@@ -39,6 +39,7 @@ import { DateRange } from 'react-day-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Wind } from 'lucide-react';
 
 export default function AdminMachinesPage() {
   const firestore = useFirestore();
@@ -460,7 +461,7 @@ export default function AdminMachinesPage() {
                             <Select value={assignmentPieceId} onValueChange={setAssignmentPieceId}>
                                 <SelectTrigger><SelectValue placeholder="Elige una pieza..." /></SelectTrigger>
                                 <SelectContent>
-                                    {pieces?.map(p => (
+                                    {pieces?.filter(p => p.requiereGranallado).map(p => (
                                         <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>
                                     ))}
                                 </SelectContent>
