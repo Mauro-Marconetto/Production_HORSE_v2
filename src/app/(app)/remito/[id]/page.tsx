@@ -10,6 +10,141 @@ import { Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 
+const RemitoCopy = ({ remito, supplier, pieces, settings, copyType }: { remito: Remito, supplier: Supplier | null, pieces: Piece[] | null, settings: RemitoSettings | null, copyType: 'ORIGINAL' | 'DUPLICADO' | 'TRIPLICADO' }) => {
+    const remitoNumberString = remito.numero ? remito.numero.toString().padStart(8, '0') : 'N/A';
+    const remitoNumber = `0008-${remitoNumberString}`;
+    const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
+
+    return (
+        <div className="max-w-4xl mx-auto bg-white p-4 sm:p-8 border border-gray-300 rounded-md print:border-none print:shadow-none flex flex-col h-[1056px] print:break-after-page">
+            <header className="grid grid-cols-3 gap-4 pb-4 border-b border-gray-300">
+                <div className="flex flex-col">
+                    <Image src="/logo.png" alt="ForgeFlow Logo" width={200} height={40} className="mb-4"/>
+                    <div className="text-xs">
+                        <p className="font-bold">HORSE ARGENTINA S.A.</p>
+                        <p>Parque Industrial</p>
+                        <p>Rafaela (S2300), Santa Fe, Argentina</p>
+                        <p>Tel: +54 3492 440315</p>
+                    </div>
+                </div>
+                <div className="flex flex-col items-center justify-start pt-4">
+                        <div className="flex items-center justify-center h-16 w-16 border-2 border-black">
+                        <span className="text-5xl font-bold">R</span>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <h1 className="text-xl font-bold">REMITO</h1>
+                    <p className="text-sm">N°: <span className="font-mono">{remitoNumber}</span></p>
+                    <p className="text-sm">Fecha: <span className="font-mono">{new Date(remito.fecha).toLocaleDateString('es-AR')}</span></p>
+                    <div className="mt-4 text-xs">
+                        <p>CUIT: 30-70828551-3</p>
+                        <p>Ing. Brutos: 20-70828551-0</p>
+                        <p>Inicio Actividades: 05/2003</p>
+                    </div>
+                </div>
+            </header>
+
+            <section className="grid grid-cols-2 gap-4 my-4 pb-4 border-b border-gray-300 text-sm">
+                <div>
+                    <h2 className="font-bold mb-1">Destinatario:</h2>
+                    <p className="font-semibold">{supplier?.nombre}</p>
+                    <p>{supplier?.direccion}</p>
+                    <p>CUIT: {supplier?.cuit}</p>
+                </div>
+                    <div>
+                    <h2 className="font-bold mb-1">Transportista:</h2>
+                    <p><span className="font-semibold">{remito.transportista}</span></p>
+                    <p>{remito.vehiculo}</p>
+                    {remito.transportistaCuit && <p>C.U.I.T.: {remito.transportistaCuit}</p>}
+                </div>
+            </section>
+
+            <section className="my-4 flex-grow">
+                <table className="w-full text-sm">
+                    <thead className="border-b border-gray-400">
+                        <tr className="text-left">
+                            <th className="p-2 w-1/4">Código</th>
+                            <th className="p-2 w-1/2">Descripción</th>
+                            <th className="p-2 w-1/4 text-right">Cantidad</th>
+                        </tr>
+                    </thead>
+                    <tbody className="min-h-[500px]">
+                        {remito.items.map((item, index) => {
+                            const piece = pieces?.find(p => p.id === item.pieceId);
+                            return (
+                            <tr key={index} className="border-b border-gray-200 align-top">
+                                <td className="p-2 font-mono">{piece?.codigo || 'N/A'}</td>
+                                <td className="p-2">{piece ? `Pieza ${piece.codigo}` : ''}</td>
+                                <td className="p-2 text-right font-mono">{item.qty.toLocaleString('es-AR')}</td>
+                            </tr>
+                            )
+                        })}
+                    </tbody>
+                </table>
+            </section>
+
+                <footer className="mt-auto pt-4 text-xs">
+                <div className="border-t border-gray-400 pt-2 text-center">
+                    <p><span className="font-bold">IMPORTANTE:</span> CUALQUIER RECLAMO POR CANTIDAD, DETERIORO, ETC. DEBERA HACERSE EN FORMA INMEDIATA AL TRANSPORTISTA O A MAS TARDAR DENTRO DE LAS 24 HS. DE RECIBIDA LA MERCADERIA</p>
+                </div>
+                <div className="mt-2 border-2 border-black grid grid-cols-4">
+                    {/* Headers */}
+                    <div className="border-r border-black text-center font-bold p-1">AUTORIZADO POR</div>
+                    <div className="border-r border-black text-center font-bold p-1">DESPACHADO POR</div>
+                    <div className="border-r border-black text-center font-bold p-1">CONTROL PROTECCION PLANTA</div>
+                    <div className="text-center font-bold p-1">RECIBO AUTORIZADO</div>
+
+                    {/* First row of content */}
+                    <div className="border-t border-r border-black h-20"></div>
+                    <div className="border-t border-r border-black grid grid-cols-2">
+                        <div className="border-r border-black p-1">LEGAJO</div>
+                        <div className="p-1">FIRMA</div>
+                    </div>
+                    <div className="border-t border-r border-black grid grid-cols-2">
+                        <div className="border-r border-black p-1">LEGAJO</div>
+                        <div className="p-1">FIRMA</div>
+                    </div>
+                    <div className="border-t border-black grid grid-cols-2">
+                        <div className="border-r border-black p-1">DOC.ID.</div>
+                        <div className="p-1">FIRMA</div>
+                    </div>
+                    
+                    {/* Second row of content */}
+                    <div className="border-t border-r border-black grid grid-cols-2 h-20">
+                        <div className="border-r border-black p-1">ACLARACION</div>
+                        <div className="p-1">FECHA</div>
+                    </div>
+                    <div className="border-t border-r border-black grid grid-cols-2">
+                        <div className="border-r border-black p-1">FECHA</div>
+                        <div className="p-1">ACLARACION</div>
+                    </div>
+                    <div className="border-t border-r border-black grid grid-cols-2">
+                        <div className="border-r border-black p-1">FECHA</div>
+                        <div className="p-1">ACLARACION</div>
+                    </div>
+                    <div className="border-t border-black grid grid-cols-2">
+                        <div className="border-r border-black p-1">FECHA</div>
+                        <div className="p-1">ACLARACION</div>
+                    </div>
+                </div>
+                <div className="flex justify-between mt-1">
+                    <div>
+                        <span className="font-bold">F-66-1</span>
+                        <span className="ml-4 font-bold">{copyType}</span>
+                    </div>
+                    {settings && (
+                        <div className="text-right">
+                            <p>C.A.I. N°: {settings.cai}</p>
+                            <p>Fecha Vencimiento: {new Date(settings.caiExpiration).toLocaleDateString('es-AR')}</p>
+                        </div>
+                    )}
+                </div>
+            </footer>
+        </div>
+    );
+}
+
+
 export default function RemitoPage() {
     const { id: remitoId } = useParams();
     const firestore = useFirestore();
@@ -30,8 +165,6 @@ export default function RemitoPage() {
 
     const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'remitos') : null, [firestore]);
     const { data: settings, isLoading: isLoadingSettings } = useDoc<RemitoSettings>(settingsRef);
-
-    const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
 
     const isLoading = isLoadingRemito || isLoadingSupplier || isLoadingPieces || isLoadingSettings;
 
@@ -54,141 +187,18 @@ export default function RemitoPage() {
             </div>
         );
     }
-    
-    const remitoNumberString = remito.numero ? remito.numero.toString().padStart(8, '0') : 'N/A';
-    const remitoNumber = `0008-${remitoNumberString}`;
 
     return (
         <div className="min-h-screen bg-gray-100 text-black p-4 sm:p-8 print:bg-white print:p-0">
-             <div className="max-w-4xl mx-auto bg-white p-4 sm:p-8 border border-gray-300 rounded-md print:border-none print:shadow-none flex flex-col h-[1056px]">
-                <header className="grid grid-cols-3 gap-4 pb-4 border-b border-gray-300">
-                    <div className="flex flex-col">
-                        <Image src="/logo.png" alt="ForgeFlow Logo" width={200} height={40} className="mb-4"/>
-                        <div className="text-xs">
-                            <p className="font-bold">HORSE ARGENTINA S.A.</p>
-                            <p>Parque Industrial</p>
-                            <p>Rafaela (S2300), Santa Fe, Argentina</p>
-                            <p>Tel: +54 3492 440315</p>
-                        </div>
-                    </div>
-                    <div className="flex flex-col items-center justify-start pt-4">
-                         <div className="flex items-center justify-center h-16 w-16 border-2 border-black">
-                            <span className="text-5xl font-bold">R</span>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <h1 className="text-xl font-bold">REMITO</h1>
-                        <p className="text-sm">N°: <span className="font-mono">{remitoNumber}</span></p>
-                        <p className="text-sm">Fecha: <span className="font-mono">{new Date(remito.fecha).toLocaleDateString('es-AR')}</span></p>
-                        <div className="mt-4 text-xs">
-                            <p>CUIT: 30-70828551-3</p>
-                            <p>Ing. Brutos: 20-70828551-0</p>
-                            <p>Inicio Actividades: 05/2003</p>
-                        </div>
-                    </div>
-                </header>
-
-                <section className="grid grid-cols-2 gap-4 my-4 pb-4 border-b border-gray-300 text-sm">
-                    <div>
-                        <h2 className="font-bold mb-1">Destinatario:</h2>
-                        <p className="font-semibold">{supplier?.nombre}</p>
-                        <p>{supplier?.direccion}</p>
-                        <p>CUIT: {supplier?.cuit}</p>
-                    </div>
-                     <div>
-                        <h2 className="font-bold mb-1">Transportista:</h2>
-                        <p><span className="font-semibold">{remito.transportista}</span></p>
-                        <p>{remito.vehiculo}</p>
-                        {remito.transportistaCuit && <p>C.U.I.T.: {remito.transportistaCuit}</p>}
-                    </div>
-                </section>
-
-                <section className="my-4 flex-grow">
-                    <table className="w-full text-sm">
-                        <thead className="border-b border-gray-400">
-                            <tr className="text-left">
-                                <th className="p-2 w-1/4">Código</th>
-                                <th className="p-2 w-1/2">Descripción</th>
-                                <th className="p-2 w-1/4 text-right">Cantidad</th>
-                            </tr>
-                        </thead>
-                        <tbody className="min-h-[500px]">
-                            {remito.items.map((item, index) => {
-                                const piece = pieces?.find(p => p.id === item.pieceId);
-                                return (
-                                <tr key={index} className="border-b border-gray-200 align-top">
-                                    <td className="p-2 font-mono">{piece?.codigo || 'N/A'}</td>
-                                    <td className="p-2">{piece ? `Pieza ${piece.codigo}` : ''}</td>
-                                    <td className="p-2 text-right font-mono">{item.qty.toLocaleString('es-AR')}</td>
-                                </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                </section>
-
-                 <footer className="mt-auto pt-4 text-xs">
-                    <div className="border-t border-gray-400 pt-2 text-center">
-                        <p><span className="font-bold">IMPORTANTE:</span> CUALQUIER RECLAMO POR CANTIDAD, DETERIORO, ETC. DEBERA HACERSE EN FORMA INMEDIATA AL TRANSPORTISTA O A MAS TARDAR DENTRO DE LAS 24 HS. DE RECIBIDA LA MERCADERIA</p>
-                    </div>
-                    <div className="mt-2 border-2 border-black grid grid-cols-4">
-                        {/* Headers */}
-                        <div className="border-r border-black text-center font-bold p-1">AUTORIZADO POR</div>
-                        <div className="border-r border-black text-center font-bold p-1">DESPACHADO POR</div>
-                        <div className="border-r border-black text-center font-bold p-1">CONTROL PROTECCION PLANTA</div>
-                        <div className="text-center font-bold p-1">RECIBO AUTORIZADO</div>
-
-                        {/* First row of content */}
-                        <div className="border-t border-r border-black h-20"></div>
-                        <div className="border-t border-r border-black grid grid-cols-2">
-                            <div className="border-r border-black p-1">LEGAJO</div>
-                            <div className="p-1">FIRMA</div>
-                        </div>
-                        <div className="border-t border-r border-black grid grid-cols-2">
-                            <div className="border-r border-black p-1">LEGAJO</div>
-                            <div className="p-1">FIRMA</div>
-                        </div>
-                        <div className="border-t border-black grid grid-cols-2">
-                            <div className="border-r border-black p-1">DOC.ID.</div>
-                            <div className="p-1">FIRMA</div>
-                        </div>
-                        
-                        {/* Second row of content */}
-                        <div className="border-t border-r border-black grid grid-cols-2 h-20">
-                            <div className="border-r border-black p-1">ACLARACION</div>
-                            <div className="p-1">FECHA</div>
-                        </div>
-                        <div className="border-t border-r border-black grid grid-cols-2">
-                            <div className="border-r border-black p-1">FECHA</div>
-                            <div className="p-1">ACLARACION</div>
-                        </div>
-                        <div className="border-t border-r border-black grid grid-cols-2">
-                            <div className="border-r border-black p-1">FECHA</div>
-                            <div className="p-1">ACLARACION</div>
-                        </div>
-                        <div className="border-t border-black grid grid-cols-2">
-                            <div className="border-r border-black p-1">FECHA</div>
-                            <div className="p-1">ACLARACION</div>
-                        </div>
-                    </div>
-                    <div className="flex justify-between mt-1">
-                        <div>
-                            <span className="font-bold">F-66-1</span>
-                            <span className="ml-4">ORIGINAL</span>
-                        </div>
-                        {settings && (
-                            <div className="text-right">
-                                <p>C.A.I. N°: {settings.cai}</p>
-                                <p>Fecha Vencimiento: {new Date(settings.caiExpiration).toLocaleDateString('es-AR')}</p>
-                            </div>
-                        )}
-                    </div>
-                </footer>
+             <div className="space-y-8 print:space-y-0">
+                <RemitoCopy remito={remito} supplier={supplier} pieces={pieces} settings={settings} copyType="ORIGINAL" />
+                <RemitoCopy remito={remito} supplier={supplier} pieces={pieces} settings={settings} copyType="DUPLICADO" />
+                <RemitoCopy remito={remito} supplier={supplier} pieces={pieces} settings={settings} copyType="TRIPLICADO" />
              </div>
              <div className="max-w-4xl mx-auto mt-4 flex justify-end print:hidden">
                 <Button onClick={handlePrint}>
                     <Printer className="mr-2 h-4 w-4"/>
-                    Imprimir Remito
+                    Imprimir Remito (x3)
                 </Button>
             </div>
         </div>
