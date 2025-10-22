@@ -14,6 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind } from "lucide-react";
 import type { Piece, Production } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 
 interface InventoryRow {
     piece: Piece;
@@ -31,14 +36,21 @@ export default function StockPage() {
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesCollection);
 
     const productionCollection = useMemoFirebase(() => firestore ? collection(firestore, 'production') : null, [firestore]);
-    const { data: allProduction, isLoading: isLoadingProduction } = useCollection<Production>(productionCollection);
+    const { data: initialProduction, isLoading: isLoadingProduction, forceRefresh } = useCollection<Production>(productionCollection);
+
+    const [allProduction, setAllProduction] = useState(initialProduction);
+    const [isSubprocessDialogOpen, setIsSubprocessDialogOpen] = useState(false);
+    const [subprocessForm, setSubprocessForm] = useState({ pieceId: '', process: '', quantity: '' });
+
+     useMemo(() => {
+        setAllProduction(initialProduction);
+    }, [initialProduction]);
     
     const inventoryData = useMemo((): InventoryRow[] => {
         if (!pieces || !allProduction) return [];
 
         const stockByState = new Map<string, { piece: Piece; stockInyectado: number; stockMecanizado: number; stockGranallado: number; stockListo: number; }>();
 
-        // Initialize map for each piece code
         pieces.forEach(p => {
              if (!stockByState.has(p.codigo)) {
                 stockByState.set(p.codigo, { 
@@ -51,7 +63,6 @@ export default function StockPage() {
             }
         });
         
-        // Accumulate stock from production records
         allProduction.forEach(prod => {
             const piece = pieces.find(p => p.id === prod.pieceId);
             if (piece && stockByState.has(piece.codigo)) {
@@ -65,38 +76,19 @@ export default function StockPage() {
                 } else {
                      entry.stockListo += finalizado;
                 }
-
-                // Unprocessed stock always adds to 'inyectado'
                 entry.stockInyectado += (prod.qtySinPrensar || 0) + (prod.qtyAptaSinPrensarCalidad || 0);
             }
         });
-        
-        // Subtract processed quantities from Inyectado
-        stockByState.forEach(entry => {
-            entry.stockInyectado -= (entry.stockMecanizado + entry.stockGranallado);
-             // Ensure it doesn't go below zero if data is inconsistent
-            entry.stockInyectado = Math.max(0, entry.stockInyectado);
-        });
 
-
-        // Transform the map into an array of rows
         const rows: InventoryRow[] = [];
-        stockByState.forEach((data, pieceCode) => {
+        stockByState.forEach((data) => {
             const totalStock = data.stockInyectado + data.stockMecanizado + data.stockGranallado + data.stockListo;
             
-            if (data.stockInyectado > 0) {
-                rows.push({ piece: data.piece, state: 'Inyectado', stock: data.stockInyectado, totalStockForPiece: totalStock });
-            }
-            if (data.stockMecanizado > 0) {
-                rows.push({ piece: data.piece, state: 'Mecanizado', stock: data.stockMecanizado, totalStockForPiece: totalStock });
-            }
-             if (data.stockGranallado > 0) {
-                rows.push({ piece: data.piece, state: 'Granallado', stock: data.stockGranallado, totalStockForPiece: totalStock });
-            }
-            if (data.stockListo > 0) {
-                rows.push({ piece: data.piece, state: 'Listo', stock: data.stockListo, totalStockForPiece: totalStock });
-            }
-            // If a piece has no stock anywhere, show a single 'Listo' row with 0 stock.
+            if (data.stockInyectado > 0) rows.push({ piece: data.piece, state: 'Inyectado', stock: data.stockInyectado, totalStockForPiece: totalStock });
+            if (data.stockMecanizado > 0) rows.push({ piece: data.piece, state: 'Mecanizado', stock: data.stockMecanizado, totalStockForPiece: totalStock });
+            if (data.stockGranallado > 0) rows.push({ piece: data.piece, state: 'Granallado', stock: data.stockGranallado, totalStockForPiece: totalStock });
+            if (data.stockListo > 0) rows.push({ piece: data.piece, state: 'Listo', stock: data.stockListo, totalStockForPiece: totalStock });
+            
             if (totalStock === 0) {
                  rows.push({ piece: data.piece, state: 'Listo', stock: 0, totalStockForPiece: 0 });
             }
@@ -106,6 +98,56 @@ export default function StockPage() {
     }, [pieces, allProduction]);
     
     const isLoading = isLoadingPieces || isLoadingProduction;
+
+    const handleSendToSubprocess = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const { pieceId, process, quantity } = subprocessForm;
+        const qty = Number(quantity);
+
+        const pieceCode = pieces?.find(p => p.id === pieceId)?.codigo;
+        const listoRow = inventoryData.find(d => d.piece.id === pieceId && d.state === 'Listo');
+        const stockListo = listoRow?.stock || 0;
+
+        if (qty > stockListo) {
+            toast({ title: "Error de Stock", description: `No hay suficiente stock "Listo" para la pieza ${pieceCode}. Disponible: ${stockListo}`, variant: "destructive" });
+            return;
+        }
+
+        const mockProdSalida: Production = {
+            id: `mock-out-${Date.now()}`,
+            fechaISO: new Date().toISOString(),
+            machineId: 'stock-transfer',
+            pieceId: pieceId,
+            moldId: '',
+            turno: '',
+            qtyFinalizada: -qty, // Negative quantity to decrease stock
+            qtySinPrensar: 0,
+            qtyScrap: 0,
+            qtySegregada: 0,
+            inspeccionadoCalidad: true,
+        };
+
+        const mockProdEntrada: Production = {
+            id: `mock-in-${Date.now()}`,
+            fechaISO: new Date().toISOString(),
+            machineId: 'stock-transfer',
+            pieceId: pieceId,
+            moldId: '',
+            turno: '',
+            qtyFinalizada: qty, // Positive quantity for the new state
+            qtySinPrensar: 0,
+            qtyScrap: 0,
+            qtySegregada: 0,
+            subproceso: process as 'mecanizado' | 'granallado',
+            inspeccionadoCalidad: true,
+        };
+
+        setAllProduction(prev => [...(prev || []), mockProdSalida, mockProdEntrada]);
+        
+        toast({ title: "Éxito", description: `${qty.toLocaleString()} unidades de ${pieceCode} enviadas a ${process}.`});
+        setIsSubprocessDialogOpen(false);
+        setSubprocessForm({ pieceId: '', process: '', quantity: '' });
+    };
 
     const getStateBadgeVariant = (state: InventoryRow['state']) => {
         switch(state) {
@@ -125,8 +167,8 @@ export default function StockPage() {
                     <p className="text-muted-foreground">Monitoriza los niveles de stock en tiempo real en cada etapa del proceso.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline">
-                        <Wrench className="mr-2 h-4 w-4" /> Enviar para Mecanizado
+                    <Button variant="outline" onClick={() => setIsSubprocessDialogOpen(true)}>
+                        <Wrench className="mr-2 h-4 w-4" /> Enviar a Subproceso
                     </Button>
                 </div>
             </div>
@@ -155,7 +197,7 @@ export default function StockPage() {
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!isLoading && inventoryData.map(({ piece, state, stock, totalStockForPiece }, index) => {
+                            {!isLoading && inventoryData.map(({ piece, state, stock, totalStockForPiece }) => {
                                 const stockMin = piece.stockMin || 0;
                                 const stockMax = piece.stockMax || 1;
 
@@ -208,6 +250,47 @@ export default function StockPage() {
                     </Table>
                 </CardContent>
             </Card>
+
+            <Dialog open={isSubprocessDialogOpen} onOpenChange={setIsSubprocessDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Enviar Stock a Subproceso</DialogTitle>
+                        <DialogDescription>Mueve unidades del stock "Listo" a un proceso secundario como mecanizado o granallado.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSendToSubprocess}>
+                        <div className="grid gap-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="sp-piece">Pieza a Mover</Label>
+                                <Select required value={subprocessForm.pieceId} onValueChange={(v) => setSubprocessForm(s => ({...s, pieceId: v}))}>
+                                    <SelectTrigger id="sp-piece"><SelectValue placeholder="Selecciona una pieza..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {pieces?.map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="sp-process">Subproceso de Destino</Label>
+                                <Select required value={subprocessForm.process} onValueChange={(v) => setSubprocessForm(s => ({...s, process: v}))}>
+                                    <SelectTrigger id="sp-process"><SelectValue placeholder="Selecciona un proceso..." /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="mecanizado">Mecanizado</SelectItem>
+                                        <SelectItem value="granallado">Granallado</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="sp-quantity">Cantidad a Mover</Label>
+                                <Input id="sp-quantity" type="number" required value={subprocessForm.quantity} onChange={(e) => setSubprocessForm(s => ({...s, quantity: e.target.value}))} />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setIsSubprocessDialogOpen(false)}>Cancelar</Button>
+                            <Button type="submit">Confirmar Envío</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
         </main>
     );
 }
