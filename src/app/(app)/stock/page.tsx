@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 
 interface InventoryRow {
     piece: Piece;
-    state: 'Inyectado' | 'Mecanizado' | 'En Mecanizado' | 'Granallado' | 'Listo';
+    state: 'Inyectado' | 'En Mecanizado' | 'Mecanizado' | 'Granallado' | 'Listo';
     stock: number;
     totalStockForPiece: number;
 }
@@ -75,7 +75,7 @@ export default function StockPage() {
             const piece = pieces.find(p => p.id === prod.pieceId);
             if (piece && stockByState.has(piece.codigo)) {
                 const entry = stockByState.get(piece.codigo)!;
-                const finalizado = (prod.qtyFinalizada || 0) + (prod.qtyAptaCalidad || 0);
+                const finalizado = (prod.qtyFinalizada || 0);
 
                 if (prod.subproceso === 'mecanizado_ext') {
                     entry.stockEnMecanizado += finalizado;
@@ -119,7 +119,6 @@ export default function StockPage() {
             return;
         }
 
-        // Validate stock for each item
         for (const item of remitoItems) {
             const listoRow = inventoryData.find(d => d.piece.id === item.pieceId && d.state === 'Listo');
             const stockListo = listoRow?.stock || 0;
@@ -164,9 +163,12 @@ export default function StockPage() {
                     qtyFinalizada: item.qty,
                     qtySinPrensar: 0,
                     qtyScrap: 0,
+                    qtyAptaCalidad: 0,
+                    qtyAptaSinPrensarCalidad: 0,
+                    qtyScrapCalidad: 0,
                     qtySegregada: 0,
                     inspeccionadoCalidad: true,
-                    subproceso: 'mecanizado_ext',
+                    subproceso: 'mecanizado_ext' as const,
                     createdBy: 'system',
                 };
                 batch.set(positiveProdRef, positiveProdData);
@@ -181,6 +183,9 @@ export default function StockPage() {
                     qtyFinalizada: -item.qty,
                     qtySinPrensar: 0,
                     qtyScrap: 0,
+                    qtyAptaCalidad: 0,
+                    qtyAptaSinPrensarCalidad: 0,
+                    qtyScrapCalidad: 0,
                     qtySegregada: 0,
                     inspeccionadoCalidad: true,
                     createdBy: 'system',
@@ -427,4 +432,5 @@ export default function StockPage() {
 
         </main>
     );
-}
+
+    
