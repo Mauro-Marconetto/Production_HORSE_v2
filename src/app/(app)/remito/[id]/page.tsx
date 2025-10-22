@@ -23,9 +23,9 @@ const RemitoCopy = ({ remito, supplier, pieces, settings, copyType }: { remito: 
                     <Image src="/logo.png" alt="ForgeFlow Logo" width={200} height={40} className="mb-4"/>
                     <div className="text-xs">
                         <p className="font-bold">HORSE ARGENTINA S.A.</p>
-                        <p>Parque Industrial</p>
-                        <p>Rafaela (S2300), Santa Fe, Argentina</p>
-                        <p>Tel: +54 3492 440315</p>
+                        <p>La Voz del Interior Nº 6353</p>
+                        <p>Tel.:(0351) 4750127/4750142/475092</p>
+                        <p>I.V.A. Responsable Inscripto</p>
                     </div>
                 </div>
                 <div className="flex flex-col items-center justify-start pt-4">
@@ -34,12 +34,11 @@ const RemitoCopy = ({ remito, supplier, pieces, settings, copyType }: { remito: 
                     </div>
                 </div>
                 <div className="text-right">
-                    <h2>N°:{remitoNumber}</h2>
+                    <h2 className="font-bold">N°:{remitoNumber}</h2>
                     <p className="mt-4 text-sm">Fecha: <span className="font-mono">{remitoDate}</span></p>
                     <div className="mt-4 text-xs">
-                        <p>CUIT: 30-70828551-3</p>
-                        <p>Ing. Brutos: 20-70828551-0</p>
-                        <p>Inicio Actividades: 05/2003</p>
+                        <p>CUIT: 30-55756460-4</p>
+                        <p>Ing. Brutos: 30-55756460-4</p>
                     </div>
                 </div>
             </header>
@@ -55,7 +54,7 @@ const RemitoCopy = ({ remito, supplier, pieces, settings, copyType }: { remito: 
                     <h2 className="font-bold mb-1">Transportista:</h2>
                     <p><span className="font-semibold">{remito.transportista}</span></p>
                     <p>{remito.vehiculo}</p>
-                    {remito.transportistaCuit && <p>C.U.I.T.: {remito.transportistaCuit}</p>}
+                    {remito.transportistaCuit && <p>CUIT: {remito.transportistaCuit}</p>}
                 </div>
             </section>
 
