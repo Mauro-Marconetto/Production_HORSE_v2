@@ -72,6 +72,15 @@ export default function AdminMachinesPage() {
       setMachineType(selectedMachine?.type || 'inyectora');
     }
   }, [isDialogOpen, selectedMachine]);
+  
+  useEffect(() => {
+    if (selectedMachine && machines) {
+        const updatedMachine = machines.find(m => m.id === selectedMachine.id);
+        if (updatedMachine) {
+            setSelectedMachine(updatedMachine);
+        }
+    }
+  }, [machines, selectedMachine]);
 
   const openNewMachineDialog = () => {
     setSelectedMachine(null);
@@ -188,6 +197,14 @@ export default function AdminMachinesPage() {
     const machineDocRef = doc(firestore, 'machines', selectedMachine.id);
     let updatedAssignments = [...(selectedMachine.assignments || [])];
 
+    const newAssignmentData = {
+        startDate: assignmentDate.from.toISOString(),
+        endDate: assignmentDate.to.toISOString(),
+        ...(isInjection 
+            ? { moldId: assignmentMoldId, pieceId: null, qty: null } 
+            : { moldId: null, pieceId: assignmentPieceId, qty: assignmentQty })
+    };
+
     if (editingAssignmentId) {
         // Update existing assignment
         const assignmentIndex = updatedAssignments.findIndex(a => a.id === editingAssignmentId);
@@ -195,18 +212,14 @@ export default function AdminMachinesPage() {
             const currentAssignment = updatedAssignments[assignmentIndex];
             updatedAssignments[assignmentIndex] = {
                 ...currentAssignment,
-                ...(isInjection ? { moldId: assignmentMoldId, pieceId: null, qty: null } : { moldId: null, pieceId: assignmentPieceId, qty: assignmentQty }),
-                startDate: assignmentDate.from.toISOString(),
-                endDate: assignmentDate.to.toISOString(),
+                ...newAssignmentData
             }
         }
     } else {
         // Add new assignment
         const newAssignment: ProductionAssignment = {
             id: `ASGN-${Date.now()}`,
-            startDate: assignmentDate.from.toISOString(),
-            endDate: assignmentDate.to.toISOString(),
-            ...(isInjection ? { moldId: assignmentMoldId, pieceId: null, qty: null } : { moldId: null, pieceId: assignmentPieceId, qty: assignmentQty }),
+            ...newAssignmentData,
         };
         updatedAssignments.push(newAssignment);
     }
