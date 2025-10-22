@@ -151,14 +151,20 @@ export default function ProductionPage() {
                         qtyScrap: existing.qtyScrap || 0,
                     });
                 } else {
-                     setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 }); // Reset quantities
-                    if (selectedMachine?.type === 'inyectora' && selectedMachine.assignments) {
+                     setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
+                    if (selectedMachine?.assignments) {
                         const today = new Date();
                         const currentAssignment = selectedMachine.assignments.find(a => 
-                            a.moldId && isWithinInterval(today, { start: new Date(a.startDate), end: new Date(a.endDate) })
+                            isWithinInterval(today, { start: new Date(a.startDate), end: new Date(a.endDate) })
                         );
-                        setMoldId(currentAssignment?.moldId || '');
-                        setPieceId('');
+                        
+                        if (selectedMachine.type === 'inyectora') {
+                            setMoldId(currentAssignment?.moldId || '');
+                            setPieceId('');
+                        } else if (selectedMachine.type === 'granalladora') {
+                            setPieceId(currentAssignment?.pieceId || '');
+                            setMoldId('');
+                        }
                     } else {
                        setMoldId('');
                        setPieceId('');
@@ -191,7 +197,8 @@ export default function ProductionPage() {
     
     const handleGoToDeclaration = () => {
         setProdCurrentInput(''); // Reset keyboard input when moving to declaration step
-        setProdActiveField('qtyFinalizada'); // Set default active field
+        const defaultField = selectedMachine?.type === 'granalladora' ? 'qtyFinalizada' : 'qtyFinalizada';
+        setProdActiveField(defaultField); 
         setStep('declaration');
     }
 
@@ -307,6 +314,7 @@ export default function ProductionPage() {
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
     const getMoldName = (id: string) => molds?.find(m => m.id === id)?.nombre || 'N/A';
+    const isAssignmentActive = (machine: Machine | null) => machine?.assignments?.some(a => isWithinInterval(new Date(), { start: new Date(a.startDate), end: new Date(a.endDate) }));
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -434,7 +442,7 @@ export default function ProductionPage() {
                             {selectedMachine?.type === 'inyectora' && (
                                 <div className="flex flex-col gap-4">
                                     <h3 className="text-xl font-semibold text-center">3. Selecciona Molde</h3>
-                                    <Select onValueChange={setMoldId} value={moldId} disabled={!!existingProduction || !!selectedMachine?.assignments?.some(a => isWithinInterval(new Date(), { start: new Date(a.startDate), end: new Date(a.endDate) }))}>
+                                    <Select onValueChange={setMoldId} value={moldId} disabled={!!existingProduction || isAssignmentActive(selectedMachine)}>
                                         <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
                                         <SelectContent>
                                             {molds?.map(m => <SelectItem key={m.id} value={m.id} className="text-lg h-12">{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}
@@ -446,7 +454,7 @@ export default function ProductionPage() {
                              {selectedMachine?.type === 'granalladora' && (
                                 <div className="flex flex-col gap-4">
                                     <h3 className="text-xl font-semibold text-center">3. Selecciona Referencia</h3>
-                                    <Select onValueChange={setPieceId} value={pieceId} disabled={!!existingProduction}>
+                                    <Select onValueChange={setPieceId} value={pieceId} disabled={!!existingProduction || isAssignmentActive(selectedMachine)}>
                                         <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige una referencia..." /></SelectTrigger>
                                         <SelectContent>
                                             {pieces?.filter(p => p.requiereGranallado).map(p => <SelectItem key={p.id} value={p.id} className="text-lg h-12">{p.codigo}</SelectItem>)}
@@ -666,3 +674,5 @@ export default function ProductionPage() {
     </main>
   );
 }
+
+    
