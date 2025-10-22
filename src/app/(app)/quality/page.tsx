@@ -366,12 +366,14 @@ export default function QualityPage() {
                     <TableCell>{p.nroRack}</TableCell>
                     <TableCell className="text-right font-bold text-lg">{p.qtySegregada.toLocaleString()}</TableCell>
                     <TableCell className="text-center">
-                       <Button variant="outline" size="sm" className="mr-2" onClick={() => setLotToEdit(p)}>
-                           <Edit className="mr-2 h-4 w-4" /> Detalles
-                       </Button>
-                      <Button onClick={() => setSelectedProduction(p)}>
-                        <Check className="mr-2 h-4 w-4" /> Inspeccionar
-                      </Button>
+                        <div className="flex flex-col md:flex-row gap-2 justify-center items-center">
+                            <Button variant="outline" size="sm" onClick={() => setLotToEdit(p)}>
+                                <Edit className="mr-2 h-4 w-4" /> Detalles
+                            </Button>
+                            <Button onClick={() => setSelectedProduction(p)}>
+                                <Check className="mr-2 h-4 w-4" /> Inspeccionar
+                            </Button>
+                        </div>
                     </TableCell>
                   </TableRow>
               ))}
