@@ -241,7 +241,7 @@ export default function AdminPiecesPage() {
                     <TableRow>
                         <TableHead>Pieza</TableHead>
                         <TableHead>Molde Asociado</TableHead>
-                        <TableHead>Máquinas Compatibles</TableHead>
+                        <TableHead>Inyectoras Compatibles</TableHead>
                         <TableHead>Subprocesos</TableHead>
                         <TableHead className="text-right">Stock Mín.</TableHead>
                         <TableHead className="text-right">Stock Máx.</TableHead>
@@ -381,10 +381,10 @@ export default function AdminPiecesPage() {
 
                         <div className="grid grid-cols-4 items-start gap-4">
                             <Label className="text-right pt-2">
-                                Máquinas Compatibles
+                                Inyectoras Compatibles
                             </Label>
                             <div className="col-span-3 grid grid-cols-2 gap-4 rounded-lg border p-4">
-                                {isLoadingMachines ? <p>Cargando máquinas...</p> : machines?.map(machine => (
+                                {isLoadingMachines ? <p>Cargando máquinas...</p> : machines?.filter(m => m.type === 'inyectora').map(machine => (
                                     <div key={machine.id} className="flex items-center space-x-2">
                                         <Checkbox
                                             id={`machine-${machine.id}`}
@@ -405,7 +405,7 @@ export default function AdminPiecesPage() {
                                         </label>
                                     </div>
                                 ))}
-                                {!isLoadingMachines && (!machines || machines.length === 0) && <p className="text-sm text-muted-foreground">No hay máquinas definidas. Créalas en la sección de Máquinas.</p>}
+                                {!isLoadingMachines && (!machines || machines.filter(m => m.type === 'inyectora').length === 0) && <p className="text-sm text-muted-foreground">No hay inyectoras definidas. Créalas en la sección de Máquinas.</p>}
                             </div>
                         </div>
 
