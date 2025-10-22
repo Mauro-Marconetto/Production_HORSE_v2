@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 
@@ -125,7 +125,7 @@ export default function StockPage() {
         }
 
         setIsSaving(true);
-
+        
         const remitoData: Omit<Remito, 'id'> = {
             ...remitoForm,
             fecha: new Date().toISOString(),
@@ -134,22 +134,64 @@ export default function StockPage() {
         };
 
         try {
-            await addDoc(collection(firestore, "remitos"), remitoData);
+            const batch = writeBatch(firestore);
+
+            // 1. Create the remito document
+            const remitoRef = collection(firestore, "remitos");
+            const newRemitoRef = addDoc(remitoRef, remitoData);
+
+            const productionRef = collection(firestore, "production");
+
+            // 2. For each item, create a negative production record to decrease "Listo" stock
+            // and a positive production record to increase "En Mecanizado" stock.
+            remitoItems.forEach(item => {
+                const piece = pieces?.find(p => p.id === item.pieceId);
+
+                // Create positive record for "En Mecanizado"
+                const positiveProdData = {
+                    fechaISO: new Date().toISOString(),
+                    machineId: 'subproceso-externo',
+                    pieceId: item.pieceId,
+                    moldId: '',
+                    turno: '',
+                    qtyFinalizada: item.qty,
+                    qtySinPrensar: 0,
+                    qtyScrap: 0,
+                    qtySegregada: 0,
+                    inspeccionadoCalidad: true,
+                    subproceso: 'mecanizado',
+                    createdBy: 'system',
+                };
+                batch.set(addDoc(productionRef, {}).ref, positiveProdData);
+
+                // Create negative record for "Listo"
+                const negativeProdData = {
+                     fechaISO: new Date().toISOString(),
+                    machineId: 'subproceso-externo',
+                    pieceId: item.pieceId,
+                    moldId: '',
+                    turno: '',
+                    qtyFinalizada: -item.qty,
+                    qtySinPrensar: 0,
+                    qtyScrap: 0,
+                    qtySegregada: 0,
+                    inspeccionadoCalidad: true,
+                    createdBy: 'system',
+                };
+                batch.set(addDoc(productionRef, {}).ref, negativeProdData);
+            });
+
+            await batch.commit();
             
-            // Here you would also create the negative production parts to update stock,
-            // for now, we'll just show a success toast.
-            
-            toast({ title: "Éxito", description: "Remito creado correctamente." });
+            toast({ title: "Éxito", description: "Remito creado y stock actualizado correctamente." });
             setIsRemitoDialogOpen(false);
             setRemitoForm({ supplierId: '', transportista: '', vehiculo: '' });
             setRemitoItems([]);
+            forceRefresh();
+
         } catch (error) {
-            const contextualError = new FirestorePermissionError({
-                path: 'remitos',
-                operation: 'create',
-                requestResourceData: remitoData,
-            });
-            errorEmitter.emit('permission-error', contextualError);
+             console.error('Error creating remito:', error);
+             toast({ title: 'Error', description: 'No se pudo crear el remito o actualizar el stock.', variant: 'destructive'});
         } finally {
             setIsSaving(false);
         }
