@@ -189,7 +189,7 @@ export default function StockPage() {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => setIsRemitoDialogOpen(true)}>
-                        <Wrench className="mr-2 h-4 w-4" /> Crear Remito de Mecanizado
+                        <Wrench className="mr-2 h-4 w-4" /> Enviar a Mecanizado
                     </Button>
                 </div>
             </div>
@@ -341,5 +341,7 @@ export default function StockPage() {
         </main>
     );
 }
+
+    
 
     
