@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { doc, collection } from 'firebase/firestore';
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import type { Remito, Supplier, Piece } from '@/lib/types';
+import type { Remito, Supplier, Piece, RemitoSettings } from '@/lib/types';
 import { Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
@@ -28,9 +28,12 @@ export default function RemitoPage() {
     const piecesRef = useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]);
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesRef);
 
+    const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'remitos') : null, [firestore]);
+    const { data: settings, isLoading: isLoadingSettings } = useDoc<RemitoSettings>(settingsRef);
+
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
 
-    const isLoading = isLoadingRemito || isLoadingSupplier || isLoadingPieces;
+    const isLoading = isLoadingRemito || isLoadingSupplier || isLoadingPieces || isLoadingSettings;
 
     const handlePrint = () => {
         window.print();
@@ -52,6 +55,8 @@ export default function RemitoPage() {
         );
     }
     
+    const remitoNumber = remito.numero?.toString().padStart(8, '0') || remito.id.slice(-8).toUpperCase();
+
     return (
         <div className="min-h-screen bg-white text-black p-4 sm:p-8 print:p-0">
              <div className="max-w-4xl mx-auto bg-white p-4 sm:p-8 border border-gray-300 rounded-md print:border-none print:shadow-none">
@@ -67,7 +72,7 @@ export default function RemitoPage() {
                     </div>
                     <div className="text-right">
                         <h1 className="text-3xl font-bold">REMITO</h1>
-                        <p className="text-sm">N°: <span className="font-mono">{remito.id.slice(-8).toUpperCase()}</span></p>
+                        <p className="text-sm">N°: <span className="font-mono">{remitoNumber}</span></p>
                         <p className="text-sm">Fecha: <span className="font-mono">{new Date(remito.fecha).toLocaleDateString('es-AR')}</span></p>
                         <div className="mt-4 text-xs">
                             <p>CUIT: 30-70828551-3</p>
@@ -124,7 +129,15 @@ export default function RemitoPage() {
                             </div>
                          </div>
                          <div className="flex flex-col justify-between">
-                             <p>Documento no válido como factura.</p>
+                             <div>
+                                <p>Documento no válido como factura.</p>
+                                {settings && (
+                                    <div className="mt-4">
+                                        <p>C.A.I. N°: {settings.cai}</p>
+                                        <p>Fecha Vencimiento: {new Date(settings.caiExpiration).toLocaleDateString('es-AR')}</p>
+                                    </div>
+                                )}
+                             </div>
                              <div className="pt-12">
                                 <div className="border-t border-gray-400 pt-1">Firma del receptor</div>
                             </div>

@@ -221,10 +221,17 @@ export interface RemitoItem {
 
 export interface Remito {
   id: string;
+  numero?: number;
   fecha: string; // ISO Date
   supplierId: string;
   transportista: string;
   vehiculo?: string;
   status: 'enviado' | 'en_proceso' | 'retornado_parcial' | 'retornado_completo';
   items: RemitoItem[];
+}
+
+export interface RemitoSettings {
+  nextRemitoNumber: number;
+  cai: string;
+  caiExpiration: string; // ISO Date string
 }

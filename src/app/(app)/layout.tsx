@@ -67,6 +67,7 @@ const adminNavItems = [
   { href: "/admin/users", icon: Users, label: "Usuarios" },
   { href: "/admin/roles", icon: Shield, label: "Roles" },
   { href: "/admin/suppliers", icon: Building, label: "Proveedores" },
+  { href: "/admin/settings", icon: Cog, label: "Configuración" },
 ];
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
