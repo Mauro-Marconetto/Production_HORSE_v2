@@ -15,6 +15,14 @@ import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind } from "luc
 import type { Piece, Production } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 
+interface InventoryData {
+    piece: Piece;
+    stockInyectado: number;
+    stockMecanizado: number;
+    stockGranallado: number;
+    stockListo: number;
+}
+
 export default function StockPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -25,14 +33,20 @@ export default function StockPage() {
     const productionCollection = useMemoFirebase(() => firestore ? collection(firestore, 'production') : null, [firestore]);
     const { data: allProduction, isLoading: isLoadingProduction } = useCollection<Production>(productionCollection);
     
-    const inventoryData = useMemo(() => {
+    const inventoryData = useMemo((): InventoryData[] => {
         if (!pieces || !allProduction) return [];
 
-        const pieceMap = new Map<string, { piece: Piece; stockListo: number; stockSinPrensar: number }>();
+        const pieceMap = new Map<string, InventoryData>();
 
         pieces.forEach(p => {
              if (!pieceMap.has(p.codigo)) {
-                pieceMap.set(p.codigo, { piece: p, stockListo: 0, stockSinPrensar: 0 });
+                pieceMap.set(p.codigo, { 
+                    piece: p, 
+                    stockInyectado: 0,
+                    stockMecanizado: 0,
+                    stockGranallado: 0,
+                    stockListo: 0 
+                });
             }
         });
         
@@ -40,8 +54,22 @@ export default function StockPage() {
             const piece = pieces.find(p => p.id === prod.pieceId);
             if (piece && pieceMap.has(piece.codigo)) {
                 const entry = pieceMap.get(piece.codigo)!;
-                entry.stockListo += (prod.qtyFinalizada || 0) + (prod.qtyAptaCalidad || 0);
-                entry.stockSinPrensar += (prod.qtySinPrensar || 0) + (prod.qtyAptaSinPrensarCalidad || 0);
+                const finalizado = (prod.qtyFinalizada || 0) + (prod.qtyAptaCalidad || 0);
+
+                if (prod.subproceso === 'mecanizado') {
+                    entry.stockMecanizado += finalizado;
+                } else if (prod.subproceso === 'granallado') {
+                    entry.stockGranallado += finalizado;
+                } else if (piece.requiereGranallado) { 
+                    // Si requiere granallado pero no viene de ese proceso, va a stock bruto
+                    entry.stockInyectado += finalizado;
+                }
+                else {
+                    entry.stockListo += finalizado;
+                }
+
+                // Las piezas sin prensar siempre son stock inyectado bruto
+                entry.stockInyectado += (prod.qtySinPrensar || 0) + (prod.qtyAptaSinPrensarCalidad || 0);
             }
         });
 
@@ -55,7 +83,7 @@ export default function StockPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-headline font-bold">Stock</h1>
-                    <p className="text-muted-foreground">Monitoriza los niveles de stock en tiempo real.</p>
+                    <p className="text-muted-foreground">Monitoriza los niveles de stock en tiempo real en cada etapa del proceso.</p>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline">
@@ -65,17 +93,19 @@ export default function StockPage() {
             </div>
             <Card>
                 <CardHeader>
-                    <CardTitle>Niveles de Stock Actuales</CardTitle>
-                    <CardDescription>Resumen de todas las piezas en stock, diferenciando entre stock listo y sin prensar. Los niveles Mín/Máx se configuran en el catálogo de piezas.</CardDescription>
+                    <CardTitle>Niveles de Stock por Etapa</CardTitle>
+                    <CardDescription>Resumen de todas las piezas en stock, diferenciando entre cada etapa del proceso productivo.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[250px]">Pieza</TableHead>
-                                <TableHead className="text-right">Stock Listo (OK)</TableHead>
-                                <TableHead className="text-right">Stock Sin Prensar</TableHead>
-                                <TableHead className="text-right">Stock Total</TableHead>
+                                <TableHead className="w-[150px]">Pieza</TableHead>
+                                <TableHead className="text-right">Inyectado (Bruto)</TableHead>
+                                <TableHead className="text-right">Mecanizado</TableHead>
+                                <TableHead className="text-right">Granallado</TableHead>
+                                <TableHead className="text-right">Listo (OK)</TableHead>
+                                <TableHead className="text-right font-bold">Stock Total</TableHead>
                                 <TableHead className="w-[200px] text-center">Mín / Máx</TableHead>
                                 <TableHead className="w-[200px] text-center">Capacidad</TableHead>
                                 <TableHead className="text-center">Estado</TableHead>
@@ -84,13 +114,13 @@ export default function StockPage() {
                         <TableBody>
                             {isLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center">
+                                    <TableCell colSpan={9} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {!isLoading && inventoryData.map(({ piece, stockListo, stockSinPrensar }) => {
-                                const totalStock = stockListo + stockSinPrensar;
+                            {!isLoading && inventoryData.map(({ piece, stockInyectado, stockMecanizado, stockGranallado, stockListo }) => {
+                                const totalStock = stockInyectado + stockMecanizado + stockGranallado + stockListo;
                                 const stockMin = piece.stockMin || 0;
                                 const stockMax = piece.stockMax || 1;
 
@@ -101,9 +131,11 @@ export default function StockPage() {
                                 return (
                                     <TableRow key={piece.id}>
                                         <TableCell className="font-medium">{piece.codigo}</TableCell>
+                                        <TableCell className="text-right">{stockInyectado.toLocaleString('es-ES')}</TableCell>
+                                        <TableCell className="text-right">{stockMecanizado.toLocaleString('es-ES')}</TableCell>
+                                        <TableCell className="text-right">{stockGranallado.toLocaleString('es-ES')}</TableCell>
                                         <TableCell className="text-right font-semibold">{stockListo.toLocaleString('es-ES')}</TableCell>
-                                        <TableCell className="text-right text-muted-foreground">{stockSinPrensar.toLocaleString('es-ES')}</TableCell>
-                                        <TableCell className="text-right font-bold">{totalStock.toLocaleString('es-ES')}</TableCell>
+                                        <TableCell className="text-right font-bold bg-muted/50">{totalStock.toLocaleString('es-ES')}</TableCell>
                                         <TableCell className="text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 <span className="font-mono text-sm">{stockMin.toLocaleString('es-ES')}</span>
@@ -130,7 +162,7 @@ export default function StockPage() {
                             })}
                             {!isLoading && inventoryData.length === 0 && (
                                  <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center">
+                                    <TableCell colSpan={9} className="h-24 text-center">
                                         No se encontraron piezas o datos de producción.
                                     </TableCell>
                                 </TableRow>

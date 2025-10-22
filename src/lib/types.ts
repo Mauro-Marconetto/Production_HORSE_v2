@@ -140,6 +140,7 @@ export interface Production {
   qtySinPrensar: number;
   qtyScrap: number;
   qtySegregada: number;
+  subproceso?: 'mecanizado' | 'granallado';
   createdBy?: string; // UID of user who declared production
   
   // Quality Segregation fields
