@@ -61,9 +61,6 @@ export default function StockPage() {
                     <Button variant="outline">
                         <Wrench className="mr-2 h-4 w-4" /> Enviar para Mecanizado
                     </Button>
-                    <Button variant="outline">
-                        <Wind className="mr-2 h-4 w-4" /> Enviar para Granallado
-                    </Button>
                 </div>
             </div>
             <Card>

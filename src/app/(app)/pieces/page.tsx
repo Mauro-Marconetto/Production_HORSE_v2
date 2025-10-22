@@ -35,6 +35,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from '@/components/ui/checkbox';
 import { MoreHorizontal, PlusCircle, Loader2, Trash2 } from 'lucide-react';
 import type { Piece, Mold, Machine } from '@/lib/types';
+import { Wind } from 'lucide-react';
 
 export default function AdminPiecesPage() {
     const firestore = useFirestore();
@@ -54,6 +55,7 @@ export default function AdminPiecesPage() {
     const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
     const [currentMoldName, setCurrentMoldName] = useState<string>('');
     const [compatibleMachines, setCompatibleMachines] = useState<string[]>([]);
+    const [requiereGranallado, setRequiereGranallado] = useState<boolean>(false);
     
     const isLoading = isLoadingPieces || isLoadingMolds || isLoadingMachines;
 
@@ -63,10 +65,12 @@ export default function AdminPiecesPage() {
                 const associatedMold = molds?.find(m => m.pieces.includes(selectedPiece.id));
                 setCurrentMoldName(associatedMold?.nombre || '');
                 setCompatibleMachines(associatedMold?.compatibilidad || []);
+                setRequiereGranallado(selectedPiece.requiereGranallado || false);
             } else {
                 // Reset for new piece
                 setCurrentMoldName('');
                 setCompatibleMachines([]);
+                setRequiereGranallado(false);
             }
         }
     }, [isDialogOpen, selectedPiece, molds]);
@@ -92,6 +96,7 @@ export default function AdminPiecesPage() {
         const moldNameFromInput = (formData.get('moldName') as string).trim();
         const stockMin = Number(formData.get('stockMin'));
         const stockMax = Number(formData.get('stockMax'));
+        const requiereGranalladoValue = formData.get('requiereGranallado') === 'on';
 
 
         if (!codigo || !moldNameFromInput) {
@@ -110,7 +115,8 @@ export default function AdminPiecesPage() {
                 codigo, 
                 clienteId: selectedPiece?.clienteId || '', // preserve client if exists
                 stockMin: stockMin || 0,
-                stockMax: stockMax || 0
+                stockMax: stockMax || 0,
+                requiereGranallado: requiereGranalladoValue,
             };
             batch.set(pieceDocRef, pieceData, { merge: true });
 
@@ -236,6 +242,7 @@ export default function AdminPiecesPage() {
                         <TableHead>Pieza</TableHead>
                         <TableHead>Molde Asociado</TableHead>
                         <TableHead>Máquinas Compatibles</TableHead>
+                        <TableHead>Subprocesos</TableHead>
                         <TableHead className="text-right">Stock Mín.</TableHead>
                         <TableHead className="text-right">Stock Máx.</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
@@ -244,7 +251,7 @@ export default function AdminPiecesPage() {
                     <TableBody>
                         {isLoading && (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">
+                                <TableCell colSpan={7} className="h-24 text-center">
                                     <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                                 </TableCell>
                             </TableRow>
@@ -275,6 +282,14 @@ export default function AdminPiecesPage() {
                                                 <span className="text-xs text-muted-foreground">No definido</span>
                                             )}
                                         </div>
+                                   </TableCell>
+                                   <TableCell>
+                                        {piece.requiereGranallado && (
+                                            <Badge variant="outline" className="flex items-center gap-1">
+                                                <Wind className="h-3 w-3"/>
+                                                Granallado
+                                            </Badge>
+                                        )}
                                    </TableCell>
                                     <TableCell className="text-right">{(piece.stockMin || 0).toLocaleString()}</TableCell>
                                     <TableCell className="text-right">{(piece.stockMax || 0).toLocaleString()}</TableCell>
@@ -325,7 +340,7 @@ export default function AdminPiecesPage() {
                         })}
                          {!isLoading && (!pieces || pieces.length === 0) && (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">
+                                <TableCell colSpan={7} className="h-24 text-center">
                                     No se encontraron piezas.
                                 </TableCell>
                             </TableRow>
@@ -393,6 +408,25 @@ export default function AdminPiecesPage() {
                                 {!isLoadingMachines && (!machines || machines.length === 0) && <p className="text-sm text-muted-foreground">No hay máquinas definidas. Créalas en la sección de Máquinas.</p>}
                             </div>
                         </div>
+
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label className="text-right">Subprocesos</Label>
+                            <div className="col-span-3 flex items-center space-x-2">
+                                <Checkbox
+                                    id="requiereGranallado"
+                                    name="requiereGranallado"
+                                    checked={requiereGranallado}
+                                    onCheckedChange={(checked) => setRequiereGranallado(Boolean(checked))}
+                                />
+                                <label
+                                    htmlFor="requiereGranallado"
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                    Requiere Granallado
+                                </label>
+                            </div>
+                        </div>
+
                     </div>
                     <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
@@ -407,5 +441,3 @@ export default function AdminPiecesPage() {
         </main>
     );
 }
-
-    

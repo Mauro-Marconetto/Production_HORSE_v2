@@ -11,6 +11,7 @@ export interface Piece {
   clienteId: string;
   stockMin?: number;
   stockMax?: number;
+  requiereGranallado?: boolean;
 }
 
 export interface Mold {
