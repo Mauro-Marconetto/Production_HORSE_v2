@@ -43,6 +43,8 @@ export interface Machine {
   OEE_obj: number;
   OEE_hist?: number;
   moldAssignments?: MoldAssignment[];
+  type: 'inyectora' | 'granalladora';
+  produccionHora: number;
 }
 
 export interface ProductionCapacity {

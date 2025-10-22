@@ -38,6 +38,7 @@ import { addDays, format, isWithinInterval } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 export default function AdminMachinesPage() {
   const firestore = useFirestore();
@@ -57,10 +58,17 @@ export default function AdminMachinesPage() {
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
 
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+  const [machineType, setMachineType] = useState<Machine['type'] | ''>('');
   
   const [assignmentDate, setAssignmentDate] = useState<DateRange | undefined>();
   const [assignmentMoldId, setAssignmentMoldId] = useState<string>("");
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isDialogOpen) {
+      setMachineType(selectedMachine?.type || 'inyectora');
+    }
+  }, [isDialogOpen, selectedMachine]);
 
   const openNewMachineDialog = () => {
     setSelectedMachine(null);
@@ -101,13 +109,16 @@ export default function AdminMachinesPage() {
     const formData = new FormData(e.currentTarget);
     
     const machineId = selectedMachine ? selectedMachine.id : `M${Date.now()}`;
+    const type = formData.get('type') as Machine['type'];
     const machineData: Omit<Machine, 'moldAssignments'> = {
       id: machineId,
       nombre: formData.get('nombre') as string,
-      tonelaje: Number(formData.get('tonelaje')),
-      turnosSemana: Number(formData.get('turnosSemana')),
-      horasTurno: Number(formData.get('horasTurno')),
-      OEE_obj: Number(formData.get('OEE_obj')) / 100, // Convert from % to decimal
+      type: type,
+      tonelaje: type === 'inyectora' ? Number(formData.get('tonelaje')) : 0,
+      turnosSemana: type === 'inyectora' ? Number(formData.get('turnosSemana')) : 0,
+      horasTurno: type === 'inyectora' ? Number(formData.get('horasTurno')) : 0,
+      OEE_obj: type === 'inyectora' ? Number(formData.get('OEE_obj')) / 100 : 0, // Convert from % to decimal
+      produccionHora: Number(formData.get('produccionHora')),
     };
 
     try {
@@ -252,23 +263,30 @@ export default function AdminMachinesPage() {
             <Card key={machine.id}>
               <CardHeader className="flex flex-row items-start justify-between">
                 <div>
-                  <CardTitle className="text-2xl">{machine.nombre}</CardTitle>
+                  <CardTitle className="text-2xl flex items-center gap-2">
+                    {machine.nombre}
+                    <Badge variant="outline" className="text-sm">{machine.type === 'inyectora' ? 'Inyectora' : 'Granalladora'}</Badge>
+                    </CardTitle>
                   <CardDescription>
-                    {currentMold ? (
-                        <>
-                        Molde actual: {currentMold.nombre}
-                        <span className="text-xs ml-2">
-                            (del {format(new Date(currentAssignment!.startDate), 'dd/MM/yy')} al {format(new Date(currentAssignment!.endDate), 'dd/MM/yy')})
-                        </span>
-                        </>
-                    ) : 'Sin molde programado'}
+                    {machine.type === 'inyectora' ? (
+                        currentMold ? (
+                            <>
+                            Molde actual: {currentMold.nombre}
+                            <span className="text-xs ml-2">
+                                (del {format(new Date(currentAssignment!.startDate), 'dd/MM/yy')} al {format(new Date(currentAssignment!.endDate), 'dd/MM/yy')})
+                            </span>
+                            </>
+                        ) : 'Sin molde programado'
+                    ) : 'Máquina de post-proceso'}
                   </CardDescription>
                 </div>
                 <div className="flex items-center">
-                    <Button variant="outline" size="sm" onClick={() => openSchedulerDialog(machine)}>
-                        <CalendarDays className="mr-2 h-4 w-4"/>
-                        Programar
-                    </Button>
+                    {machine.type === 'inyectora' && (
+                        <Button variant="outline" size="sm" onClick={() => openSchedulerDialog(machine)}>
+                            <CalendarDays className="mr-2 h-4 w-4"/>
+                            Programar
+                        </Button>
+                    )}
                     <AlertDialog>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -315,9 +333,14 @@ export default function AdminMachinesPage() {
               <CardContent>
                 <h4 className="mb-2 font-semibold text-muted-foreground">Datos Operativos</h4>
                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div><span className="font-medium">Tonelaje:</span> {machine.tonelaje}T</div>
-                    <div><span className="font-medium">Turnos/Semana:</span> {machine.turnosSemana}</div>
-                    <div><span className="font-medium">OEE Obj.:</span> {machine.OEE_obj * 100}%</div>
+                    {machine.type === 'inyectora' && (
+                        <>
+                            <div><span className="font-medium">Tonelaje:</span> {machine.tonelaje}T</div>
+                            <div><span className="font-medium">Turnos/Semana:</span> {machine.turnosSemana}</div>
+                            <div><span className="font-medium">OEE Obj.:</span> {machine.OEE_obj * 100}%</div>
+                        </>
+                    )}
+                    <div><span className="font-medium">Producción/Hora:</span> {machine.produccionHora} u/h</div>
                  </div>
               </CardContent>
             </Card>
@@ -339,22 +362,43 @@ export default function AdminMachinesPage() {
                 <Label htmlFor="nombre" className="text-right">Nombre</Label>
                 <Input id="nombre" name="nombre" defaultValue={selectedMachine?.nombre || ''} className="col-span-3" required />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="tonelaje" className="text-right">Tonelaje (T)</Label>
-                <Input id="tonelaje" name="tonelaje" type="number" defaultValue={selectedMachine?.tonelaje || ''} className="col-span-3" required />
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="type" className="text-right">Tipo</Label>
+                <Select name="type" value={machineType} onValueChange={(v) => setMachineType(v as Machine['type'])}>
+                    <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Selecciona un tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="inyectora">Inyectora</SelectItem>
+                        <SelectItem value="granalladora">Granalladora</SelectItem>
+                    </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="turnosSemana" className="text-right">Turnos/Semana</Label>
-                <Input id="turnosSemana" name="turnosSemana" type="number" defaultValue={selectedMachine?.turnosSemana || ''} className="col-span-3" required />
+                <Label htmlFor="produccionHora" className="text-right">Prod. por Hora</Label>
+                <Input id="produccionHora" name="produccionHora" type="number" defaultValue={selectedMachine?.produccionHora || ''} className="col-span-3" required />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="horasTurno" className="text-right">Horas/Turno</Label>
-                <Input id="horasTurno" name="horasTurno" type="number" defaultValue={selectedMachine?.horasTurno || ''} className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="OEE_obj" className="text-right">OEE Objetivo (%)</Label>
-                <Input id="OEE_obj" name="OEE_obj" type="number" defaultValue={(selectedMachine?.OEE_obj || 0) * 100} className="col-span-3" required min="0" max="100" />
-              </div>
+
+              {machineType === 'inyectora' && (
+                <>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="tonelaje" className="text-right">Tonelaje (T)</Label>
+                        <Input id="tonelaje" name="tonelaje" type="number" defaultValue={selectedMachine?.tonelaje || ''} className="col-span-3" required />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="turnosSemana" className="text-right">Turnos/Semana</Label>
+                        <Input id="turnosSemana" name="turnosSemana" type="number" defaultValue={selectedMachine?.turnosSemana || ''} className="col-span-3" required />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="horasTurno" className="text-right">Horas/Turno</Label>
+                        <Input id="horasTurno" name="horasTurno" type="number" defaultValue={selectedMachine?.horasTurno || ''} className="col-span-3" required />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="OEE_obj" className="text-right">OEE Objetivo (%)</Label>
+                        <Input id="OEE_obj" name="OEE_obj" type="number" defaultValue={(selectedMachine?.OEE_obj || 0) * 100} className="col-span-3" required min="0" max="100" />
+                    </div>
+                </>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>

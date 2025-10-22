@@ -170,6 +170,15 @@
           "type": "string",
           "description": "The name of the machine."
         },
+        "type": {
+            "type": "string",
+            "enum": ["inyectora", "granalladora"],
+            "description": "The type of the machine."
+        },
+        "produccionHora": {
+            "type": "number",
+            "description": "The production rate per hour for the machine."
+        },
         "tonelaje": {
           "type": "number",
           "description": "The tonnage of the machine."
@@ -194,6 +203,8 @@
       "required": [
         "id",
         "nombre",
+        "type",
+        "produccionHora",
         "tonelaje",
         "turnosSemana",
         "horasTurno",
