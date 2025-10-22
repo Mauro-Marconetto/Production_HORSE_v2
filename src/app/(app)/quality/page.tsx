@@ -49,7 +49,7 @@ const defectOptions = [
     "Pliegue",
     "Otros",
 ];
-const controlTypeOptions = ["Visual", "Dimensional", "Estanqueidad"];
+const controlTypeOptions = ["RX", "Dimensional", "Visual", "Composición Química"];
 
 export default function QualityPage() {
     const firestore = useFirestore();
@@ -255,6 +255,7 @@ export default function QualityPage() {
             qtyFinalizada: 0,
             qtySinPrensar: 0,
             qtyScrap: 0,
+            qtyArranque: 0,
             createdBy: user.uid,
             inspeccionadoCalidad: false,
             fechaISO: new Date().toISOString(),
