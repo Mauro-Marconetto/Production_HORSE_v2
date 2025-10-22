@@ -55,12 +55,13 @@ export default function RemitoPage() {
         );
     }
     
-    const remitoNumber = remito.numero?.toString().padStart(8, '0') || remito.id.slice(-8).toUpperCase();
+    const remitoNumberString = remito.numero?.toString().padStart(8, '0') || '00000000';
+    const remitoNumber = `0008-${remitoNumberString}`;
 
     return (
         <div className="min-h-screen bg-white text-black p-4 sm:p-8 print:p-0">
              <div className="max-w-4xl mx-auto bg-white p-4 sm:p-8 border border-gray-300 rounded-md print:border-none print:shadow-none">
-                <header className="flex justify-between items-start pb-4 border-b border-gray-300">
+                <header className="grid grid-cols-3 gap-4 pb-4 border-b border-gray-300">
                     <div className="flex flex-col">
                         <Image src="/logo.png" alt="ForgeFlow Logo" width={200} height={40} className="mb-4"/>
                         <div className="text-xs">
@@ -70,8 +71,13 @@ export default function RemitoPage() {
                             <p>Tel: +54 3492 440315</p>
                         </div>
                     </div>
+                    <div className="flex justify-center items-start">
+                        <div className="flex items-center justify-center h-16 w-16 border-2 border-black">
+                            <span className="text-5xl font-bold">R</span>
+                        </div>
+                    </div>
                     <div className="text-right">
-                        <h1 className="text-3xl font-bold">REMITO</h1>
+                        <h1 className="text-xl font-bold">REMITO</h1>
                         <p className="text-sm">N°: <span className="font-mono">{remitoNumber}</span></p>
                         <p className="text-sm">Fecha: <span className="font-mono">{new Date(remito.fecha).toLocaleDateString('es-AR')}</span></p>
                         <div className="mt-4 text-xs">

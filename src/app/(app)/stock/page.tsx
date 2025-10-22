@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, addDoc, serverTimestamp, writeBatch, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, writeBatch, doc, getDoc } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight } from "lucide-react";
-import type { Piece, Production, Supplier, Remito, RemitoItem } from "@/lib/types";
+import type { Piece, Production, Supplier, Remito, RemitoItem, RemitoSettings } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -132,15 +132,21 @@ export default function StockPage() {
 
         setIsSaving(true);
         
-        const remitoData: Omit<Remito, 'id'> = {
-            ...remitoForm,
-            fecha: new Date().toISOString(),
-            status: 'enviado',
-            items: remitoItems,
-        };
-
         try {
             const batch = writeBatch(firestore);
+            const settingsRef = doc(firestore, "settings", "remitos");
+            const settingsSnap = await getDoc(settingsRef);
+            const remitoSettings = settingsSnap.data() as RemitoSettings;
+            const currentRemitoNumber = remitoSettings.nextRemitoNumber || 1;
+            
+            const remitoData: Omit<Remito, 'id'> = {
+                ...remitoForm,
+                numero: currentRemitoNumber,
+                fecha: new Date().toISOString(),
+                status: 'enviado',
+                items: remitoItems,
+            };
+
             const remitosCollectionRef = collection(firestore, "remitos");
             const remitoRef = doc(remitosCollectionRef);
             batch.set(remitoRef, remitoData);
@@ -181,6 +187,8 @@ export default function StockPage() {
                 };
                 batch.set(negativeProdRef, negativeProdData);
             });
+            
+            batch.update(settingsRef, { nextRemitoNumber: currentRemitoNumber + 1 });
 
             await batch.commit();
             
