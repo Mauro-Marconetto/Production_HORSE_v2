@@ -141,7 +141,7 @@ export interface Production {
   qtyScrap: number;
   qtyArranque?: number;
   qtySegregada: number;
-  subproceso?: 'mecanizado' | 'granallado';
+  subproceso?: 'mecanizado' | 'granallado' | 'mecanizado_ext';
   createdBy?: string; // UID of user who declared production
   
   // Quality Segregation fields
@@ -228,5 +228,3 @@ export interface Remito {
   status: 'enviado' | 'en_proceso' | 'retornado_parcial' | 'retornado_completo';
   items: RemitoItem[];
 }
-
-    

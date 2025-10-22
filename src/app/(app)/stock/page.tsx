@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
@@ -23,7 +22,7 @@ import { Label } from "@/components/ui/label";
 
 interface InventoryRow {
     piece: Piece;
-    state: 'Inyectado' | 'Mecanizado' | 'Granallado' | 'Listo';
+    state: 'Inyectado' | 'Mecanizado' | 'En Mecanizado' | 'Granallado' | 'Listo';
     stock: number;
     totalStockForPiece: number;
 }
@@ -57,7 +56,7 @@ export default function StockPage() {
     const inventoryData = useMemo((): InventoryRow[] => {
         if (!pieces || !allProduction) return [];
 
-        const stockByState = new Map<string, { piece: Piece; stockInyectado: number; stockMecanizado: number; stockGranallado: number; stockListo: number; }>();
+        const stockByState = new Map<string, { piece: Piece; stockInyectado: number; stockMecanizado: number; stockEnMecanizado: number; stockGranallado: number; stockListo: number; }>();
 
         pieces.forEach(p => {
              if (!stockByState.has(p.codigo)) {
@@ -65,6 +64,7 @@ export default function StockPage() {
                     piece: p, 
                     stockInyectado: 0,
                     stockMecanizado: 0,
+                    stockEnMecanizado: 0,
                     stockGranallado: 0,
                     stockListo: 0 
                 });
@@ -77,7 +77,9 @@ export default function StockPage() {
                 const entry = stockByState.get(piece.codigo)!;
                 const finalizado = (prod.qtyFinalizada || 0) + (prod.qtyAptaCalidad || 0);
 
-                if (prod.subproceso === 'mecanizado') {
+                if (prod.subproceso === 'mecanizado_ext') {
+                    entry.stockEnMecanizado += finalizado;
+                } else if (prod.subproceso === 'mecanizado') {
                     entry.stockMecanizado += finalizado;
                 } else if (prod.subproceso === 'granallado') {
                     entry.stockGranallado += finalizado;
@@ -90,9 +92,10 @@ export default function StockPage() {
         
         const rows: InventoryRow[] = [];
         stockByState.forEach((data) => {
-            const totalStock = data.stockInyectado + data.stockMecanizado + data.stockGranallado + data.stockListo;
+            const totalStock = data.stockInyectado + data.stockMecanizado + data.stockGranallado + data.stockListo + data.stockEnMecanizado;
             
             if (data.stockInyectado > 0) rows.push({ piece: data.piece, state: 'Inyectado', stock: data.stockInyectado, totalStockForPiece: totalStock });
+            if (data.stockEnMecanizado > 0) rows.push({ piece: data.piece, state: 'En Mecanizado', stock: data.stockEnMecanizado, totalStockForPiece: totalStock });
             if (data.stockMecanizado > 0) rows.push({ piece: data.piece, state: 'Mecanizado', stock: data.stockMecanizado, totalStockForPiece: totalStock });
             if (data.stockGranallado > 0) rows.push({ piece: data.piece, state: 'Granallado', stock: data.stockGranallado, totalStockForPiece: totalStock });
             if (data.stockListo > 0) rows.push({ piece: data.piece, state: 'Listo', stock: data.stockListo, totalStockForPiece: totalStock });
@@ -157,7 +160,7 @@ export default function StockPage() {
                     qtyScrap: 0,
                     qtySegregada: 0,
                     inspeccionadoCalidad: true,
-                    subproceso: 'mecanizado',
+                    subproceso: 'mecanizado_ext',
                     createdBy: 'system',
                 };
                 batch.set(positiveProdRef, positiveProdData);
@@ -217,11 +220,19 @@ export default function StockPage() {
     const getStateBadgeVariant = (state: InventoryRow['state']) => {
         switch(state) {
             case 'Inyectado': return 'outline';
+            case 'En Mecanizado': return 'destructive';
             case 'Mecanizado': return 'secondary';
             case 'Granallado': return 'secondary';
             case 'Listo': return 'default';
             default: return 'secondary';
         }
+    }
+    
+    const getStateBadgeIcon = (state: InventoryRow['state']) => {
+        if (state === 'En Mecanizado') {
+            return <Wrench className="mr-1 h-3 w-3" />;
+        }
+        return null;
     }
 
     return (
@@ -275,7 +286,10 @@ export default function StockPage() {
                                         <TableCell className="font-medium">
                                             <div className="flex items-center gap-2">
                                                 <span>{piece.codigo}</span>
-                                                <Badge variant={getStateBadgeVariant(state)}>{state}</Badge>
+                                                <Badge variant={getStateBadgeVariant(state)}>
+                                                    {getStateBadgeIcon(state)}
+                                                    {state}
+                                                </Badge>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right font-semibold">{stock.toLocaleString('es-ES')}</TableCell>
@@ -406,8 +420,3 @@ export default function StockPage() {
         </main>
     );
 }
-
-    
-
-    
-
