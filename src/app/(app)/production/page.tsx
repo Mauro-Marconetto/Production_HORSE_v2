@@ -21,7 +21,7 @@ type PressingStep = 'list' | 'declaration';
 type PressingDeclarationField = 'pressedQty' | 'scrapQty';
 
 
-const declarationFields: { key: DeclarationField, label: string }[] = [
+const allDeclarationFields: { key: DeclarationField, label: string }[] = [
     { key: 'qtyFinalizada', label: 'Finalizada' },
     { key: 'qtySinPrensar', label: 'Sin Prensar' },
     { key: 'qtyScrap', label: 'Scrap' },
@@ -91,6 +91,13 @@ export default function ProductionPage() {
         if (!production) return [];
         return production.filter(p => (p.qtySinPrensar || 0) > 0 || (p.qtyAptaSinPrensarCalidad || 0) > 0);
     }, [production]);
+
+    const declarationFields = useMemo(() => {
+        if (selectedMachine?.type === 'granalladora') {
+            return allDeclarationFields.filter(field => field.key !== 'qtySinPrensar');
+        }
+        return allDeclarationFields;
+    }, [selectedMachine]);
 
     const resetProdDialogState = () => {
         setStep('selection');
@@ -659,5 +666,3 @@ export default function ProductionPage() {
     </main>
   );
 }
-
-    

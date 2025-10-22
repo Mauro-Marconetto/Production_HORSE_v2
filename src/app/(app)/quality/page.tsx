@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 type QualityInspectionField = 'qtyAptaCalidad' | 'qtyAptaSinPrensarCalidad' | 'qtyScrapCalidad';
 
-const inspectionFields: { key: QualityInspectionField, label: string }[] = [
+const allInspectionFields: { key: QualityInspectionField, label: string }[] = [
     { key: 'qtyAptaCalidad', label: 'Apta (OK)' },
     { key: 'qtyAptaSinPrensarCalidad', label: 'Apta - Sin Prensar (OK)'},
     { key: 'qtyScrapCalidad', label: 'Scrap' },
@@ -104,6 +104,19 @@ export default function QualityPage() {
         qtySegregada: ''
     });
 
+    const getMachineForProduction = (prod: Production | null) => {
+        if (!prod || !machines) return null;
+        return machines.find(m => m.id === prod.machineId) || null;
+    }
+
+    const inspectionFields = useMemo(() => {
+        const machine = getMachineForProduction(selectedProduction);
+        if (machine?.type === 'granalladora') {
+            return allInspectionFields.filter(field => field.key !== 'qtyAptaSinPrensarCalidad');
+        }
+        return allInspectionFields;
+    }, [selectedProduction, machines]);
+
     useEffect(() => {
         if (selectedProduction) {
             setQuantities({ qtyAptaCalidad: 0, qtyAptaSinPrensarCalidad: 0, qtyScrapCalidad: 0 });
@@ -138,13 +151,13 @@ export default function QualityPage() {
 
     useEffect(() => {
         const machine = machines?.find(m => m.id === segregateForm.machineId);
-        if (machine?.moldAssignments) {
+        if (machine?.assignments) {
             const today = new Date();
-            const currentAssignment = machine.moldAssignments.find(a => 
+            const currentAssignment = machine.assignments.find(a => 
                 isWithinInterval(today, { start: new Date(a.startDate), end: new Date(a.endDate) })
             );
-            if (currentAssignment) {
-                setSegregateForm(s => ({ ...s, moldId: currentAssignment.moldId }));
+            if (currentAssignment?.moldId) {
+                setSegregateForm(s => ({ ...s, moldId: currentAssignment.moldId! }));
             }
         }
     }, [segregateForm.machineId, machines]);
@@ -533,7 +546,7 @@ export default function QualityPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="seg-mold">Molde</Label>
-                <Select required value={segregateForm.moldId} onValueChange={(v) => setSegregateForm(s => ({...s, moldId: v}))} disabled={!!machines?.find(m=>m.id === segregateForm.machineId)?.moldAssignments?.some(a => isWithinInterval(new Date(), { start: new Date(a.startDate), end: new Date(a.endDate) }))}>
+                <Select required value={segregateForm.moldId} onValueChange={(v) => setSegregateForm(s => ({...s, moldId: v}))} disabled={!!machines?.find(m=>m.id === segregateForm.machineId)?.assignments?.some(a => isWithinInterval(new Date(), { start: new Date(a.startDate), end: new Date(a.endDate) }))}>
                     <SelectTrigger id="seg-mold"><SelectValue placeholder="Selecciona molde..." /></SelectTrigger>
                     <SelectContent>{molds?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}</SelectContent>
                 </Select>
