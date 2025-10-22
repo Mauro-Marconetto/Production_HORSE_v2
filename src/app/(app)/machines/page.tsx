@@ -31,7 +31,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { MoreHorizontal, PlusCircle, Loader2, Trash2, CalendarDays, Edit } from 'lucide-react';
-import type { Machine, Mold, MoldAssignment, Piece } from '@/lib/types';
+import type { Machine, Mold, ProductionAssignment, Piece } from '@/lib/types';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { addDays, format, isWithinInterval } from 'date-fns';
@@ -62,6 +62,8 @@ export default function AdminMachinesPage() {
   
   const [assignmentDate, setAssignmentDate] = useState<DateRange | undefined>();
   const [assignmentMoldId, setAssignmentMoldId] = useState<string>("");
+  const [assignmentPieceId, setAssignmentPieceId] = useState<string>("");
+  const [assignmentQty, setAssignmentQty] = useState<number>(0);
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -89,12 +91,16 @@ export default function AdminMachinesPage() {
   const resetSchedulerForm = () => {
     setAssignmentDate(undefined);
     setAssignmentMoldId("");
+    setAssignmentPieceId("");
+    setAssignmentQty(0);
     setEditingAssignmentId(null);
   }
 
-  const handleEditAssignmentClick = (assignment: MoldAssignment) => {
+  const handleEditAssignmentClick = (assignment: ProductionAssignment) => {
     setEditingAssignmentId(assignment.id);
-    setAssignmentMoldId(assignment.moldId);
+    setAssignmentMoldId(assignment.moldId || "");
+    setAssignmentPieceId(assignment.pieceId || "");
+    setAssignmentQty(assignment.qty || 0);
     setAssignmentDate({
         from: new Date(assignment.startDate),
         to: new Date(assignment.endDate),
@@ -110,14 +116,14 @@ export default function AdminMachinesPage() {
     
     const machineId = selectedMachine ? selectedMachine.id : `M${Date.now()}`;
     const type = formData.get('type') as Machine['type'];
-    const machineData: Omit<Machine, 'moldAssignments'> = {
+    const machineData: Omit<Machine, 'assignments'> = {
       id: machineId,
       nombre: formData.get('nombre') as string,
       type: type,
       tonelaje: type === 'inyectora' ? Number(formData.get('tonelaje')) : 0,
-      turnosSemana: type === 'inyectora' ? Number(formData.get('turnosSemana')) : 0,
-      horasTurno: type === 'inyectora' ? Number(formData.get('horasTurno')) : 0,
-      OEE_obj: type === 'inyectora' ? Number(formData.get('OEE_obj')) / 100 : 0, // Convert from % to decimal
+      turnosSemana: Number(formData.get('turnosSemana')),
+      horasTurno: Number(formData.get('horasTurno')),
+      OEE_obj: Number(formData.get('OEE_obj')) / 100, // Convert from % to decimal
       produccionHora: Number(formData.get('produccionHora')),
     };
 
@@ -161,14 +167,25 @@ export default function AdminMachinesPage() {
   };
   
   const handleSaveAssignment = async () => {
-    if (!firestore || !selectedMachine || !assignmentMoldId || !assignmentDate?.from || !assignmentDate?.to) {
-        toast({ title: "Error", description: "Completa todos los campos para añadir la programación.", variant: "destructive"});
+    if (!firestore || !selectedMachine || !assignmentDate?.from || !assignmentDate?.to) {
+        toast({ title: "Error", description: "Completa el rango de fechas para añadir la programación.", variant: "destructive"});
         return;
     }
 
+    const isInjection = selectedMachine.type === 'inyectora';
+    if (isInjection && !assignmentMoldId) {
+        toast({ title: "Error", description: "Selecciona un molde para la inyectora.", variant: "destructive"});
+        return;
+    }
+    if (!isInjection && (!assignmentPieceId || !assignmentQty)) {
+        toast({ title: "Error", description: "Selecciona una pieza y una cantidad para la granalladora.", variant: "destructive"});
+        return;
+    }
+
+
     setIsSaving(true);
     const machineDocRef = doc(firestore, 'machines', selectedMachine.id);
-    let updatedAssignments = [...(selectedMachine.moldAssignments || [])];
+    let updatedAssignments = [...(selectedMachine.assignments || [])];
 
     if (editingAssignmentId) {
         // Update existing assignment
@@ -176,16 +193,20 @@ export default function AdminMachinesPage() {
         if (assignmentIndex > -1) {
             updatedAssignments[assignmentIndex] = {
                 ...updatedAssignments[assignmentIndex],
-                moldId: assignmentMoldId,
+                moldId: isInjection ? assignmentMoldId : undefined,
+                pieceId: !isInjection ? assignmentPieceId : undefined,
+                qty: !isInjection ? assignmentQty : undefined,
                 startDate: assignmentDate.from.toISOString(),
                 endDate: assignmentDate.to.toISOString(),
             }
         }
     } else {
         // Add new assignment
-        const newAssignment: MoldAssignment = {
+        const newAssignment: ProductionAssignment = {
             id: `ASGN-${Date.now()}`,
-            moldId: assignmentMoldId,
+            moldId: isInjection ? assignmentMoldId : undefined,
+            pieceId: !isInjection ? assignmentPieceId : undefined,
+            qty: !isInjection ? assignmentQty : undefined,
             startDate: assignmentDate.from.toISOString(),
             endDate: assignmentDate.to.toISOString(),
         };
@@ -194,9 +215,9 @@ export default function AdminMachinesPage() {
 
     try {
         await updateDoc(machineDocRef, {
-            moldAssignments: updatedAssignments
+            assignments: updatedAssignments
         });
-        toast({ title: "Éxito", description: `Programación de molde ${editingAssignmentId ? 'actualizada' : 'añadida'}.`});
+        toast({ title: "Éxito", description: `Programación ${editingAssignmentId ? 'actualizada' : 'añadida'}.`});
         resetSchedulerForm();
         refreshMachines();
     } catch (error: any) {
@@ -210,10 +231,10 @@ export default function AdminMachinesPage() {
     if (!firestore || !selectedMachine) return;
     setIsSaving(true);
     const machineDocRef = doc(firestore, 'machines', selectedMachine.id);
-    const updatedAssignments = selectedMachine.moldAssignments?.filter(a => a.id !== assignmentId) || [];
+    const updatedAssignments = selectedMachine.assignments?.filter(a => a.id !== assignmentId) || [];
 
     try {
-        await updateDoc(machineDocRef, { moldAssignments: updatedAssignments });
+        await updateDoc(machineDocRef, { assignments: updatedAssignments });
         toast({ title: "Éxito", description: "Programación eliminada." });
         if (editingAssignmentId === assignmentId) {
             resetSchedulerForm();
@@ -228,10 +249,10 @@ export default function AdminMachinesPage() {
   
   const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
 
-  const currentAssignmentForMachine = (machine: Machine): MoldAssignment | null => {
-    if (!machine.moldAssignments) return null;
+  const currentAssignmentForMachine = (machine: Machine): ProductionAssignment | null => {
+    if (!machine.assignments) return null;
     const today = new Date();
-    const currentAssignment = machine.moldAssignments.find(a => 
+    const currentAssignment = machine.assignments.find(a => 
         isWithinInterval(today, { start: new Date(a.startDate), end: new Date(a.endDate) })
     );
     return currentAssignment || null;
@@ -250,14 +271,15 @@ export default function AdminMachinesPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {(isLoadingMachines || isLoadingMolds) && (
+        {(isLoadingMachines || isLoadingMolds || isLoadingPieces) && (
             <div className="flex items-center justify-center py-12 col-span-2">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
         )}
         {!isLoadingMachines && machines?.map((machine) => {
           const currentAssignment = currentAssignmentForMachine(machine);
-          const currentMold = currentAssignment ? molds?.find(m => m.id === currentAssignment.moldId) : null;
+          const currentMold = currentAssignment?.moldId ? molds?.find(m => m.id === currentAssignment.moldId) : null;
+          const currentPiece = currentAssignment?.pieceId ? pieces?.find(p => p.id === currentAssignment.pieceId) : null;
           
           return (
             <Card key={machine.id}>
@@ -268,25 +290,22 @@ export default function AdminMachinesPage() {
                     <Badge variant="outline" className="text-sm">{machine.type === 'inyectora' ? 'Inyectora' : 'Granalladora'}</Badge>
                     </CardTitle>
                   <CardDescription>
-                    {machine.type === 'inyectora' ? (
-                        currentMold ? (
-                            <>
-                            Molde actual: {currentMold.nombre}
+                     {currentAssignment ? (
+                        <>
+                            {machine.type === 'inyectora' && `Molde actual: ${currentMold?.nombre}`}
+                            {machine.type === 'granalladora' && `Pieza actual: ${currentPiece?.codigo}`}
                             <span className="text-xs ml-2">
                                 (del {format(new Date(currentAssignment!.startDate), 'dd/MM/yy')} al {format(new Date(currentAssignment!.endDate), 'dd/MM/yy')})
                             </span>
-                            </>
-                        ) : 'Sin molde programado'
-                    ) : 'Máquina de post-proceso'}
+                        </>
+                    ) : 'Sin programación activa'}
                   </CardDescription>
                 </div>
                 <div className="flex items-center">
-                    {machine.type === 'inyectora' && (
-                        <Button variant="outline" size="sm" onClick={() => openSchedulerDialog(machine)}>
-                            <CalendarDays className="mr-2 h-4 w-4"/>
-                            Programar
-                        </Button>
-                    )}
+                    <Button variant="outline" size="sm" onClick={() => openSchedulerDialog(machine)}>
+                        <CalendarDays className="mr-2 h-4 w-4"/>
+                        Programar
+                    </Button>
                     <AlertDialog>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -336,10 +355,10 @@ export default function AdminMachinesPage() {
                     {machine.type === 'inyectora' && (
                         <>
                             <div><span className="font-medium">Tonelaje:</span> {machine.tonelaje}T</div>
-                            <div><span className="font-medium">Turnos/Semana:</span> {machine.turnosSemana}</div>
-                            <div><span className="font-medium">OEE Obj.:</span> {machine.OEE_obj * 100}%</div>
                         </>
                     )}
+                    <div><span className="font-medium">Turnos/Semana:</span> {machine.turnosSemana}</div>
+                    <div><span className="font-medium">OEE Obj.:</span> {machine.OEE_obj * 100}%</div>
                     <div><span className="font-medium">Producción/Hora:</span> {machine.produccionHora} u/h</div>
                  </div>
               </CardContent>
@@ -385,20 +404,20 @@ export default function AdminMachinesPage() {
                         <Label htmlFor="tonelaje" className="text-right">Tonelaje (T)</Label>
                         <Input id="tonelaje" name="tonelaje" type="number" defaultValue={selectedMachine?.tonelaje || ''} className="col-span-3" required />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="turnosSemana" className="text-right">Turnos/Semana</Label>
-                        <Input id="turnosSemana" name="turnosSemana" type="number" defaultValue={selectedMachine?.turnosSemana || ''} className="col-span-3" required />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="horasTurno" className="text-right">Horas/Turno</Label>
-                        <Input id="horasTurno" name="horasTurno" type="number" defaultValue={selectedMachine?.horasTurno || ''} className="col-span-3" required />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="OEE_obj" className="text-right">OEE Objetivo (%)</Label>
-                        <Input id="OEE_obj" name="OEE_obj" type="number" defaultValue={(selectedMachine?.OEE_obj || 0) * 100} className="col-span-3" required min="0" max="100" />
-                    </div>
                 </>
               )}
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="turnosSemana" className="text-right">Turnos/Semana</Label>
+                    <Input id="turnosSemana" name="turnosSemana" type="number" defaultValue={selectedMachine?.turnosSemana || ''} className="col-span-3" required />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="horasTurno" className="text-right">Horas/Turno</Label>
+                    <Input id="horasTurno" name="horasTurno" type="number" defaultValue={selectedMachine?.horasTurno || ''} className="col-span-3" required />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="OEE_obj" className="text-right">OEE Objetivo (%)</Label>
+                    <Input id="OEE_obj" name="OEE_obj" type="number" defaultValue={(selectedMachine?.OEE_obj || 0) * 100} className="col-span-3" required min="0" max="100" />
+                </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
@@ -414,27 +433,47 @@ export default function AdminMachinesPage() {
       <Dialog open={isSchedulerOpen} onOpenChange={setIsSchedulerOpen}>
         <DialogContent className="max-w-4xl">
             <DialogHeader>
-                <DialogTitle>Programador de Moldes para {selectedMachine?.nombre}</DialogTitle>
+                <DialogTitle>Programador para {selectedMachine?.nombre}</DialogTitle>
                 <DialogDescription>
-                    Asigna qué molde estará en esta máquina y durante qué fechas. Haz clic en una programación existente para editarla.
+                    Asigna qué se producirá en esta máquina y durante qué fechas. Haz clic en una programación existente para editarla.
                 </DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-8 py-4">
                 <div className="space-y-4">
                     <h4 className="font-semibold text-lg border-b pb-2">{editingAssignmentId ? 'Editar Programación' : 'Nueva Programación'}</h4>
-                    <div className="space-y-2">
-                        <Label>1. Selecciona un Molde</Label>
-                         <Select value={assignmentMoldId} onValueChange={setAssignmentMoldId}>
-                            <SelectTrigger><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
-                            <SelectContent>
-                                {molds?.filter(m => m.compatibilidad.includes(selectedMachine?.id || '')).map(m => (
-                                    <SelectItem key={m.id} value={m.id}>{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    {selectedMachine?.type === 'inyectora' ? (
+                        <div className="space-y-2">
+                            <Label>1. Selecciona un Molde</Label>
+                            <Select value={assignmentMoldId} onValueChange={setAssignmentMoldId}>
+                                <SelectTrigger><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
+                                <SelectContent>
+                                    {molds?.filter(m => m.compatibilidad.includes(selectedMachine?.id || '')).map(m => (
+                                        <SelectItem key={m.id} value={m.id}>{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    ) : (
+                        <>
+                         <div className="space-y-2">
+                            <Label>1. Selecciona una Pieza</Label>
+                            <Select value={assignmentPieceId} onValueChange={setAssignmentPieceId}>
+                                <SelectTrigger><SelectValue placeholder="Elige una pieza..." /></SelectTrigger>
+                                <SelectContent>
+                                    {pieces?.map(p => (
+                                        <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                         </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="qty">2. Cantidad a Producir</Label>
+                            <Input id="qty" type="number" value={assignmentQty} onChange={(e) => setAssignmentQty(Number(e.target.value))} placeholder="Ej: 5000" />
+                         </div>
+                        </>
+                    )}
                      <div className="space-y-2">
-                        <Label>2. Selecciona un Rango de Fechas</Label>
+                        <Label>Paso final: Selecciona un Rango de Fechas</Label>
                          <Popover>
                             <PopoverTrigger asChild>
                             <Button
@@ -487,9 +526,10 @@ export default function AdminMachinesPage() {
                 <div className="space-y-4">
                      <h4 className="font-semibold text-lg border-b pb-2">Programaciones Activas</h4>
                      <div className="max-h-60 overflow-y-auto pr-2 space-y-2">
-                        {selectedMachine?.moldAssignments && selectedMachine.moldAssignments.length > 0 ? (
-                            selectedMachine.moldAssignments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).map(assignment => {
+                        {selectedMachine?.assignments && selectedMachine.assignments.length > 0 ? (
+                            selectedMachine.assignments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).map(assignment => {
                                 const mold = molds?.find(m => m.id === assignment.moldId);
+                                const piece = pieces?.find(p => p.id === assignment.pieceId);
                                 return (
                                     <div 
                                         key={assignment.id} 
@@ -500,7 +540,7 @@ export default function AdminMachinesPage() {
                                         onClick={() => handleEditAssignmentClick(assignment)}
                                     >
                                         <div>
-                                            <p className="font-semibold">{mold?.nombre}</p>
+                                            <p className="font-semibold">{mold?.nombre || piece?.codigo}</p>
                                             <p className="text-sm text-muted-foreground">
                                                 {format(new Date(assignment.startDate), 'dd/MM/yy')} - {format(new Date(assignment.endDate), 'dd/MM/yy')}
                                             </p>

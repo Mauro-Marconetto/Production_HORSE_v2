@@ -27,12 +27,15 @@ export interface Mold {
   status: 'ok' | 'mantenimiento';
 }
 
-export interface MoldAssignment {
+export interface ProductionAssignment {
     id: string; // Unique ID for the assignment itself
-    moldId: string;
+    moldId?: string; // For injection machines
+    pieceId?: string; // For other types of machines like shot blasting
     startDate: string; // ISO Date string
     endDate: string; // ISO Date string
+    qty?: number; // Quantity to produce, for non-mold assignments
 }
+
 
 export interface Machine {
   id: string;
@@ -42,7 +45,7 @@ export interface Machine {
   horasTurno: number;
   OEE_obj: number;
   OEE_hist?: number;
-  moldAssignments?: MoldAssignment[];
+  assignments?: ProductionAssignment[];
   type: 'inyectora' | 'granalladora';
   produccionHora: number;
 }
