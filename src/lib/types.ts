@@ -33,7 +33,6 @@ export interface ProductionAssignment {
     pieceId?: string; // For other types of machines like shot blasting
     startDate: string; // ISO Date string
     endDate: string; // ISO Date string
-    qty?: number; // Quantity to produce, for non-mold assignments
 }
 
 

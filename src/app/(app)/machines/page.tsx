@@ -64,7 +64,6 @@ export default function AdminMachinesPage() {
   const [assignmentDate, setAssignmentDate] = useState<DateRange | undefined>();
   const [assignmentMoldId, setAssignmentMoldId] = useState<string>("");
   const [assignmentPieceId, setAssignmentPieceId] = useState<string>("");
-  const [assignmentQty, setAssignmentQty] = useState<number>(0);
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,7 +101,6 @@ export default function AdminMachinesPage() {
     setAssignmentDate(undefined);
     setAssignmentMoldId("");
     setAssignmentPieceId("");
-    setAssignmentQty(0);
     setEditingAssignmentId(null);
   }
 
@@ -110,7 +108,6 @@ export default function AdminMachinesPage() {
     setEditingAssignmentId(assignment.id);
     setAssignmentMoldId(assignment.moldId || "");
     setAssignmentPieceId(assignment.pieceId || "");
-    setAssignmentQty(assignment.qty || 0);
     setAssignmentDate({
         from: new Date(assignment.startDate),
         to: new Date(assignment.endDate),
@@ -187,8 +184,8 @@ export default function AdminMachinesPage() {
         toast({ title: "Error", description: "Selecciona un molde para la inyectora.", variant: "destructive"});
         return;
     }
-    if (!isInjection && (!assignmentPieceId || !assignmentQty)) {
-        toast({ title: "Error", description: "Selecciona una pieza y una cantidad para la granalladora.", variant: "destructive"});
+    if (!isInjection && !assignmentPieceId) {
+        toast({ title: "Error", description: "Selecciona una pieza para la granalladora.", variant: "destructive"});
         return;
     }
 
@@ -197,12 +194,12 @@ export default function AdminMachinesPage() {
     const machineDocRef = doc(firestore, 'machines', selectedMachine.id);
     let updatedAssignments = [...(selectedMachine.assignments || [])];
 
-    const newAssignmentData = {
+    const newAssignmentData: Omit<ProductionAssignment, 'id'> = {
         startDate: assignmentDate.from.toISOString(),
         endDate: assignmentDate.to.toISOString(),
         ...(isInjection 
-            ? { moldId: assignmentMoldId, pieceId: null, qty: null } 
-            : { moldId: null, pieceId: assignmentPieceId, qty: assignmentQty })
+            ? { moldId: assignmentMoldId } 
+            : { pieceId: assignmentPieceId })
     };
 
     if (editingAssignmentId) {
@@ -476,10 +473,6 @@ export default function AdminMachinesPage() {
                                     ))}
                                 </SelectContent>
                             </Select>
-                         </div>
-                         <div className="space-y-2">
-                            <Label htmlFor="qty">2. Cantidad a Producir</Label>
-                            <Input id="qty" type="number" value={assignmentQty} onChange={(e) => setAssignmentQty(Number(e.target.value))} placeholder="Ej: 5000" />
                          </div>
                         </>
                     )}
