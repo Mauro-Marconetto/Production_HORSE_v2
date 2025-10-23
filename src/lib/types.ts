@@ -68,11 +68,14 @@ export interface Demand {
 }
 
 export interface Inventory {
-  id: string; // composite key {pieceId}/{fechaISO}
-  pieceId: string;
-  fechaISO: string;
-  stock: number;
+  id: string; // Same as pieceId
+  stockInyectado?: number; // sin prensar
+  stockEnMecanizado?: number; // en proveedor externo
+  stockMecanizado?: number; // retornado de proveedor
+  stockGranallado?: number; // granallado
+  stockListo?: number; // listo para entregar
 }
+
 
 export interface CurrentInventory {
     pieceId: string;
@@ -141,7 +144,7 @@ export interface Production {
   qtyScrap: number;
   qtyArranque?: number;
   qtySegregada: number;
-  subproceso?: 'mecanizado' | 'granallado' | 'mecanizado_ext';
+  subproceso?: 'mecanizado' | 'granallado';
   createdBy?: string; // UID of user who declared production
   
   // Quality Segregation fields

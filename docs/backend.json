@@ -255,26 +255,34 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Inventory",
       "type": "object",
-      "description": "Represents the inventory level for a specific piece on a specific date.",
+      "description": "Represents the real-time inventory level for a specific piece across different stages.",
       "properties": {
-        "pieceId": {
+        "id": {
           "type": "string",
-          "description": "Reference to Piece. (Relationship: Inventory 1:N Piece)"
+          "description": "Unique identifier for the inventory item, same as the pieceId."
         },
-        "fechaISO": {
-          "type": "string",
-          "description": "The date in ISO format."
-        },
-        "stock": {
+        "stockInyectado": {
           "type": "number",
-          "description": "The stock level."
+          "description": "Stock of pieces that have been injected but not yet processed (sin prensar)."
+        },
+        "stockEnMecanizado": {
+          "type": "number",
+          "description": "Stock currently at an external supplier for machining."
+        },
+        "stockMecanizado": {
+          "type": "number",
+          "description": "Stock that has returned from machining and is ready for the next step."
+        },
+        "stockGranallado": {
+          "type": "number",
+          "description": "Stock that has been shot-blasted (granallado)."
+        },
+        "stockListo": {
+          "type": "number",
+          "description": "Finished goods stock, ready for delivery."
         }
       },
-      "required": [
-        "pieceId",
-        "fechaISO",
-        "stock"
-      ]
+      "required": ["id"]
     },
     "Calendar": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -792,37 +800,17 @@
         }
       },
       {
-        "path": "inventory/{pieceId}/{fechaISO}",
+        "path": "inventory/{pieceId}",
         "definition": {
           "entityName": "Inventory",
           "schema": {
             "$ref": "#/backend/entities/Inventory"
           },
-          "description": "Stores inventory levels for a specific piece on a specific date.",
+          "description": "Stores real-time inventory levels for each piece across various stages.",
           "params": [
             {
               "name": "pieceId",
-              "description": "Reference to Piece."
-            },
-            {
-              "name": "fechaISO",
-              "description": "The date in ISO format."
-            }
-          ]
-        }
-      },
-      {
-        "path": "inventory/current/{pieceId}",
-        "definition": {
-          "entityName": "Inventory",
-          "schema": {
-            "$ref": "#/backend/entities/Inventory"
-          },
-          "description": "Stores the current inventory level for a specific piece.",
-          "params": [
-            {
-              "name": "pieceId",
-              "description": "Reference to Piece."
+              "description": "Unique identifier for the piece."
             }
           ]
         }
@@ -924,7 +912,7 @@
         }
       },
       {
-        "path": "production/{fechaISO}",
+        "path": "production/{productionId}",
         "definition": {
           "entityName": "Production",
           "schema": {
@@ -933,8 +921,8 @@
           "description": "Stores actual production data for a specific date.",
           "params": [
             {
-              "name": "fechaISO",
-              "description": "The date in ISO format."
+              "name": "productionId",
+              "description": "Unique identifier for the production record."
             }
           ]
         }

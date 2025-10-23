@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, addDoc, serverTimestamp, writeBatch, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, writeBatch, doc, getDoc, updateDoc, increment } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight } from "lucide-react";
-import type { Piece, Production, Supplier, Remito, RemitoItem, RemitoSettings } from "@/lib/types";
+import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,79 +37,52 @@ export default function StockPage() {
     const piecesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]);
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesCollection);
 
-    const productionCollection = useMemoFirebase(() => firestore ? collection(firestore, 'production') : null, [firestore]);
-    const { data: initialProduction, isLoading: isLoadingProduction, forceRefresh } = useCollection<Production>(productionCollection);
+    const inventoryCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
+    const { data: inventory, isLoading: isLoadingInventory, forceRefresh } = useCollection<Inventory>(inventoryCollection);
     
     const suppliersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'suppliers') : null, [firestore]);
     const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<Supplier>(suppliersCollection);
 
-    const [allProduction, setAllProduction] = useState(initialProduction);
     const [isRemitoDialogOpen, setIsRemitoDialogOpen] = useState(false);
     const [createdRemitoId, setCreatedRemitoId] = useState<string | null>(null);
     const [remitoForm, setRemitoForm] = useState({ supplierId: '' });
     const [remitoItems, setRemitoItems] = useState<RemitoItem[]>([]);
     const [isSaving, setIsSaving] = useState(false);
-
-     useMemo(() => {
-        setAllProduction(initialProduction);
-    }, [initialProduction]);
     
     const inventoryData = useMemo((): InventoryRow[] => {
-        if (!pieces || !allProduction) return [];
-
-        const stockByState = new Map<string, { piece: Piece; stockInyectado: number; stockMecanizado: number; stockEnMecanizado: number; stockGranallado: number; stockListo: number; }>();
-
-        pieces.forEach(p => {
-             if (!stockByState.has(p.codigo)) {
-                stockByState.set(p.codigo, { 
-                    piece: p, 
-                    stockInyectado: 0,
-                    stockMecanizado: 0,
-                    stockEnMecanizado: 0,
-                    stockGranallado: 0,
-                    stockListo: 0 
-                });
-            }
-        });
-        
-        allProduction.forEach(prod => {
-            const piece = pieces.find(p => p.id === prod.pieceId);
-            if (piece && stockByState.has(piece.codigo)) {
-                const entry = stockByState.get(piece.codigo)!;
-                const finalizado = (prod.qtyFinalizada || 0);
-
-                if (prod.subproceso === 'mecanizado_ext') {
-                    entry.stockEnMecanizado += finalizado;
-                } else if (prod.subproceso === 'mecanizado') {
-                    entry.stockMecanizado += finalizado;
-                } else if (prod.subproceso === 'granallado') {
-                    entry.stockGranallado += finalizado;
-                } else {
-                     entry.stockListo += finalizado;
-                }
-                entry.stockInyectado += (prod.qtySinPrensar || 0) + (prod.qtyAptaSinPrensarCalidad || 0);
-            }
-        });
+        if (!pieces || !inventory) return [];
         
         const rows: InventoryRow[] = [];
-        stockByState.forEach((data) => {
-            const totalStock = data.stockInyectado + data.stockMecanizado + data.stockGranallado + data.stockListo + data.stockEnMecanizado;
-            
-            if (data.stockInyectado > 0) rows.push({ piece: data.piece, state: 'Inyectado', stock: data.stockInyectado, totalStockForPiece: totalStock });
-            if (data.stockEnMecanizado > 0) rows.push({ piece: data.piece, state: 'En Mecanizado', stock: data.stockEnMecanizado, totalStockForPiece: totalStock });
-            if (data.stockMecanizado > 0) rows.push({ piece: data.piece, state: 'Mecanizado', stock: data.stockMecanizado, totalStockForPiece: totalStock });
-            if (data.stockGranallado > 0) rows.push({ piece: data.piece, state: 'Granallado', stock: data.stockGranallado, totalStockForPiece: totalStock });
-            if (data.stockListo > 0) rows.push({ piece: data.piece, state: 'Listo', stock: data.stockListo, totalStockForPiece: totalStock });
-            
-            if (totalStock === 0) {
-                 rows.push({ piece: data.piece, state: 'Listo', stock: 0, totalStockForPiece: 0 });
+
+        inventory.forEach(invItem => {
+            const piece = pieces.find(p => p.id === invItem.id);
+            if (!piece) return;
+
+            const stockInyectado = invItem.stockInyectado || 0;
+            const stockEnMecanizado = invItem.stockEnMecanizado || 0;
+            const stockMecanizado = invItem.stockMecanizado || 0;
+            const stockGranallado = invItem.stockGranallado || 0;
+            const stockListo = invItem.stockListo || 0;
+
+            const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo;
+
+            if (stockInyectado > 0) rows.push({ piece, state: 'Inyectado', stock: stockInyectado, totalStockForPiece: totalStock });
+            if (stockEnMecanizado > 0) rows.push({ piece, state: 'En Mecanizado', stock: stockEnMecanizado, totalStockForPiece: totalStock });
+            if (stockMecanizado > 0) rows.push({ piece, state: 'Mecanizado', stock: stockMecanizado, totalStockForPiece: totalStock });
+            if (stockGranallado > 0) rows.push({ piece, state: 'Granallado', stock: stockGranallado, totalStockForPiece: totalStock });
+            if (stockListo > 0) rows.push({ piece, state: 'Listo', stock: stockListo, totalStockForPiece: totalStock });
+             
+            // Ensure every piece has at least one row even if all stock is 0
+            const pieceHasRow = rows.some(r => r.piece.id === piece.id);
+            if (!pieceHasRow) {
+                 rows.push({ piece, state: 'Listo', stock: 0, totalStockForPiece: 0 });
             }
         });
 
         return rows;
-    }, [pieces, allProduction]);
+    }, [pieces, inventory]);
     
-    const isLoading = isLoadingPieces || isLoadingProduction || isLoadingSuppliers;
+    const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers;
 
     const handleCreateRemito = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -121,8 +94,8 @@ export default function StockPage() {
         }
 
         for (const item of remitoItems) {
-            const listoRow = inventoryData.find(d => d.piece.id === item.pieceId && d.state === 'Listo');
-            const stockListo = listoRow?.stock || 0;
+            const invItem = inventory?.find(i => i.id === item.pieceId);
+            const stockListo = invItem?.stockListo || 0;
             if (item.qty > stockListo) {
                 const pieceCode = pieces?.find(p => p.id === item.pieceId)?.codigo;
                 toast({ title: "Error de Stock", description: `No hay suficiente stock "Listo" para la pieza ${pieceCode}. Disponible: ${stockListo}`, variant: "destructive" });
@@ -157,47 +130,13 @@ export default function StockPage() {
             const remitoRef = doc(remitosCollectionRef);
             batch.set(remitoRef, remitoData);
             
-            const productionRef = collection(firestore, "production");
-
+            // Update inventory for each item
             remitoItems.forEach(item => {
-                const positiveProdRef = doc(productionRef);
-                const positiveProdData = {
-                    fechaISO: new Date().toISOString(),
-                    machineId: 'subproceso-externo',
-                    pieceId: item.pieceId,
-                    moldId: '',
-                    turno: '',
-                    qtyFinalizada: item.qty,
-                    qtySinPrensar: 0,
-                    qtyScrap: 0,
-                    qtyAptaCalidad: 0,
-                    qtyAptaSinPrensarCalidad: 0,
-                    qtyScrapCalidad: 0,
-                    qtySegregada: 0,
-                    inspeccionadoCalidad: true,
-                    subproceso: 'mecanizado_ext' as const,
-                    createdBy: 'system',
-                };
-                batch.set(positiveProdRef, positiveProdData);
-
-                const negativeProdRef = doc(productionRef);
-                const negativeProdData = {
-                     fechaISO: new Date().toISOString(),
-                    machineId: 'subproceso-externo',
-                    pieceId: item.pieceId,
-                    moldId: '',
-                    turno: '',
-                    qtyFinalizada: -item.qty,
-                    qtySinPrensar: 0,
-                    qtyScrap: 0,
-                    qtyAptaCalidad: 0,
-                    qtyAptaSinPrensarCalidad: 0,
-                    qtyScrapCalidad: 0,
-                    qtySegregada: 0,
-                    inspeccionadoCalidad: true,
-                    createdBy: 'system',
-                };
-                batch.set(negativeProdRef, negativeProdData);
+                const inventoryDocRef = doc(firestore, "inventory", item.pieceId);
+                batch.update(inventoryDocRef, {
+                    stockListo: increment(-item.qty),
+                    stockEnMecanizado: increment(item.qty),
+                });
             });
             
             batch.update(settingsRef, { nextRemitoNumber: currentRemitoNumber + 1 });
@@ -341,7 +280,7 @@ export default function StockPage() {
                             {!isLoading && inventoryData.length === 0 && (
                                  <TableRow>
                                     <TableCell colSpan={6} className="h-24 text-center">
-                                        No se encontraron piezas o datos de producción.
+                                        No se encontraron piezas o datos de inventario.
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -431,4 +370,5 @@ export default function StockPage() {
     );
 
     
+
 

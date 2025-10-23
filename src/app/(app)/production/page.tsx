@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from "react";
-import { collection, doc, addDoc, serverTimestamp, Timestamp, query, orderBy, where, getDocs, writeBatch, updateDoc, Firestore } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, Timestamp, query, orderBy, where, getDoc, writeBatch, Firestore, increment } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,6 +63,10 @@ export default function ProductionPage() {
     const piecesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]);
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesCollection);
 
+    const inventoryCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
+    const { data: inventory, isLoading: isLoadingInventory } = useCollection<any>(inventoryCollection);
+
+
     const [isProdDialogOpen, setIsProdDialogOpen] = useState(false);
     const [isPressingDialogOpen, setIsPressingDialogOpen] = useState(false);
 
@@ -82,16 +86,16 @@ export default function ProductionPage() {
 
     // Pressing Declaration State
     const [pressingStep, setPressingStep] = useState<PressingStep>('list');
-    const [selectedLotForPressing, setSelectedLotForPressing] = useState<Production | null>(null);
+    const [selectedLotForPressing, setSelectedLotForPressing] = useState<any | null>(null);
     const [pressingQuantities, setPressingQuantities] = useState({ pressedQty: 0, scrapQty: 0 });
     const [pressingCurrentInput, setPressingCurrentInput] = useState('');
     const [pressingActiveField, setPressingActiveField] = useState<PressingDeclarationField>('pressedQty');
 
 
     const lotsToPress = useMemo(() => {
-        if (!production) return [];
-        return production.filter(p => (p.qtySinPrensar || 0) > 0 || (p.qtyAptaSinPrensarCalidad || 0) > 0);
-    }, [production]);
+        if (!inventory) return [];
+        return inventory.filter(item => (item.stockInyectado || 0) > 0);
+    }, [inventory]);
 
     const declarationFields = useMemo(() => {
         if (selectedMachine?.type === 'granalladora') {
@@ -147,12 +151,8 @@ export default function ProductionPage() {
                 if (existing) {
                     setMoldId(existing.moldId || '');
                     setPieceId(existing.pieceId || '');
-                    setProdQuantities({
-                        qtyFinalizada: existing.qtyFinalizada || 0,
-                        qtySinPrensar: existing.qtySinPrensar || 0,
-                        qtyScrap: existing.qtyScrap || 0,
-                        qtyArranque: existing.qtyArranque || 0,
-                    });
+                    // For existing production, we only allow adding quantities, so inputs start at 0
+                    setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
                 } else {
                      setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
                     if (selectedMachine?.assignments) {
@@ -184,9 +184,8 @@ export default function ProductionPage() {
 
     useEffect(() => {
         // Update quantity for active field when currentInput changes
-        const existingQty = existingProduction ? (existingProduction[prodActiveField] || 0) : 0;
-        setProdQuantities(q => ({ ...q, [prodActiveField]: existingQty + (Number(prodCurrentInput) || 0) }));
-    }, [prodCurrentInput, prodActiveField, existingProduction]);
+        setProdQuantities(q => ({ ...q, [prodActiveField]: Number(prodCurrentInput) || 0 }));
+    }, [prodCurrentInput, prodActiveField]);
 
     useEffect(() => {
         const parsedInput = Number(pressingCurrentInput) || 0;
@@ -224,42 +223,55 @@ export default function ProductionPage() {
         setIsSaving(true);
         
         try {
-             const productionData: Partial<Production> = {
+            const batch = writeBatch(firestore);
+
+            // 1. Create or update the Production document
+            const productionData: Partial<Production> = {
                 ...prodQuantities,
                 turno: turno as Production['turno'],
                 machineId,
                 pieceId: finalPieceId,
-                moldId: selectedMachine?.type === 'inyectora' ? moldId : '', // Store moldId only for injection
+                moldId: selectedMachine?.type === 'inyectora' ? moldId : '',
                 createdBy: user.uid,
                 fechaISO: new Date().toISOString(),
+                inspeccionadoCalidad: false,
+                qtySegregada: 0,
              };
-
              if (selectedMachine?.type === 'granalladora') {
                 productionData.subproceso = 'granallado';
              }
 
-             if (existingProduction) {
-                // Update existing document
-                const docRef = doc(firestore, 'production', existingProduction.id);
-                await updateDoc(docRef, productionData);
-                toast({ title: "Éxito", description: "Producción actualizada correctamente." });
+            if (existingProduction) {
+                const prodDocRef = doc(firestore, 'production', existingProduction.id);
+                batch.update(prodDocRef, {
+                    qtyFinalizada: increment(prodQuantities.qtyFinalizada),
+                    qtySinPrensar: increment(prodQuantities.qtySinPrensar),
+                    qtyScrap: increment(prodQuantities.qtyScrap),
+                    qtyArranque: increment(prodQuantities.qtyArranque || 0),
+                });
             } else {
-                // Create new document
-                 const fullProductionData: Omit<Production, 'id'> = {
-                    ...productionData,
-                    inspeccionadoCalidad: false,
-                    qtySegregada: 0,
-                 } as Omit<Production, 'id'>;
-                await addDoc(collection(firestore, "production"), fullProductionData);
-                toast({ title: "Éxito", description: "Producción declarada correctamente." });
+                const prodDocRef = doc(collection(firestore, "production"));
+                batch.set(prodDocRef, productionData);
             }
 
+            // 2. Update the Inventory document
+            const inventoryDocRef = doc(firestore, 'inventory', finalPieceId);
+            const inventoryUpdateData = {
+                stockListo: increment(prodQuantities.qtyFinalizada),
+                stockInyectado: increment(prodQuantities.qtySinPrensar),
+                // Scrap and Arranque don't go to inventory
+            };
+            batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
+
+            await batch.commit();
+
+            toast({ title: "Éxito", description: `Producción ${existingProduction ? 'actualizada' : 'declarada'} y stock actualizado.` });
             forceRefresh();
             setIsProdDialogOpen(false);
 
         } catch (error) {
              const contextualError = new FirestorePermissionError({
-                path: 'production',
+                path: 'production or inventory',
                 operation: 'write',
                 requestResourceData: prodQuantities,
             });
@@ -274,7 +286,7 @@ export default function ProductionPage() {
 
         const { pressedQty, scrapQty } = pressingQuantities;
         const totalProcessed = pressedQty + scrapQty;
-        const totalAvailableToPress = (selectedLotForPressing.qtySinPrensar || 0) + (selectedLotForPressing.qtyAptaSinPrensarCalidad || 0);
+        const totalAvailableToPress = selectedLotForPressing.stockInyectado || 0;
         
         if (totalProcessed > totalAvailableToPress) {
             toast({ title: "Error", description: "La cantidad procesada no puede superar la cantidad sin prensar disponible.", variant: "destructive" });
@@ -282,31 +294,43 @@ export default function ProductionPage() {
         }
 
         setIsSaving(true);
-
-        const docRef = doc(firestore, 'production', selectedLotForPressing.id);
-        const currentSinPrensar = selectedLotForPressing.qtySinPrensar || 0;
-        
-        let remainingSinPrensar = currentSinPrensar - totalProcessed;
-        let remainingAptaSinPrensar = (selectedLotForPressing.qtyAptaSinPrensarCalidad || 0);
-
-        if (currentSinPrensar < totalProcessed) {
-            remainingAptaSinPrensar -= (totalProcessed - currentSinPrensar);
-        }
-
-        const updateData = {
-            qtyFinalizada: (selectedLotForPressing.qtyFinalizada || 0) + pressedQty,
-            qtyScrap: (selectedLotForPressing.qtyScrap || 0) + scrapQty,
-            qtySinPrensar: Math.max(0, remainingSinPrensar),
-            qtyAptaSinPrensarCalidad: Math.max(0, remainingAptaSinPrensar),
-        };
+        const inventoryDocRef = doc(firestore, 'inventory', selectedLotForPressing.id);
 
         try {
-            await updateDoc(docRef, updateData);
+            const batch = writeBatch(firestore);
+            
+            // Update inventory
+            batch.update(inventoryDocRef, {
+                stockInyectado: increment(-totalProcessed),
+                stockListo: increment(pressedQty),
+            });
+
+            // Create a production record for the scrap from pressing
+            if (scrapQty > 0) {
+                const scrapProdRef = doc(collection(firestore, 'production'));
+                const scrapData = {
+                    fechaISO: new Date().toISOString(),
+                    machineId: 'prensado-manual',
+                    pieceId: selectedLotForPressing.id,
+                    turno: '',
+                    qtyScrap: scrapQty,
+                    // set other fields to 0 or defaults
+                    qtyFinalizada: 0,
+                    qtySinPrensar: 0,
+                    qtyArranque: 0,
+                    qtySegregada: 0,
+                    inspeccionadoCalidad: true,
+                    createdBy: user?.uid,
+                };
+                batch.set(scrapProdRef, scrapData);
+            }
+
+            await batch.commit();
             toast({ title: "Éxito", description: "Declaración de prensado guardada correctamente." });
             setIsPressingDialogOpen(false);
             forceRefresh();
         } catch (error) {
-             const contextualError = new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: updateData });
+             const contextualError = new FirestorePermissionError({ path: inventoryDocRef.path, operation: 'update', requestResourceData: pressingQuantities });
              errorEmitter.emit('permission-error', contextualError);
         } finally {
             setIsSaving(false);
@@ -315,8 +339,15 @@ export default function ProductionPage() {
     
     const isStep1Valid = turno && machineId && (selectedMachine?.type === 'inyectora' ? moldId : pieceId);
     const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap + prodQuantities.qtyArranque;
-    const totalSegregada = (existingProduction?.qtySegregada || 0);
-    const totalDeclared = totalDeclaredInSession + totalSegregada;
+    
+    // Total declared in previous sessions for this turn
+    const previousTotalDeclared = (existingProduction?.qtyFinalizada || 0) + 
+                                  (existingProduction?.qtySinPrensar || 0) +
+                                  (existingProduction?.qtyScrap || 0) +
+                                  (existingProduction?.qtyArranque || 0) +
+                                  (existingProduction?.qtySegregada || 0);
+
+    const totalDeclared = totalDeclaredInSession + previousTotalDeclared;
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
@@ -490,8 +521,7 @@ export default function ProductionPage() {
                                     className="h-20 text-xl justify-between"
                                     onClick={() => {
                                         setProdActiveField(key);
-                                        const currentNewQty = prodQuantities[key] - (existingProduction?.[key] || 0);
-                                        setProdCurrentInput(String(currentNewQty || ''));
+                                        setProdCurrentInput(String(prodQuantities[key] || ''));
                                     }}
                                 >
                                     <span>{label}</span>
@@ -499,8 +529,8 @@ export default function ProductionPage() {
                                 </Button>
                             ))}
                              <div className="h-20 text-xl justify-between flex items-center px-4 py-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
-                                <span>Segregada (Calidad)</span>
-                                <span className="font-bold text-2xl">{(existingProduction?.qtySegregada || 0).toLocaleString()}</span>
+                                <span>Total Turno Anterior</span>
+                                <span className="font-bold text-2xl">{previousTotalDeclared.toLocaleString()}</span>
                              </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
@@ -530,24 +560,21 @@ export default function ProductionPage() {
                                     <p><strong>Referencia:</strong> {getPieceCode(pieceId)}</p>
                                )}
                                <hr/>
-                               <div className="grid grid-cols-3 gap-x-8 gap-y-2 text-base">
+                               <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-base">
                                   <h4 className="font-semibold col-span-1">Categoría</h4>
-                                  <h4 className="font-semibold col-span-1 text-right">Cant. Anterior</h4>
-                                  <h4 className="font-semibold col-span-1 text-right">Nuevo Total</h4>
+                                  <h4 className="font-semibold col-span-1 text-right">Cantidad a Añadir</h4>
                                 {declarationFields.map(({key, label}) => {
-                                    const previousQty = existingProduction?.[key] || 0;
                                     const newQty = prodQuantities[key];
                                     return (
                                         <React.Fragment key={key}>
                                             <div className="col-span-1">{label}</div>
-                                            <div className="col-span-1 text-right text-muted-foreground">{previousQty.toLocaleString()}</div>
                                             <div className="col-span-1 text-right font-bold">{newQty.toLocaleString()}</div>
                                         </React.Fragment>
                                     );
                                 })}
-                                <hr className="col-span-3 my-2"/>
+                                <hr className="col-span-2 my-2"/>
                                  <div className="col-span-1 font-bold text-lg">Total Declarado</div>
-                                 <div className="col-span-2 text-right font-bold text-lg">{totalDeclared.toLocaleString()}</div>
+                                 <div className="col-span-1 text-right font-bold text-lg">{totalDeclaredInSession.toLocaleString()}</div>
                                </div>
                             </CardContent>
                         </Card>
@@ -590,22 +617,19 @@ export default function ProductionPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead>Máquina</TableHead>
                                     <TableHead>Pieza</TableHead>
                                     <TableHead className="text-right">Cantidad sin Prensar</TableHead>
                                     <TableHead className="text-center">Acción</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {lotsToPress.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">No hay lotes pendientes de prensado.</TableCell></TableRow>}
-                                {lotsToPress.map(lot => (
+                                {isLoadingInventory && <TableRow><TableCell colSpan={3} className="text-center h-24"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground"/></TableCell></TableRow>}
+                                {!isLoadingInventory && lotsToPress.length === 0 && <TableRow><TableCell colSpan={3} className="text-center h-24">No hay lotes pendientes de prensado.</TableCell></TableRow>}
+                                {!isLoadingInventory && lotsToPress.map(lot => (
                                     <TableRow key={lot.id}>
-                                        <TableCell>{new Date(lot.fechaISO).toLocaleDateString()}</TableCell>
-                                        <TableCell>{getMachineName(lot.machineId)}</TableCell>
-                                        <TableCell>{getPieceCode(lot.pieceId)}</TableCell>
+                                        <TableCell>{getPieceCode(lot.id)}</TableCell>
                                         <TableCell className="text-right font-bold">
-                                            {((lot.qtySinPrensar || 0) + (lot.qtyAptaSinPrensarCalidad || 0)).toLocaleString()}
+                                            {(lot.stockInyectado || 0).toLocaleString()}
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Button size="sm" onClick={() => {
@@ -628,15 +652,17 @@ export default function ProductionPage() {
                             <Card>
                                 <CardHeader><CardTitle>Lote a Procesar</CardTitle></CardHeader>
                                 <CardContent className="space-y-1">
-                                    <p><strong>Pieza:</strong> {getPieceCode(selectedLotForPressing.pieceId)}</p>
-                                    <p><strong>Fecha Lote:</strong> {new Date(selectedLotForPressing.fechaISO).toLocaleString()}</p>
-                                    <p><strong>Cantidad Disponible:</strong> <span className="font-bold text-lg">{((selectedLotForPressing.qtySinPrensar || 0) + (selectedLotForPressing.qtyAptaSinPrensarCalidad || 0)).toLocaleString()}</span></p>
+                                    <p><strong>Pieza:</strong> {getPieceCode(selectedLotForPressing.id)}</p>
+                                    <p><strong>Cantidad Disponible:</strong> <span className="font-bold text-lg">{(selectedLotForPressing.stockInyectado || 0).toLocaleString()}</span></p>
                                 </CardContent>
                             </Card>
                             <Button
                                 variant={pressingActiveField === 'pressedQty' ? "default" : "secondary"}
                                 className="h-20 text-xl justify-between"
-                                onClick={() => setPressingActiveField('pressedQty')}
+                                onClick={() => {
+                                    setPressingActiveField('pressedQty');
+                                    setPressingCurrentInput(String(pressingQuantities.pressedQty || ''));
+                                }}
                             >
                                 <span>Piezas Prensadas (OK)</span>
                                 <span className="font-bold text-2xl">{pressingQuantities.pressedQty.toLocaleString()}</span>
@@ -644,7 +670,10 @@ export default function ProductionPage() {
                              <Button
                                 variant={pressingActiveField === 'scrapQty' ? "destructive" : "secondary"}
                                 className={`h-20 text-xl justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
-                                onClick={() => setPressingActiveField('scrapQty')}
+                                onClick={() => {
+                                    setPressingActiveField('scrapQty');
+                                    setPressingCurrentInput(String(pressingQuantities.scrapQty || ''));
+                                }}
                             >
                                 <span>Scrap de Prensado</span>
                                 <span className="font-bold text-2xl">{pressingQuantities.scrapQty.toLocaleString()}</span>

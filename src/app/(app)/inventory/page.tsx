@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, TrendingUp, Loader2 } from "lucide-react";
-import type { Piece, Production } from "@/lib/types";
+import type { Piece, Inventory as InventoryType } from "@/lib/types";
 
 export default function InventoryPage() {
     const firestore = useFirestore();
@@ -20,35 +20,23 @@ export default function InventoryPage() {
     const piecesCollection = useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]);
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesCollection);
 
-    const productionCollection = useMemoFirebase(() => firestore ? collection(firestore, 'production') : null, [firestore]);
-    const { data: allProduction, isLoading: isLoadingProduction } = useCollection<Production>(productionCollection);
+    const inventoryCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
+    const { data: inventory, isLoading: isLoadingInventory } = useCollection<InventoryType>(inventoryCollection);
     
     const inventoryData = useMemo(() => {
-        if (!pieces || !allProduction) return [];
+        if (!pieces || !inventory) return [];
 
-        const pieceMap = new Map<string, { piece: Piece; stockListo: number; stockSinPrensar: number }>();
-
-        pieces.forEach(p => {
-             // We group by piece code, as different piece IDs can be the same marketable product
-             if (!pieceMap.has(p.codigo)) {
-                pieceMap.set(p.codigo, { piece: p, stockListo: 0, stockSinPrensar: 0 });
+        return pieces.map(piece => {
+            const inventoryItem = inventory.find(inv => inv.id === piece.id);
+            return {
+                piece: piece,
+                stockListo: inventoryItem?.stockListo || 0,
+                stockSinPrensar: inventoryItem?.stockInyectado || 0,
             }
         });
-        
-        allProduction.forEach(prod => {
-            const piece = pieces.find(p => p.id === prod.pieceId);
-            if (piece && pieceMap.has(piece.codigo)) {
-                const entry = pieceMap.get(piece.codigo)!;
-                // Accumulate stock based on production status
-                entry.stockListo += (prod.qtyFinalizada || 0) + (prod.qtyAptaCalidad || 0);
-                entry.stockSinPrensar += (prod.qtySinPrensar || 0) + (prod.qtyAptaSinPrensarCalidad || 0);
-            }
-        });
-
-        return Array.from(pieceMap.values());
-    }, [pieces, allProduction]);
+    }, [pieces, inventory]);
     
-    const isLoading = isLoadingPieces || isLoadingProduction;
+    const isLoading = isLoadingPieces || isLoadingInventory;
 
     return (
         <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -126,7 +114,7 @@ export default function InventoryPage() {
                             {!isLoading && inventoryData.length === 0 && (
                                  <TableRow>
                                     <TableCell colSpan={7} className="h-24 text-center">
-                                        No se encontraron piezas o datos de producción.
+                                        No se encontraron piezas o datos de inventario.
                                     </TableCell>
                                 </TableRow>
                             )}
