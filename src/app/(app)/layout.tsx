@@ -187,7 +187,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
         <div className="flex flex-col flex-1">
-            <header className="sticky top-0 z-40 flex h-[57px] items-center gap-1 border-b bg-background px-4 xl:hidden">
+            <header className="sticky top-0 z-40 flex h-[57px] items-center gap-1 border-b bg-background px-4 xl:hidden print:hidden">
                 <SidebarTrigger>
                     <PanelLeft />
                 </SidebarTrigger>
