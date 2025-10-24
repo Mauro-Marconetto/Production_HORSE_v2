@@ -16,7 +16,7 @@ import type { Production, Machine, Mold, Piece } from "@/lib/types";
 import { isToday, isWithinInterval } from "date-fns";
 
 type ProductionStep = 'selection' | 'declaration' | 'summary';
-type DeclarationField = 'qtyFinalizada' | 'qtySinPrensar' | 'qtyScrap' | 'qtyArranque';
+type DeclarationField = 'qtyFinalizada' | 'qtySinPrensar' | 'qtyScrap';
 type PressingStep = 'list' | 'declaration';
 type PressingDeclarationField = 'pressedQty' | 'scrapQty';
 
@@ -24,8 +24,7 @@ type PressingDeclarationField = 'pressedQty' | 'scrapQty';
 const allDeclarationFields: { key: DeclarationField, label: string }[] = [
     { key: 'qtyFinalizada', label: 'Finalizada' },
     { key: 'qtySinPrensar', label: 'Sin Prensar' },
-    { key: 'qtyScrap', label: 'Scrap' },
-    { key: 'qtyArranque', label: 'Pieza de arranque' },
+    { key: 'qtyScrap', label: 'Rechazo Interno' },
 ];
 
 async function findExistingProduction(
@@ -80,7 +79,7 @@ export default function ProductionPage() {
     const [moldId, setMoldId] = useState('');
     const [pieceId, setPieceId] = useState(''); // For granalladoras
     const [existingProduction, setExistingProduction] = useState<Production | null>(null);
-    const [prodQuantities, setProdQuantities] = useState({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
+    const [prodQuantities, setProdQuantities] = useState<{ qtyFinalizada: number; qtySinPrensar: number; qtyScrap: number }>({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
     const [prodCurrentInput, setProdCurrentInput] = useState('');
     const [prodActiveField, setProdActiveField] = useState<DeclarationField>('qtyFinalizada');
 
@@ -99,7 +98,7 @@ export default function ProductionPage() {
 
     const declarationFields = useMemo(() => {
         if (selectedMachine?.type === 'granalladora') {
-            return allDeclarationFields.filter(field => field.key !== 'qtySinPrensar' && field.key !== 'qtyArranque');
+            return allDeclarationFields.filter(field => field.key !== 'qtySinPrensar');
         }
         return allDeclarationFields;
     }, [selectedMachine]);
@@ -113,7 +112,7 @@ export default function ProductionPage() {
         setMoldId('');
         setPieceId('');
         setExistingProduction(null);
-        setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
+        setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
         setProdCurrentInput('');
         setProdActiveField('qtyFinalizada');
     }
@@ -152,9 +151,9 @@ export default function ProductionPage() {
                     setMoldId(existing.moldId || '');
                     setPieceId(existing.pieceId || '');
                     // For existing production, we only allow adding quantities, so inputs start at 0
-                    setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
+                    setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
                 } else {
-                     setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
+                     setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
                     if (selectedMachine?.assignments) {
                         const today = new Date();
                         const currentAssignment = selectedMachine.assignments.find(a => 
@@ -247,7 +246,7 @@ export default function ProductionPage() {
                     qtyFinalizada: increment(prodQuantities.qtyFinalizada),
                     qtySinPrensar: increment(prodQuantities.qtySinPrensar),
                     qtyScrap: increment(prodQuantities.qtyScrap),
-                    qtyArranque: increment(prodQuantities.qtyArranque || 0),
+                    qtyArranque: 0, // No longer used from UI
                 });
             } else {
                 const prodDocRef = doc(collection(firestore, "production"));
@@ -348,9 +347,9 @@ export default function ProductionPage() {
     };
     
     const isStep1Valid = turno && machineId && (selectedMachine?.type === 'inyectora' ? moldId : pieceId);
-    const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap + prodQuantities.qtyArranque;
+    const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap;
     
-    const totalDeclared = totalDeclaredInSession + (existingProduction?.qtySegregada || 0);
+    const previousTotalDeclared = (existingProduction?.qtySegregada || 0);
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
@@ -391,7 +390,7 @@ export default function ProductionPage() {
                 <TableHead className="text-right">Unidades OK</TableHead>
                 <TableHead className="text-right">Unidades Sin Prensar</TableHead>
                 <TableHead className="text-right">Unidades Producidas</TableHead>
-                <TableHead className="text-right">Scrap (%)</TableHead>
+                <TableHead className="text-right">Rechazo Interno (%)</TableHead>
                 <TableHead className="text-center">Calidad</TableHead>
               </TableRow>
             </TableHeader>
@@ -406,9 +405,9 @@ export default function ProductionPage() {
               {production?.map((p) => {
                 const unidadesOK = (p.qtyFinalizada || 0) + (p.qtyAptaCalidad || 0);
                 const unidadesSinPrensar = (p.qtySinPrensar || 0) + (p.qtyAptaSinPrensarCalidad || 0);
-                const scrapTotal = (p.qtyScrap || 0) + (p.qtyScrapCalidad || 0);
+                const scrapTotal = (p.qtyScrap || 0) + (p.qtyScrapCalidad || 0) + (p.qtyArranque || 0);
                 const totalUnitsForScrapCalc = unidadesOK + unidadesSinPrensar + scrapTotal + (p.qtySegregada || 0);
-                const totalUnits = totalUnitsForScrapCalc + (p.qtyArranque || 0);
+                const totalUnits = totalUnitsForScrapCalc;
                 const scrapPct = totalUnitsForScrapCalc > 0 ? scrapTotal / totalUnitsForScrapCalc : 0;
                 const isScrapHigh = scrapPct > 0.05;
 
@@ -533,7 +532,7 @@ export default function ProductionPage() {
                             ))}
                              <div className="h-20 text-xl justify-between flex items-center px-4 py-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
                                 <span>Piezas Segregadas</span>
-                                <span className="font-bold text-2xl">{(existingProduction?.qtySegregada || 0).toLocaleString()}</span>
+                                <span className="font-bold text-2xl">{previousTotalDeclared.toLocaleString()}</span>
                              </div>
                              <div className="grid grid-cols-2 gap-2 mt-auto">
                                 <Button type="button" variant="destructive" className="h-16 text-lg" onClick={() => setStep('selection')}>Cancelar</Button>

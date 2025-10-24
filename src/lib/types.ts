@@ -141,8 +141,8 @@ export interface Production {
   nroRack?: string;
   qtyFinalizada: number;
   qtySinPrensar: number;
-  qtyScrap: number;
-  qtyArranque?: number;
+  qtyScrap: number; // Represents "Rechazo Interno"
+  qtyArranque?: number; // Legacy, combined into qtyScrap
   qtySegregada: number;
   subproceso?: 'mecanizado' | 'granallado';
   createdBy?: string; // UID of user who declared production
@@ -239,5 +239,3 @@ export interface RemitoSettings {
   cai: string;
   caiExpiration: string; // ISO Date string
 }
-
-    
