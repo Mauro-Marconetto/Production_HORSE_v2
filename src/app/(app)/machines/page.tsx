@@ -34,7 +34,7 @@ import { MoreHorizontal, PlusCircle, Loader2, Trash2, CalendarDays, Edit } from 
 import type { Machine, Mold, ProductionAssignment, Piece } from '@/lib/types';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { addDays, format, isWithinInterval } from 'date-fns';
+import { addDays, format, isWithinInterval, parseISO } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -174,10 +174,11 @@ export default function AdminMachinesPage() {
   };
   
   const handleSaveAssignment = async () => {
-    if (!firestore || !selectedMachine || !assignmentDate?.from || !assignmentDate?.to) {
+    if (!firestore || !selectedMachine || !assignmentDate?.from) {
         toast({ title: "Error", description: "Completa el rango de fechas para añadir la programación.", variant: "destructive"});
         return;
     }
+    const assignmentEndDate = assignmentDate.to || assignmentDate.from;
 
     const isInjection = selectedMachine.type === 'inyectora';
     if (isInjection && !assignmentMoldId) {
@@ -188,7 +189,34 @@ export default function AdminMachinesPage() {
         toast({ title: "Error", description: "Selecciona una pieza para la granalladora.", variant: "destructive"});
         return;
     }
+    
+    // --- Overlap validation ---
+    const newStartDate = assignmentDate.from;
+    const newEndDate = assignmentEndDate;
 
+    const existingAssignments = selectedMachine.assignments || [];
+    const hasOverlap = existingAssignments.some(existing => {
+        // If we are editing, don't compare the assignment with itself
+        if (editingAssignmentId && existing.id === editingAssignmentId) {
+            return false;
+        }
+
+        const existingStartDate = parseISO(existing.startDate);
+        const existingEndDate = parseISO(existing.endDate);
+        
+        // Check for overlap: (StartA <= EndB) and (EndA >= StartB)
+        return newStartDate <= existingEndDate && newEndDate >= existingStartDate;
+    });
+
+    if (hasOverlap) {
+        toast({
+            title: "Error de Programación",
+            description: "Las fechas seleccionadas se solapan con una programación existente para esta máquina.",
+            variant: "destructive"
+        });
+        return;
+    }
+    // --- End of validation ---
 
     setIsSaving(true);
     const machineDocRef = doc(firestore, 'machines', selectedMachine.id);
@@ -196,7 +224,7 @@ export default function AdminMachinesPage() {
 
     const newAssignmentData: Omit<ProductionAssignment, 'id'> = {
         startDate: assignmentDate.from.toISOString(),
-        endDate: assignmentDate.to.toISOString(),
+        endDate: assignmentEndDate.toISOString(),
         ...(isInjection 
             ? { moldId: assignmentMoldId } 
             : { pieceId: assignmentPieceId })
@@ -569,3 +597,4 @@ export default function AdminMachinesPage() {
     </main>
   );
 }
+
