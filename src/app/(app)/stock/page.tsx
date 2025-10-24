@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 
 interface InventoryRow {
     piece: Piece;
-    state: 'Inyectado' | 'En Mecanizado' | 'Mecanizado' | 'Granallado' | 'Listo';
+    state: 'Sin Prensar' | 'En Mecanizado' | 'Mecanizado' | 'Granallado' | 'Listo';
     stock: number;
     totalStockForPiece: number;
 }
@@ -65,7 +65,7 @@ export default function StockPage() {
 
             const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo;
 
-            if (stockInyectado > 0) rows.push({ piece, state: 'Inyectado', stock: stockInyectado, totalStockForPiece: totalStock });
+            if (stockInyectado > 0) rows.push({ piece, state: 'Sin Prensar', stock: stockInyectado, totalStockForPiece: totalStock });
             if (stockEnMecanizado > 0) rows.push({ piece, state: 'En Mecanizado', stock: stockEnMecanizado, totalStockForPiece: totalStock });
             if (stockMecanizado > 0) rows.push({ piece, state: 'Mecanizado', stock: stockMecanizado, totalStockForPiece: totalStock });
             if (stockGranallado > 0) rows.push({ piece, state: 'Granallado', stock: stockGranallado, totalStockForPiece: totalStock });
@@ -177,7 +177,7 @@ export default function StockPage() {
 
     const getStateBadgeVariant = (state: InventoryRow['state']) => {
         switch(state) {
-            case 'Inyectado': return 'outline';
+            case 'Sin Prensar': return 'outline';
             case 'En Mecanizado': return 'destructive';
             case 'Mecanizado': return 'secondary';
             case 'Granallado': return 'secondary';
@@ -189,6 +189,9 @@ export default function StockPage() {
     const getStateBadgeIcon = (state: InventoryRow['state']) => {
         if (state === 'En Mecanizado') {
             return <Wrench className="mr-1 h-3 w-3" />;
+        }
+        if (state === 'Granallado') {
+             return <Wind className="mr-1 h-3 w-3" />;
         }
         return null;
     }
