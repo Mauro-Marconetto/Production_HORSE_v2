@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -350,14 +349,7 @@ export default function ProductionPage() {
     const isStep1Valid = turno && machineId && (selectedMachine?.type === 'inyectora' ? moldId : pieceId);
     const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap + prodQuantities.qtyArranque;
     
-    // Total declared in previous sessions for this turn
-    const previousTotalDeclared = (existingProduction?.qtyFinalizada || 0) + 
-                                  (existingProduction?.qtySinPrensar || 0) +
-                                  (existingProduction?.qtyScrap || 0) +
-                                  (existingProduction?.qtyArranque || 0) +
-                                  (existingProduction?.qtySegregada || 0);
-
-    const totalDeclared = totalDeclaredInSession + previousTotalDeclared;
+    const totalDeclared = totalDeclaredInSession + (existingProduction?.qtySegregada || 0);
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
@@ -539,8 +531,8 @@ export default function ProductionPage() {
                                 </Button>
                             ))}
                              <div className="h-20 text-xl justify-between flex items-center px-4 py-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
-                                <span>Total Turno Anterior</span>
-                                <span className="font-bold text-2xl">{previousTotalDeclared.toLocaleString()}</span>
+                                <span>Piezas Segregadas</span>
+                                <span className="font-bold text-2xl">{(existingProduction?.qtySegregada || 0).toLocaleString()}</span>
                              </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
@@ -720,4 +712,3 @@ export default function ProductionPage() {
 
     </main>
   );
-}
