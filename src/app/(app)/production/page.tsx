@@ -16,7 +16,7 @@ import type { Production, Machine, Mold, Piece } from "@/lib/types";
 import { isToday, isWithinInterval } from "date-fns";
 
 type ProductionStep = 'selection' | 'declaration' | 'summary';
-type DeclarationField = 'qtyFinalizada' | 'qtySinPrensar' | 'qtyScrap';
+type DeclarationField = 'qtyFinalizada' | 'qtySinPrensar' | 'qtyScrap' | 'qtyArranque';
 type PressingStep = 'list' | 'declaration';
 type PressingDeclarationField = 'pressedQty' | 'scrapQty';
 
@@ -24,7 +24,8 @@ type PressingDeclarationField = 'pressedQty' | 'scrapQty';
 const allDeclarationFields: { key: DeclarationField, label: string }[] = [
     { key: 'qtyFinalizada', label: 'Finalizada' },
     { key: 'qtySinPrensar', label: 'Sin Prensar' },
-    { key: 'qtyScrap', label: 'Rechazo Interno' },
+    { key: 'qtyScrap', label: 'Scrap' },
+    { key: 'qtyArranque', label: 'Pieza de arranque' },
 ];
 
 async function findExistingProduction(
@@ -79,7 +80,7 @@ export default function ProductionPage() {
     const [moldId, setMoldId] = useState('');
     const [pieceId, setPieceId] = useState(''); // For granalladoras
     const [existingProduction, setExistingProduction] = useState<Production | null>(null);
-    const [prodQuantities, setProdQuantities] = useState<{ qtyFinalizada: number; qtySinPrensar: number; qtyScrap: number }>({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
+    const [prodQuantities, setProdQuantities] = useState({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
     const [prodCurrentInput, setProdCurrentInput] = useState('');
     const [prodActiveField, setProdActiveField] = useState<DeclarationField>('qtyFinalizada');
 
@@ -98,7 +99,7 @@ export default function ProductionPage() {
 
     const declarationFields = useMemo(() => {
         if (selectedMachine?.type === 'granalladora') {
-            return allDeclarationFields.filter(field => field.key !== 'qtySinPrensar');
+            return allDeclarationFields.filter(field => field.key !== 'qtySinPrensar' && field.key !== 'qtyArranque');
         }
         return allDeclarationFields;
     }, [selectedMachine]);
@@ -112,7 +113,7 @@ export default function ProductionPage() {
         setMoldId('');
         setPieceId('');
         setExistingProduction(null);
-        setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
+        setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
         setProdCurrentInput('');
         setProdActiveField('qtyFinalizada');
     }
@@ -151,9 +152,9 @@ export default function ProductionPage() {
                     setMoldId(existing.moldId || '');
                     setPieceId(existing.pieceId || '');
                     // For existing production, we only allow adding quantities, so inputs start at 0
-                    setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
+                    setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
                 } else {
-                     setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0 });
+                     setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
                     if (selectedMachine?.assignments) {
                         const today = new Date();
                         const currentAssignment = selectedMachine.assignments.find(a => 
@@ -246,7 +247,7 @@ export default function ProductionPage() {
                     qtyFinalizada: increment(prodQuantities.qtyFinalizada),
                     qtySinPrensar: increment(prodQuantities.qtySinPrensar),
                     qtyScrap: increment(prodQuantities.qtyScrap),
-                    qtyArranque: 0, // No longer used from UI
+                    qtyArranque: increment(prodQuantities.qtyArranque || 0),
                 });
             } else {
                 const prodDocRef = doc(collection(firestore, "production"));
@@ -347,7 +348,7 @@ export default function ProductionPage() {
     };
     
     const isStep1Valid = turno && machineId && (selectedMachine?.type === 'inyectora' ? moldId : pieceId);
-    const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap;
+    const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap + (prodQuantities.qtyArranque || 0);
     
     const previousSegregatedQty = existingProduction?.qtySegregada || 0;
 
