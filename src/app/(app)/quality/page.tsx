@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, doc, updateDoc, query, orderBy, addDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy, addDoc, writeBatch } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import type { Production, Machine, Mold, Piece } from "@/lib/types";
 import { addDays, format, isWithinInterval } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
+import { increment } from "firebase/firestore";
 
 type QualityInspectionField = 'qtyAptaCalidad' | 'qtyAptaSinPrensarCalidad' | 'qtyScrapCalidad';
 
@@ -62,7 +63,7 @@ export default function QualityPage() {
             : null, 
     [firestore]);
     
-    const { data: allProduction, isLoading: isLoadingProd } = useCollection<Production>(productionQuery);
+    const { data: allProduction, isLoading: isLoadingProd, forceRefresh } = useCollection<Production>(productionQuery);
 
     const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]));
     const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]));
@@ -209,32 +210,42 @@ export default function QualityPage() {
         }
 
         setIsSaving(true);
+        const batch = writeBatch(firestore);
+        
+        // 1. Update Production Document
         const prodDocRef = doc(firestore, 'production', selectedProduction.id);
-        const currentApta = selectedProduction.qtyAptaCalidad || 0;
-        const currentAptaSinPrensar = selectedProduction.qtyAptaSinPrensarCalidad || 0;
-        const currentScrap = selectedProduction.qtyScrapCalidad || 0;
         const remainingSegregada = (selectedProduction.qtySegregada || 0) - totalInspectedInSession;
         
-        const updatedData = {
-            qtyAptaCalidad: currentApta + quantities.qtyAptaCalidad,
-            qtyAptaSinPrensarCalidad: currentAptaSinPrensar + quantities.qtyAptaSinPrensarCalidad,
-            qtyScrapCalidad: currentScrap + quantities.qtyScrapCalidad,
+        const updatedProdData = {
+            qtyAptaCalidad: increment(quantities.qtyAptaCalidad),
+            qtyAptaSinPrensarCalidad: increment(quantities.qtyAptaSinPrensarCalidad),
+            qtyScrapCalidad: increment(quantities.qtyScrapCalidad),
             qtySegregada: remainingSegregada,
             inspectedBy: user.uid,
             inspectionDate: new Date().toISOString(),
             inspeccionadoCalidad: remainingSegregada === 0,
         };
+        batch.update(prodDocRef, updatedProdData);
 
-        updateDoc(prodDocRef, updatedData)
-            .then(() => {
-                toast({ title: "Éxito", description: "Inspección de calidad guardada correctamente." });
-                handleCloseInspectionDialog();
-            })
-            .catch((error) => {
-                const contextualError = new FirestorePermissionError({ path: prodDocRef.path, operation: 'update', requestResourceData: updatedData });
-                errorEmitter.emit('permission-error', contextualError);
-            })
-            .finally(() => { setIsSaving(false); });
+        // 2. Update Inventory Document
+        const inventoryDocRef = doc(firestore, 'inventory', selectedProduction.pieceId);
+        const inventoryUpdateData = {
+            stockListo: increment(quantities.qtyAptaCalidad),
+            stockInyectado: increment(quantities.qtyAptaSinPrensarCalidad)
+        };
+        batch.update(inventoryDocRef, inventoryUpdateData);
+        
+        try {
+            await batch.commit();
+            toast({ title: "Éxito", description: "Inspección de calidad guardada y stock actualizado." });
+            handleCloseInspectionDialog();
+            forceRefresh(); // Force refresh of collections
+        } catch (error) {
+             const contextualError = new FirestorePermissionError({ path: prodDocRef.path, operation: 'update', requestResourceData: updatedProdData });
+             errorEmitter.emit('permission-error', contextualError);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleSaveSegregation = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -443,6 +454,7 @@ export default function QualityPage() {
                         <TableHead>Fecha Inspección</TableHead>
                         <TableHead>Máquina</TableHead>
                         <TableHead>Pieza / Molde</TableHead>
+                        <TableHead>Nro. Rack</TableHead>
                         <TableHead className="text-right">Total Segregado</TableHead>
                         <TableHead className="text-right text-green-600">Cantidad Apta</TableHead>
                         <TableHead className="text-right text-destructive">Cantidad Scrap</TableHead>
@@ -451,7 +463,7 @@ export default function QualityPage() {
                 <TableBody>
                      {isLoading && (
                         <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center">
+                            <TableCell colSpan={7} className="h-24 text-center">
                                 <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                             </TableCell>
                         </TableRow>
@@ -463,6 +475,7 @@ export default function QualityPage() {
                             <TableCell>{new Date(p.inspectionDate || p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                             <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
                             <TableCell>{getPieceCode(p.pieceId)} / {getMoldName(p.moldId)}</TableCell>
+                            <TableCell>{p.nroRack}</TableCell>
                             <TableCell className="text-right font-medium">{(aptaTotal) + (p.qtyScrapCalidad || 0)}</TableCell>
                             <TableCell className="text-right text-green-600 font-bold">{aptaTotal.toLocaleString()}</TableCell>
                             <TableCell className="text-right text-destructive font-bold">{(p.qtyScrapCalidad || 0).toLocaleString()}</TableCell>
@@ -470,7 +483,7 @@ export default function QualityPage() {
                     )})}
                     {!isLoading && inspectedHistory.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                            <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                                 No hay inspecciones en el rango de fechas seleccionado.
                             </TableCell>
                         </TableRow>
