@@ -349,7 +349,7 @@ export default function ProductionPage() {
     const isStep1Valid = turno && machineId && (selectedMachine?.type === 'inyectora' ? moldId : pieceId);
     const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap;
     
-    const previousTotalDeclared = (existingProduction?.qtySegregada || 0);
+    const previousSegregatedQty = existingProduction?.qtySegregada || 0;
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
@@ -389,6 +389,7 @@ export default function ProductionPage() {
                 <TableHead>Turno</TableHead>
                 <TableHead className="text-right">Unidades OK</TableHead>
                 <TableHead className="text-right">Unidades Sin Prensar</TableHead>
+                <TableHead className="text-right text-destructive">Rechazo Interno</TableHead>
                 <TableHead className="text-right">Unidades Producidas</TableHead>
                 <TableHead className="text-right">Rechazo Interno (%)</TableHead>
                 <TableHead className="text-center">Calidad</TableHead>
@@ -397,7 +398,7 @@ export default function ProductionPage() {
             <TableBody>
               {(isLoadingProd || isLoadingMachines || isLoadingMolds || isLoadingPieces) && (
                 <TableRow>
-                    <TableCell colSpan={10} className="h-24 text-center">
+                    <TableCell colSpan={11} className="h-24 text-center">
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                     </TableCell>
                 </TableRow>
@@ -420,7 +421,8 @@ export default function ProductionPage() {
                     <TableCell className="capitalize">{p.turno}</TableCell>
                     <TableCell className="text-right font-semibold">{unidadesOK.toLocaleString()}</TableCell>
                     <TableCell className="text-right">{unidadesSinPrensar.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{totalUnits.toLocaleString()}</TableCell>
+                    <TableCell className="text-right text-destructive">{scrapTotal.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-bold">{totalUnits.toLocaleString()}</TableCell>
                     <TableCell className={`text-right ${isScrapHigh ? 'text-destructive' : ''}`}>
                       {(scrapPct * 100).toFixed(1)}%
                     </TableCell>
@@ -440,7 +442,7 @@ export default function ProductionPage() {
               })}
               {!isLoadingProd && (!production || production.length === 0) && (
                  <TableRow>
-                    <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                         No hay registros de producción.
                     </TableCell>
                 </TableRow>
@@ -532,9 +534,9 @@ export default function ProductionPage() {
                             ))}
                              <div className="h-20 text-xl justify-between flex items-center px-4 py-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
                                 <span>Piezas Segregadas</span>
-                                <span className="font-bold text-2xl">{previousTotalDeclared.toLocaleString()}</span>
+                                <span className="font-bold text-2xl">{previousSegregatedQty.toLocaleString()}</span>
                              </div>
-                             <div className="grid grid-cols-2 gap-2 mt-auto">
+                            <div className="grid grid-cols-2 gap-2 mt-auto">
                                 <Button type="button" variant="destructive" className="h-16 text-lg" onClick={() => setStep('selection')}>Cancelar</Button>
                                 <Button type="button" className="h-16 text-lg bg-green-600 hover:bg-green-700" onClick={() => setStep('summary')}>Declarar</Button>
                             </div>
