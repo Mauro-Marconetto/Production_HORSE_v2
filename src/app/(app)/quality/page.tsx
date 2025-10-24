@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, doc, updateDoc, query, orderBy, addDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy, addDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -233,7 +233,7 @@ export default function QualityPage() {
             stockListo: increment(quantities.qtyAptaCalidad),
             stockInyectado: increment(quantities.qtyAptaSinPrensarCalidad)
         };
-        batch.update(inventoryDocRef, inventoryUpdateData);
+        batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
         
         try {
             await batch.commit();
