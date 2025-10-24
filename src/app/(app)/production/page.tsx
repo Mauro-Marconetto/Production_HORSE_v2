@@ -256,11 +256,21 @@ export default function ProductionPage() {
 
             // 2. Update the Inventory document
             const inventoryDocRef = doc(firestore, 'inventory', finalPieceId);
-            const inventoryUpdateData = {
-                stockListo: increment(prodQuantities.qtyFinalizada),
-                stockInyectado: increment(prodQuantities.qtySinPrensar),
-                // Scrap and Arranque don't go to inventory
-            };
+            let inventoryUpdateData: { [key: string]: any } = {};
+
+            if (selectedMachine?.type === 'granalladora') {
+                inventoryUpdateData = {
+                    stockGranallado: increment(prodQuantities.qtyFinalizada),
+                    stockInyectado: increment(-prodQuantities.qtyFinalizada),
+                    // Scrap from granallado doesn't affect inventory directly, it's just a loss
+                };
+            } else { // Inyectora
+                inventoryUpdateData = {
+                    stockListo: increment(prodQuantities.qtyFinalizada),
+                    stockInyectado: increment(prodQuantities.qtySinPrensar),
+                };
+            }
+            
             batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
 
             await batch.commit();
@@ -356,7 +366,7 @@ export default function ProductionPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-headline font-bold">Producción</h1>
           <p className="text-muted-foreground">Monitoriza y declara el progreso de la producción real.</p>
