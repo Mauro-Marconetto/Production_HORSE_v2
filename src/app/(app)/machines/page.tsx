@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -294,6 +295,17 @@ export default function AdminMachinesPage() {
     return currentAssignment || null;
   }
 
+  const disabledDates = useMemo(() => {
+    if (!selectedMachine?.assignments) return [];
+    
+    return selectedMachine.assignments
+        .filter(a => a.id !== editingAssignmentId) // Exclude the one being edited
+        .map(a => ({
+            from: parseISO(a.startDate),
+            to: parseISO(a.endDate)
+        }));
+  }, [selectedMachine, editingAssignmentId]);
+
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
@@ -539,6 +551,7 @@ export default function AdminMachinesPage() {
                                 selected={assignmentDate}
                                 onSelect={setAssignmentDate}
                                 numberOfMonths={2}
+                                disabled={disabledDates}
                             />
                             </PopoverContent>
                         </Popover>
@@ -597,4 +610,3 @@ export default function AdminMachinesPage() {
     </main>
   );
 }
-
