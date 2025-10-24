@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -534,6 +535,10 @@ export default function ProductionPage() {
                                 <span>Piezas Segregadas</span>
                                 <span className="font-bold text-2xl">{(existingProduction?.qtySegregada || 0).toLocaleString()}</span>
                              </div>
+                             <div className="grid grid-cols-2 gap-2 mt-auto">
+                                <Button type="button" variant="destructive" className="h-16 text-lg" onClick={() => setStep('selection')}>Cancelar</Button>
+                                <Button type="button" className="h-16 text-lg bg-green-600 hover:bg-green-700" onClick={() => setStep('summary')}>Declarar</Button>
+                            </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
@@ -590,8 +595,7 @@ export default function ProductionPage() {
                     )}
                      {step === 'declaration' && (
                         <>
-                            <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={() => setStep('selection')}>Anterior</Button>
-                            <Button type="button" className="w-48 h-12 text-lg" onClick={() => setStep('summary')}>Revisar</Button>
+                           {/* Buttons are now inside the main content for this step */}
                         </>
                     )}
                      {step === 'summary' && (
@@ -712,3 +716,4 @@ export default function ProductionPage() {
 
     </main>
   );
+}
