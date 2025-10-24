@@ -82,6 +82,10 @@
         "clienteId": {
           "type": "string",
           "description": "Reference to the client that buys this piece."
+        },
+        "tiempoDeCiclo": {
+          "type": "number",
+          "description": "The cycle time in seconds for the piece."
         }
       },
       "required": [

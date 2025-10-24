@@ -100,6 +100,7 @@ export default function AdminPiecesPage() {
         const moldNameFromInput = (formData.get('moldName') as string).trim();
         const stockMin = Number(formData.get('stockMin'));
         const stockMax = Number(formData.get('stockMax'));
+        const tiempoDeCiclo = Number(formData.get('tiempoDeCiclo'));
         const requiereGranalladoValue = formData.get('requiereGranallado') === 'on';
         const requiereMecanizadoValue = formData.get('requiereMecanizado') === 'on';
 
@@ -121,6 +122,7 @@ export default function AdminPiecesPage() {
                 clienteId: selectedPiece?.clienteId || '', // preserve client if exists
                 stockMin: stockMin || 0,
                 stockMax: stockMax || 0,
+                tiempoDeCiclo: tiempoDeCiclo || 0,
                 requiereGranallado: requiereGranalladoValue,
                 requiereMecanizado: requiereMecanizadoValue,
             };
@@ -265,13 +267,14 @@ export default function AdminPiecesPage() {
                         <TableHead>Subprocesos</TableHead>
                         <TableHead className="text-right">Stock Mín.</TableHead>
                         <TableHead className="text-right">Stock Máx.</TableHead>
+                        <TableHead className="text-right">Tiempo Ciclo (s)</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading && (
                             <TableRow>
-                                <TableCell colSpan={7} className="h-24 text-center">
+                                <TableCell colSpan={8} className="h-24 text-center">
                                     <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                                 </TableCell>
                             </TableRow>
@@ -321,6 +324,7 @@ export default function AdminPiecesPage() {
                                    </TableCell>
                                     <TableCell className="text-right">{(piece.stockMin || 0).toLocaleString()}</TableCell>
                                     <TableCell className="text-right">{(piece.stockMax || 0).toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{(piece.tiempoDeCiclo || 0)}</TableCell>
                                     <TableCell className="text-right">
                                         <AlertDialog>
                                             <DropdownMenu>
@@ -368,7 +372,7 @@ export default function AdminPiecesPage() {
                         })}
                          {!isLoading && (!pieces || pieces.length === 0) && (
                             <TableRow>
-                                <TableCell colSpan={7} className="h-24 text-center">
+                                <TableCell colSpan={8} className="h-24 text-center">
                                     No se encontraron piezas.
                                 </TableCell>
                             </TableRow>
@@ -405,6 +409,10 @@ export default function AdminPiecesPage() {
                          <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="stockMax" className="text-right">Stock Máximo</Label>
                             <Input id="stockMax" name="stockMax" type="number" defaultValue={selectedPiece?.stockMax || ''} className="col-span-3" />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="tiempoDeCiclo" className="text-right">Tiempo de Ciclo (s)</Label>
+                            <Input id="tiempoDeCiclo" name="tiempoDeCiclo" type="number" defaultValue={selectedPiece?.tiempoDeCiclo || ''} className="col-span-3" />
                         </div>
 
                         <div className="grid grid-cols-4 items-start gap-4">
