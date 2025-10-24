@@ -34,7 +34,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from '@/components/ui/checkbox';
 import { MoreHorizontal, PlusCircle, Loader2, Trash2, Wrench } from 'lucide-react';
-import type { Piece, Mold, Machine } from '@/lib/types';
+import type { Piece, Mold, Machine, Inventory } from '@/lib/types';
 import { Wind } from 'lucide-react';
 
 export default function AdminPiecesPage() {
@@ -94,6 +94,7 @@ export default function AdminPiecesPage() {
 
         setIsSaving(true);
         const formData = new FormData(e.currentTarget);
+        const isNewPiece = !selectedPiece;
         const pieceId = selectedPiece ? selectedPiece.id : `P${Date.now()}`;
         const codigo = formData.get('codigo') as string;
         const moldNameFromInput = (formData.get('moldName') as string).trim();
@@ -125,10 +126,24 @@ export default function AdminPiecesPage() {
             };
             batch.set(pieceDocRef, pieceData, { merge: true });
 
-            // 2. Find original mold if editing
+            // 2. If it's a new piece, create its inventory document
+            if (isNewPiece) {
+                const inventoryDocRef = doc(firestore, 'inventory', pieceId);
+                const initialInventory: Inventory = {
+                    id: pieceId,
+                    stockInyectado: 0,
+                    stockEnMecanizado: 0,
+                    stockMecanizado: 0,
+                    stockGranallado: 0,
+                    stockListo: 0,
+                };
+                batch.set(inventoryDocRef, initialInventory);
+            }
+
+            // 3. Find original mold if editing
             const originalMold = selectedPiece ? molds?.find(m => m.pieces.includes(selectedPiece.id)) : undefined;
 
-            // 3. Find or create the new mold
+            // 4. Find or create the new mold
             const moldsQuery = query(collection(firestore, 'molds'), where("nombre", "==", moldNameFromInput));
             const querySnapshot = await getDocs(moldsQuery);
             let newMoldRef: any;
@@ -157,7 +172,7 @@ export default function AdminPiecesPage() {
                 };
             }
             
-            // 4. Update mold associations
+            // 5. Update mold associations
             // If the piece was associated with a different mold before, remove it
             if (originalMold && originalMold.id !== newMoldData.id) {
                 const oldMoldRef = doc(firestore, 'molds', originalMold.id);

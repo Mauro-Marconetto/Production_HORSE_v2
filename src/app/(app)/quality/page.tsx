@@ -233,6 +233,7 @@ export default function QualityPage() {
             stockListo: increment(quantities.qtyAptaCalidad),
             stockInyectado: increment(quantities.qtyAptaSinPrensarCalidad)
         };
+        // Use set with merge to create the document if it doesn't exist
         batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
         
         try {
