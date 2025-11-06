@@ -39,7 +39,7 @@ service cloud.firestore {
      * @principle Allows open access to user profiles.
      */
     match /users/{userId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -51,7 +51,7 @@ service cloud.firestore {
      * @principle Allows open access to role information.
      */
     match /roles/{roleId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -63,7 +63,7 @@ service cloud.firestore {
      * @principle Allows open access to piece information.
      */
     match /pieces/{pieceId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -75,7 +75,7 @@ service cloud.firestore {
      * @principle Allows open access to mold information.
      */
     match /molds/{moldId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -87,7 +87,7 @@ service cloud.firestore {
      * @principle Allows open access to machine information.
      */
     match /machines/{machineId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -99,7 +99,7 @@ service cloud.firestore {
      * @principle Allows open access to demand information.
      */
     match /demand/{periodoYYYYWW}/{pieceId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -111,7 +111,7 @@ service cloud.firestore {
      * @principle Allows open access to inventory information.
      */
     match /inventory/{pieceId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -123,7 +123,7 @@ service cloud.firestore {
      * @principle Allows open access to calendar information.
      */
     match /calendars/{machineId}/{periodoYYYYWW} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -135,7 +135,7 @@ service cloud.firestore {
      * @principle Allows open access to downtime information.
      */
     match /downtime/{machineId}/{YYYYMM} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -147,7 +147,7 @@ service cloud.firestore {
      * @principle Allows open access to downtime_agg information.
      */
     match /downtime_agg/{machineId}/{YYYYMM} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -159,7 +159,7 @@ service cloud.firestore {
      * @principle Allows open access to plan information.
      */
     match /plans/{planId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -171,7 +171,7 @@ service cloud.firestore {
      * @principle Allows open access to assignment information.
      */
     match /plans/{planId}/assignments/{assignmentId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -183,7 +183,7 @@ service cloud.firestore {
      * @principle Allows open access to production information.
      */
     match /production/{productionId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -195,7 +195,7 @@ service cloud.firestore {
      * @principle Allows open access to global settings.
      */
     match /settings/global {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
     
     /**
@@ -207,7 +207,7 @@ service cloud.firestore {
      * @principle Allows open access to remito settings.
      */
     match /settings/remitos {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     /**
@@ -219,7 +219,7 @@ service cloud.firestore {
      * @principle Allows open access to client information.
      */
     match /clients/{clientId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
     
     /**
@@ -231,7 +231,7 @@ service cloud.firestore {
      * @principle Allows open access to supplier information.
      */
     match /suppliers/{supplierId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
     
     /**
@@ -243,7 +243,7 @@ service cloud.firestore {
      * @principle Allows open access to remito information.
      */
     match /remitos/{remitoId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
     
      /**
@@ -255,7 +255,7 @@ service cloud.firestore {
      * @principle Allows open access to machining process information.
      */
     match /machining/{machiningId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }
