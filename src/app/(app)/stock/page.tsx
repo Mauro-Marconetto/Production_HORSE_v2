@@ -1,9 +1,8 @@
 
-
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, addDoc, serverTimestamp, writeBatch, doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, writeBatch, doc, getDoc, updateDoc, increment, query, where } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
