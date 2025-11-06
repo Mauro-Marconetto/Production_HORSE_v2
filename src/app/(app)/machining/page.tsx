@@ -42,11 +42,8 @@ export default function SubprocessesPage() {
     const { toast } = useToast();
 
     // Data Hooks
-    const machiningQuery = useMemoFirebase(() => firestore ? query(collection(firestore, "machining"), where("status", "in", ["Enviado", "En Proceso"])) : null, [firestore]);
+    const machiningQuery = useMemoFirebase(() => firestore ? query(collection(firestore, "machining"), orderBy("remitoId", "desc")) : null, [firestore]);
     const { data: machiningProcesses, isLoading: isLoadingMachining, forceRefresh: refreshMachining } = useCollection<MachiningProcess>(machiningQuery);
-    
-    const productionQuery = useMemoFirebase(() => firestore ? query(collection(firestore, "production"), where("subproceso", "==", "mecanizado"), orderBy("fechaISO", "desc")) : null, [firestore]);
-    const { data: machiningProduction, isLoading: isLoadingMachiningProd } = useCollection<Production>(productionQuery);
 
     const suppliersQuery = useMemoFirebase(() => firestore ? collection(firestore, "suppliers") : null, [firestore]);
     const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<Supplier>(suppliersQuery);
@@ -72,19 +69,25 @@ export default function SubprocessesPage() {
     const [isSaving, setIsSaving] = useState(false);
     
 
-    const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingMachiningProd;
+    const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos;
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
-
-    const piecesInMachining = useMemo(() => {
-        if (!machiningProcesses || !pieces) return [];
-        const pieceIds = [...new Set(machiningProcesses.map(p => p.pieceId))];
-        return pieces.filter(p => pieceIds.includes(p.id));
-    }, [machiningProcesses, pieces]);
-
+    
     const activeLots = useMemo(() => {
         if (!machiningProcesses) return [];
-        return machiningProcesses.filter(p => p.qtyEnviada > 0);
-    }, [machiningProcesses])
+        return machiningProcesses.filter(p => p.status === 'Enviado' || p.status === 'En Proceso');
+    }, [machiningProcesses]);
+
+    const completedLots = useMemo(() => {
+        if (!machiningProcesses) return [];
+        return machiningProcesses.filter(p => p.status === 'Finalizado');
+    }, [machiningProcesses]);
+
+
+    const piecesInMachining = useMemo(() => {
+        if (!activeLots || !pieces) return [];
+        const pieceIds = [...new Set(activeLots.map(p => p.pieceId))];
+        return pieces.filter(p => pieceIds.includes(p.id));
+    }, [activeLots, pieces]);
 
 
     useEffect(() => {
@@ -118,16 +121,10 @@ export default function SubprocessesPage() {
             const batch = writeBatch(firestore);
 
             // 1. Find all pending machining lots for the selected piece
-            const lotsQuery = query(
-                collection(firestore, 'machining'), 
-                where('pieceId', '==', selectedPieceId),
-                where('qtyEnviada', '>', 0)
-            );
-            const lotsSnapshot = await getDocs(lotsQuery);
+            const lotsForPiece = (machiningProcesses || []).filter(p => p.pieceId === selectedPieceId && (p.status === 'Enviado' || p.status === 'En Proceso'));
 
             // 2. Sort lots by remito date (oldest first)
-            const sortedLots = lotsSnapshot.docs
-                .map(d => ({ id: d.id, ...d.data() } as MachiningProcess & {remitoDate: string}))
+            const sortedLots = lotsForPiece
                 .map(lot => {
                     const remito = remitos?.find(r => r.id === lot.remitoId);
                     return { ...lot, remitoDate: remito?.fecha || '9999' };
@@ -143,9 +140,16 @@ export default function SubprocessesPage() {
                 const lotDocRef = doc(firestore, 'machining', lot.id);
                 const deductAmount = Math.min(lot.qtyEnviada, remainingToDeduct);
                 
+                const newStatus = lot.qtyEnviada - deductAmount > 0 ? "En Proceso" : "Finalizado";
+
                 batch.update(lotDocRef, { 
                     qtyEnviada: increment(-deductAmount),
-                    status: lot.qtyEnviada - deductAmount > 0 ? "En Proceso" : "Finalizado"
+                    status: newStatus,
+                    qtyMecanizada: increment(quantities.qtyMecanizada * (deductAmount / totalDeclared)),
+                    qtyEnsamblada: increment(quantities.qtyEnsamblada * (deductAmount / totalDeclared)),
+                    qtySegregada: increment(quantities.qtySegregada * (deductAmount / totalDeclared)),
+                    qtyScrapMecanizado: increment(quantities.qtyScrapMecanizado * (deductAmount / totalDeclared)),
+                    qtyScrapEnsamblado: increment(quantities.qtyScrapEnsamblado * (deductAmount / totalDeclared)),
                 });
                 
                 remainingToDeduct -= deductAmount;
@@ -159,28 +163,9 @@ export default function SubprocessesPage() {
             const inventoryDocRef = doc(firestore, 'inventory', selectedPieceId);
             batch.set(inventoryDocRef, {
                 stockMecanizado: increment(quantities.qtyMecanizada),
-                // Assuming Ensamblado goes to a different stock or is ready
-                // For now, let's assume it also goes to 'stockMecanizado'
-                // This can be changed to a new inventory state if needed
                 stockListo: increment(quantities.qtyEnsamblada), 
             }, { merge: true });
 
-            // 5. Create a production record for traceability
-            const prodRecordId = `prod-${Date.now()}`;
-            const prodRecordRef = doc(firestore, 'production', prodRecordId);
-            const productionRecord: Partial<Production> = {
-                id: prodRecordId,
-                fechaISO: new Date().toISOString(),
-                pieceId: selectedPieceId,
-                machineId: 'mecanizado-externo',
-                subproceso: 'mecanizado',
-                qtyFinalizada: quantities.qtyMecanizada + quantities.qtyEnsamblada, // Sum of good parts
-                qtySegregada: quantities.qtySegregada,
-                qtyScrap: quantities.qtyScrapMecanizado + quantities.qtyScrapEnsamblado,
-                qtySinPrensar: 0,
-                inspeccionadoCalidad: true, // Assume external production is inspected
-            };
-            batch.set(prodRecordRef, productionRecord);
 
             await batch.commit();
             toast({ title: "Éxito", description: "Producción de mecanizado declarada y stock actualizado." });
@@ -270,7 +255,6 @@ export default function SubprocessesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha Declaración</TableHead>
                 <TableHead>Pieza</TableHead>
                 <TableHead className="text-right">Mecanizadas (OK)</TableHead>
                 <TableHead className="text-right">Ensambladas (OK)</TableHead>
@@ -280,24 +264,23 @@ export default function SubprocessesPage() {
             <TableBody>
                 {isLoading && (
                     <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
+                        <TableCell colSpan={4} className="h-24 text-center">
                             <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                         </TableCell>
                     </TableRow>
                 )}
-                {!isLoading && machiningProduction?.map(prod => (
+                {!isLoading && completedLots.map(prod => (
                     <TableRow key={prod.id}>
-                        <TableCell>{new Date(prod.fechaISO).toLocaleString('es-AR')}</TableCell>
                         <TableCell>{getPieceCode(prod.pieceId)}</TableCell>
-                        <TableCell className="text-right">{(prod.qtyFinalizada || 0).toLocaleString()}</TableCell>
-                        <TableCell className="text-right">{(prod.qtyAptaCalidad || 0).toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-destructive">{(prod.qtyScrap || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{((prod.qtyMecanizada || 0) + (prod.qtyEnsamblada || 0)).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{((prod.qtyEnsamblada || 0)).toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-destructive">{((prod.qtyScrapMecanizado || 0) + (prod.qtyScrapEnsamblado || 0)).toLocaleString()}</TableCell>
                     </TableRow>
                 ))}
-                 {!isLoading && (!machiningProduction || machiningProduction.length === 0) && (
+                 {!isLoading && (!completedLots || completedLots.length === 0) && (
                     <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                            No hay declaraciones de mecanizado.
+                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                            No hay declaraciones de mecanizado finalizadas.
                         </TableCell>
                     </TableRow>
                 )}
@@ -405,3 +388,5 @@ export default function SubprocessesPage() {
     </main>
   );
 }
+
+    
