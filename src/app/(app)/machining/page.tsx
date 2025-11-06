@@ -114,64 +114,70 @@ export default function SubprocessesPage() {
             toast({ title: "Error", description: "Selecciona una pieza y declara al menos una cantidad.", variant: "destructive" });
             return;
         }
-
+    
         setIsSaving(true);
         
         try {
             const batch = writeBatch(firestore);
-
+    
             // 1. Find all pending machining lots for the selected piece
             const lotsForPiece = (machiningProcesses || []).filter(p => p.pieceId === selectedPieceId && (p.status === 'Enviado' || p.status === 'En Proceso'));
-
-            // 2. Sort lots by remito date (oldest first)
+    
+            // 2. Sort lots by remito date (oldest first) - FIFO
             const sortedLots = lotsForPiece
-                .map(lot => {
-                    const remito = remitos?.find(r => r.id === lot.remitoId);
-                    return { ...lot, remitoDate: remito?.fecha || '9999' };
-                })
+                .map(lot => ({ ...lot, remitoDate: remitos?.find(r => r.id === lot.remitoId)?.fecha || '9999' }))
                 .sort((a, b) => a.remitoDate.localeCompare(b.remitoDate));
-
-            let remainingToDeduct = totalDeclared;
-            
-            // 3. Deduct quantities from lots (FIFO)
+    
+            // 3. Check if there's enough stock across all lots
+            const totalStockEnMecanizado = sortedLots.reduce((sum, lot) => sum + lot.qtyEnviada, 0);
+            if (totalDeclared > totalStockEnMecanizado) {
+                throw new Error(`No hay suficiente stock en mecanizado para la pieza ${getPieceCode(selectedPieceId)}. Se intentan declarar ${totalDeclared} y solo hay ${totalStockEnMecanizado}.`);
+            }
+    
+            // 4. Distribute declared quantities across lots
+            let remainingQuantities = { ...quantities };
+    
             for (const lot of sortedLots) {
-                if (remainingToDeduct <= 0) break;
-                
+                if (Object.values(remainingQuantities).every(q => q === 0)) break;
+    
                 const lotDocRef = doc(firestore, 'machining', lot.id);
-                const deductAmount = Math.min(lot.qtyEnviada, remainingToDeduct);
-                
-                const newStatus = lot.qtyEnviada - deductAmount > 0 ? "En Proceso" : "Finalizado";
-
-                batch.update(lotDocRef, { 
-                    qtyEnviada: increment(-deductAmount),
-                    status: newStatus,
-                    qtyMecanizada: increment(quantities.qtyMecanizada * (deductAmount / totalDeclared)),
-                    qtyEnsamblada: increment(quantities.qtyEnsamblada * (deductAmount / totalDeclared)),
-                    qtySegregada: increment(quantities.qtySegregada * (deductAmount / totalDeclared)),
-                    qtyScrapMecanizado: increment(quantities.qtyScrapMecanizado * (deductAmount / totalDeclared)),
-                    qtyScrapEnsamblado: increment(quantities.qtyScrapEnsamblado * (deductAmount / totalDeclared)),
-                });
-                
-                remainingToDeduct -= deductAmount;
+                let lotDeductionTotal = 0;
+                const updatePayload: Record<string, any> = {};
+    
+                // Iterate over each quantity type to deduct from the lot
+                for (const key of Object.keys(remainingQuantities) as DeclarationField[]) {
+                    if (remainingQuantities[key] > 0) {
+                        const amountToProcessFromLot = Math.min(lot.qtyEnviada - lotDeductionTotal, remainingQuantities[key]);
+                        if (amountToProcessFromLot > 0) {
+                            updatePayload[key] = increment(amountToProcessFromLot);
+                            lotDeductionTotal += amountToProcessFromLot;
+                            remainingQuantities[key] -= amountToProcessFromLot;
+                        }
+                    }
+                }
+    
+                if (lotDeductionTotal > 0) {
+                    const newQtyEnviada = lot.qtyEnviada - lotDeductionTotal;
+                    updatePayload['qtyEnviada'] = newQtyEnviada;
+                    updatePayload['status'] = newQtyEnviada > 0 ? "En Proceso" : "Finalizado";
+                    batch.update(lotDocRef, updatePayload);
+                }
             }
-
-            if (remainingToDeduct > 0) {
-                throw new Error(`No hay suficiente stock en mecanizado para la pieza ${getPieceCode(selectedPieceId)}. Faltan ${remainingToDeduct} unidades.`);
-            }
-
-            // 4. Update inventory
+    
+            // 5. Update main inventory
             const inventoryDocRef = doc(firestore, 'inventory', selectedPieceId);
             batch.set(inventoryDocRef, {
                 stockMecanizado: increment(quantities.qtyMecanizada),
-                stockListo: increment(quantities.qtyEnsamblada), 
+                stockListo: increment(quantities.qtyEnsamblada),
+                // Note: segregada/scrap are just for record-keeping in the machining process
+                // and don't affect main inventory until a quality process decides so.
             }, { merge: true });
-
-
+    
             await batch.commit();
             toast({ title: "Éxito", description: "Producción de mecanizado declarada y stock actualizado." });
             setIsDialogOpen(false);
             refreshMachining();
-
+    
         } catch (error: any) {
             console.error("Error saving machining production:", error);
             toast({ title: "Error", description: error.message || "No se pudo guardar la declaración.", variant: "destructive" });
@@ -272,7 +278,7 @@ export default function SubprocessesPage() {
                 {!isLoading && completedLots.map(prod => (
                     <TableRow key={prod.id}>
                         <TableCell>{getPieceCode(prod.pieceId)}</TableCell>
-                        <TableCell className="text-right">{((prod.qtyMecanizada || 0) + (prod.qtyEnsamblada || 0)).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{((prod.qtyMecanizada || 0)).toLocaleString()}</TableCell>
                         <TableCell className="text-right">{((prod.qtyEnsamblada || 0)).toLocaleString()}</TableCell>
                         <TableCell className="text-right text-destructive">{((prod.qtyScrapMecanizado || 0) + (prod.qtyScrapEnsamblado || 0)).toLocaleString()}</TableCell>
                     </TableRow>
@@ -389,4 +395,3 @@ export default function SubprocessesPage() {
   );
 }
 
-    
