@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
@@ -16,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, Edit, Loader2, Calendar as CalendarIcon, PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Production, Machine, Mold, Piece } from "@/lib/types";
+import type { Production, Machine, Mold, Piece, Inventory } from "@/lib/types";
 import { addDays, format, isWithinInterval } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,13 @@ const defectOptions = [
     "Otros",
 ];
 const controlTypeOptions = ["RX", "Dimensional", "Visual", "Composición Química"];
+const origenSegregadoOptions: { value: keyof Inventory, label: string }[] = [
+    { value: 'stockListo', label: 'Stock Listo' },
+    { value: 'stockInyectado', label: 'Stock Inyectado' },
+    { value: 'stockMecanizado', label: 'Stock Mecanizado' },
+    { value: 'stockGranallado', label: 'Stock Granallado' },
+];
+
 
 export default function QualityPage() {
     const firestore = useFirestore();
@@ -122,7 +130,8 @@ export default function QualityPage() {
         defecto: '',
         defectoOtro: '',
         tipoControl: '',
-        qtySegregada: ''
+        qtySegregada: '',
+        origenSegregado: 'stockListo' as keyof Inventory,
     });
 
     const getMachineForProduction = (prod: Production | null) => {
@@ -132,7 +141,7 @@ export default function QualityPage() {
 
     const inspectionFields = useMemo(() => {
         const machine = getMachineForProduction(selectedProduction);
-        if (machine?.type === 'granalladora') {
+        if (machine?.type === 'granalladora' || selectedProduction?.origenSegregado !== 'stockInyectado') {
             return allInspectionFields.filter(field => field.key !== 'qtyAptaSinPrensarCalidad');
         }
         return allInspectionFields;
@@ -140,9 +149,20 @@ export default function QualityPage() {
 
     useEffect(() => {
         if (selectedProduction) {
-            setQuantities({ qtyAptaCalidad: 0, qtyAptaSinPrensarCalidad: 0, qtyScrapCalidad: 0 });
-            setCurrentInput('');
-            setActiveField('qtyAptaCalidad');
+            let defaultAptaField: QualityInspectionField = 'qtyAptaCalidad';
+            let initialQuantities = { qtyAptaCalidad: 0, qtyAptaSinPrensarCalidad: 0, qtyScrapCalidad: 0 };
+            
+            // If the origin was inyectado, default to apta sin prensar
+            if(selectedProduction.origenSegregado === 'stockInyectado') {
+                defaultAptaField = 'qtyAptaSinPrensarCalidad';
+                initialQuantities.qtyAptaSinPrensarCalidad = selectedProduction.qtySegregada;
+            } else {
+                initialQuantities.qtyAptaCalidad = selectedProduction.qtySegregada;
+            }
+
+            setQuantities(initialQuantities);
+            setCurrentInput(String(selectedProduction.qtySegregada));
+            setActiveField(defaultAptaField);
             setIsInspectionDialogOpen(true);
         }
     }, [selectedProduction]);
@@ -193,7 +213,7 @@ export default function QualityPage() {
     const handleClear = () => setCurrentInput('');
 
     const totalInspectedInSession = quantities.qtyAptaCalidad + quantities.qtyAptaSinPrensarCalidad + quantities.qtyScrapCalidad;
-    const isInspectionAmountValid = totalInspectedInSession <= (selectedProduction?.qtySegregada || 0);
+    const isInspectionAmountValid = totalInspectedInSession === (selectedProduction?.qtySegregada || 0);
 
     const handleSaveInspection = async () => {
         if (!firestore || !selectedProduction || !user) {
@@ -205,7 +225,7 @@ export default function QualityPage() {
             return;
         }
         if (!isInspectionAmountValid) {
-            toast({ title: "Error de validación", description: "La cantidad inspeccionada no puede ser mayor a la cantidad segregada.", variant: "destructive" });
+            toast({ title: "Error de validación", description: `La cantidad inspeccionada (${totalInspectedInSession}) debe ser igual a la cantidad segregada (${selectedProduction.qtySegregada}).`, variant: "destructive" });
             return;
         }
 
@@ -214,22 +234,21 @@ export default function QualityPage() {
         
         // 1. Update Production Document
         const prodDocRef = doc(firestore, 'production', selectedProduction.id);
-        const remainingSegregada = (selectedProduction.qtySegregada || 0) - totalInspectedInSession;
-        
         const updatedProdData = {
             qtyAptaCalidad: increment(quantities.qtyAptaCalidad),
             qtyAptaSinPrensarCalidad: increment(quantities.qtyAptaSinPrensarCalidad),
             qtyScrapCalidad: increment(quantities.qtyScrapCalidad),
-            qtySegregada: remainingSegregada,
+            qtySegregada: 0, // All have been inspected
             inspectedBy: user.uid,
             inspectionDate: new Date().toISOString(),
-            inspeccionadoCalidad: remainingSegregada === 0,
+            inspeccionadoCalidad: true,
         };
         batch.update(prodDocRef, updatedProdData);
 
         // 2. Update Inventory Document
         const inventoryDocRef = doc(firestore, 'inventory', selectedProduction.pieceId);
         const inventoryUpdateData = {
+            stockPendienteCalidad: increment(-totalInspectedInSession),
             stockListo: increment(quantities.qtyAptaCalidad),
             stockInyectado: increment(quantities.qtyAptaSinPrensarCalidad)
         };
@@ -258,32 +277,56 @@ export default function QualityPage() {
             toast({ title: "Error", description: "El molde seleccionado no tiene una pieza asociada.", variant: "destructive" });
             return;
         }
+        
+        const qtyToSegregate = Number(segregateForm.qtySegregada);
+        if (qtyToSegregate <= 0) {
+            toast({ title: "Error", description: "La cantidad a segregar debe ser mayor a cero.", variant: "destructive" });
+            return;
+        }
 
         setIsSaving(true);
-        const segregationData: Omit<Production, 'id' > = {
-            ...segregateForm,
-            qtySegregada: Number(segregateForm.qtySegregada),
-            pieceId: pieceId,
-            qtyFinalizada: 0,
-            qtySinPrensar: 0,
-            qtyScrap: 0,
-            qtyArranque: 0,
-            createdBy: user.uid,
-            inspeccionadoCalidad: false,
-            fechaISO: new Date().toISOString(),
-        };
+        const batch = writeBatch(firestore);
+        
+        try {
+            // 1. Create the segregation production record
+            const segregationData: Omit<Production, 'id' > = {
+                ...segregateForm,
+                qtySegregada: qtyToSegregate,
+                pieceId: pieceId,
+                qtyFinalizada: 0,
+                qtySinPrensar: 0,
+                qtyScrap: 0,
+                qtyArranque: 0,
+                createdBy: user.uid,
+                inspeccionadoCalidad: false,
+                fechaISO: new Date().toISOString(),
+            };
+            const newProdDocRef = doc(collection(firestore, "production"));
+            batch.set(newProdDocRef, segregationData);
+            
+            // 2. Update the inventory
+            const inventoryDocRef = doc(firestore, 'inventory', pieceId);
+            const origenStockField = segregateForm.origenSegregado;
+            
+            const inventoryUpdate = {
+                [origenStockField]: increment(-qtyToSegregate),
+                stockPendienteCalidad: increment(qtyToSegregate)
+            };
+            batch.set(inventoryDocRef, inventoryUpdate, { merge: true });
 
-        addDoc(collection(firestore, "production"), segregationData)
-            .then(() => {
-                toast({ title: "Éxito", description: "Lote segregado correctamente." });
-                setIsSegregateDialogOpen(false);
-                setSegregateForm({ turno: '', machineId: '', moldId: '', nroRack: '', defecto: '', defectoOtro: '', tipoControl: '', qtySegregada: '' });
-            })
-            .catch((error) => {
-                const contextualError = new FirestorePermissionError({ path: 'production', operation: 'create', requestResourceData: segregationData });
-                errorEmitter.emit('permission-error', contextualError);
-            })
-            .finally(() => { setIsSaving(false); });
+            await batch.commit();
+
+            toast({ title: "Éxito", description: "Lote segregado y stock actualizado correctamente." });
+            setIsSegregateDialogOpen(false);
+            setSegregateForm({ turno: '', machineId: '', moldId: '', nroRack: '', defecto: '', defectoOtro: '', tipoControl: '', qtySegregada: '', origenSegregado: 'stockListo' });
+            forceRefresh();
+
+        } catch(error) {
+            const contextualError = new FirestorePermissionError({ path: 'production/inventory', operation: 'write', requestResourceData: segregateForm });
+            errorEmitter.emit('permission-error', contextualError);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleUpdateSegregation = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -513,7 +556,7 @@ export default function QualityPage() {
                             <p className="text-5xl font-bold">{totalInspectedInSession.toLocaleString()}</p>
                             {!isInspectionAmountValid && (
                                 <p className="text-sm text-destructive font-semibold mt-1">
-                                    La suma excede la cantidad segregada.
+                                    La suma debe ser igual a la cantidad segregada.
                                 </p>
                             )}
                         </div>
@@ -541,7 +584,7 @@ export default function QualityPage() {
 
                 <DialogFooter className="p-6 pt-2 bg-muted border-t">
                     <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={handleCloseInspectionDialog}>Cancelar</Button>
-                    <Button type="button" className="w-48 h-12 text-lg" onClick={handleSaveInspection} disabled={isSaving || totalInspectedInSession === 0 || !isInspectionAmountValid}>
+                    <Button type="button" className="w-48 h-12 text-lg" onClick={handleSaveInspection} disabled={isSaving || !isInspectionAmountValid}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {isSaving ? "Guardando..." : "Confirmar"}
                     </Button>
@@ -558,6 +601,13 @@ export default function QualityPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveSegregation} className="grid gap-4 py-4">
+               <div className="space-y-2">
+                    <Label htmlFor="seg-origen">Origen del Stock a Segregar</Label>
+                    <Select required value={segregateForm.origenSegregado} onValueChange={(v) => setSegregateForm(s => ({...s, origenSegregado: v as keyof Inventory}))}>
+                        <SelectTrigger id="seg-origen"><SelectValue placeholder="Selecciona origen..." /></SelectTrigger>
+                        <SelectContent>{origenSegregadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="seg-turno">Turno</Label>
