@@ -133,11 +133,12 @@ export default function QualityPage() {
 
     const inspectionFields = useMemo(() => {
         const machine = getMachineForProduction(selectedProduction);
-        if (machine?.type === 'granalladora' || selectedProduction?.origenSegregado !== 'stockInyectado') {
-            return allInspectionFields.filter(field => field.key !== 'qtyAptaSinPrensarCalidad');
+        if (machine?.type === 'granalladora') {
+             return allInspectionFields.filter(field => field.key !== 'qtyAptaSinPrensarCalidad');
         }
         return allInspectionFields;
     }, [selectedProduction, machines]);
+
 
     useEffect(() => {
         if (selectedProduction) {
@@ -219,17 +220,17 @@ export default function QualityPage() {
         // 1. Update Production Document
         const prodDocRef = doc(firestore, 'production', selectedProduction.id);
         const updatedProdData = {
-            qtyAptaCalidad: increment(quantities.qtyAptaCalidad),
-            qtyAptaSinPrensarCalidad: increment(quantities.qtyAptaSinPrensarCalidad),
-            qtyScrapCalidad: increment(quantities.qtyScrapCalidad),
-            qtySegregada: 0, // All have been inspected
+            qtySegregada: 0, // All have been inspected, so reset to 0
             inspectedBy: user.uid,
             inspectionDate: new Date().toISOString(),
             inspeccionadoCalidad: true,
+            qtyAptaCalidad: increment(quantities.qtyAptaCalidad),
+            qtyAptaSinPrensarCalidad: increment(quantities.qtyAptaSinPrensarCalidad),
+            qtyScrapCalidad: increment(quantities.qtyScrapCalidad),
         };
         batch.update(prodDocRef, updatedProdData);
 
-        // 2. Update Inventory Document
+        // 2. Update Inventory Document by adding the newly approved quantities
         const inventoryDocRef = doc(firestore, 'inventory', selectedProduction.pieceId);
         const inventoryUpdateData = {
             stockListo: increment(quantities.qtyAptaCalidad),
@@ -724,3 +725,5 @@ export default function QualityPage() {
     </main>
   );
 }
+
+    
