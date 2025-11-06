@@ -86,6 +86,18 @@
         "tiempoDeCiclo": {
           "type": "number",
           "description": "The cycle time in seconds for the piece."
+        },
+        "requiereMecanizado": {
+          "type": "boolean"
+        },
+        "requiereGranallado": {
+          "type": "boolean"
+        },
+        "stockMin": {
+          "type": "number"
+        },
+        "stockMax": {
+          "type": "number"
         }
       },
       "required": [
@@ -202,6 +214,9 @@
         "OEE_hist": {
           "type": "number",
           "description": "The historical Overall Equipment Effectiveness (OEE) for the machine (optional)."
+        },
+        "assignments": {
+          "type": "array"
         }
       },
       "required": [
@@ -697,6 +712,62 @@
         }
       },
       "required": ["nextRemitoNumber", "cai", "caiExpiration"]
+    },
+    "Machining": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Machining Process",
+      "description": "Tracks the lifecycle of a batch of pieces sent for external machining.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the machining process record."
+        },
+        "remitoId": {
+          "type": "string",
+          "description": "Reference to the Remito for this batch."
+        },
+        "pieceId": {
+          "type": "string",
+          "description": "Reference to the Piece being machined."
+        },
+        "qtyEnviada": {
+          "type": "number",
+          "description": "The initial quantity sent to the supplier."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Enviado", "En Proceso", "Finalizado"],
+          "description": "The current overall status of the batch."
+        },
+        "qtyMecanizada": {
+          "type": "number",
+          "description": "Quantity of successfully machined pieces."
+        },
+        "qtyEnsamblada": {
+          "type": "number",
+          "description": "Quantity of successfully assembled pieces (if applicable)."
+        },
+        "qtySegregada": {
+          "type": "number",
+          "description": "Quantity segregated for quality issues at the supplier."
+        },
+        "qtyScrapMecanizado": {
+          "type": "number",
+          "description": "Scrap quantity during the machining process."
+        },
+        "qtyScrapEnsamblado": {
+          "type": "number",
+          "description": "Scrap quantity during the assembly process."
+        }
+      },
+      "required": [
+        "id",
+        "remitoId",
+        "pieceId",
+        "qtyEnviada",
+        "status"
+      ]
     }
   },
   "auth": {
@@ -999,6 +1070,22 @@
             {
               "name": "remitoId",
               "description": "Unique identifier for the remito."
+            }
+          ]
+        }
+      },
+      {
+        "path": "machining/{machiningId}",
+        "definition": {
+          "entityName": "Machining",
+          "schema": {
+            "$ref": "#/backend/entities/Machining"
+          },
+          "description": "Tracks the status of pieces sent for external machining.",
+          "params": [
+            {
+              "name": "machiningId",
+              "description": "Unique identifier for the machining process record."
             }
           ]
         }

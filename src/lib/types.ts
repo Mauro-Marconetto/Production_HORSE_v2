@@ -150,10 +150,10 @@ export interface Production {
   createdBy?: string; // UID of user who declared production
   
   // Quality Segregation fields
+  origenSegregado?: 'stockListo' | 'stockInyectado';
   defecto?: string;
   defectoOtro?: string;
   tipoControl?: string;
-  origenSegregado?: keyof Inventory; // e.g. 'stockListo', 'stockInyectado'
 
   // Quality Inspection fields
   inspeccionadoCalidad: boolean;
@@ -241,4 +241,20 @@ export interface RemitoSettings {
   nextRemitoNumber: number;
   cai: string;
   caiExpiration: string; // ISO Date string
+}
+
+
+export interface MachiningProcess {
+  id: string;
+  remitoId: string;
+  pieceId: string;
+  qtyEnviada: number;
+  status: 'Enviado' | 'En Proceso' | 'Finalizado';
+  
+  // Quantities declared during the process
+  qtyMecanizada?: number;
+  qtyEnsamblada?: number;
+  qtySegregada?: number;
+  qtyScrapMecanizado?: number;
+  qtyScrapEnsamblado?: number;
 }

@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight, ShieldAlert } from "lucide-react";
-import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings, Production } from "@/lib/types";
+import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings, Production, MachiningProcess } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -124,6 +124,9 @@ export default function StockPage() {
             const remitoSettings = settingsSnap.data() as RemitoSettings;
             const currentRemitoNumber = remitoSettings.nextRemitoNumber || 1;
             
+            const remitosCollectionRef = collection(firestore, "remitos");
+            const remitoRef = doc(remitosCollectionRef);
+
             const remitoData: Omit<Remito, 'id'> = {
                 supplierId: remitoForm.supplierId,
                 transportista: 'CAT ARGENTINA SA - CARGO UTE',
@@ -135,24 +138,31 @@ export default function StockPage() {
                 items: remitoItems,
             };
 
-            const remitosCollectionRef = collection(firestore, "remitos");
-            const remitoRef = doc(remitosCollectionRef);
             batch.set(remitoRef, remitoData);
             
-            // Update inventory for each item
-            remitoItems.forEach(item => {
+            // Update inventory and create machining process for each item
+            for (const item of remitoItems) {
                 const inventoryDocRef = doc(firestore, "inventory", item.pieceId);
                 batch.update(inventoryDocRef, {
                     stockListo: increment(-item.qty),
                     stockEnMecanizado: increment(item.qty),
                 });
-            });
+
+                const machiningDocRef = doc(collection(firestore, "machining"));
+                const machiningData: Omit<MachiningProcess, 'id'> = {
+                    remitoId: remitoRef.id,
+                    pieceId: item.pieceId,
+                    qtyEnviada: item.qty,
+                    status: 'Enviado',
+                };
+                batch.set(machiningDocRef, machiningData);
+            }
             
             batch.update(settingsRef, { nextRemitoNumber: currentRemitoNumber + 1 });
 
             await batch.commit();
             
-            toast({ title: "Éxito", description: "Remito creado y stock actualizado correctamente." });
+            toast({ title: "Éxito", description: "Remito creado, stock actualizado y proceso de mecanizado iniciado." });
             setCreatedRemitoId(remitoRef.id);
             setIsRemitoDialogOpen(false);
             setRemitoForm({ supplierId: '' });
@@ -380,4 +390,3 @@ export default function StockPage() {
     );
 }
 
-    
