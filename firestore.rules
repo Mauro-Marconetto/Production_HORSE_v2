@@ -18,7 +18,7 @@
  * - /downtime_agg/{machineId}/{YYYYMM}: Stores aggregated downtime data for a specific machine in a specific month.
  * - /plans/{planId}: Stores production plans.
  * - /plans/{planId}/assignments/{assignmentId}: Stores assignments of pieces and molds to machines within a production plan.
- * - /production/{fechaISO}: Stores actual production data for a specific date.
+ * - /production/{productionId}: Stores actual production data for a specific date.
  * - /settings/global: Stores global settings for the application.
  * - /clients/{clientId}: Stores client information.
  *
@@ -39,8 +39,7 @@ service cloud.firestore {
      * @principle Allows open access to user profiles.
      */
     match /users/{userId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -52,8 +51,7 @@ service cloud.firestore {
      * @principle Allows open access to role information.
      */
     match /roles/{roleId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -65,8 +63,7 @@ service cloud.firestore {
      * @principle Allows open access to piece information.
      */
     match /pieces/{pieceId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -78,8 +75,7 @@ service cloud.firestore {
      * @principle Allows open access to mold information.
      */
     match /molds/{moldId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -91,8 +87,7 @@ service cloud.firestore {
      * @principle Allows open access to machine information.
      */
     match /machines/{machineId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -104,8 +99,7 @@ service cloud.firestore {
      * @principle Allows open access to demand information.
      */
     match /demand/{periodoYYYYWW}/{pieceId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -117,8 +111,7 @@ service cloud.firestore {
      * @principle Allows open access to inventory information.
      */
     match /inventory/{pieceId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -130,8 +123,7 @@ service cloud.firestore {
      * @principle Allows open access to calendar information.
      */
     match /calendars/{machineId}/{periodoYYYYWW} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -143,8 +135,7 @@ service cloud.firestore {
      * @principle Allows open access to downtime information.
      */
     match /downtime/{machineId}/{YYYYMM} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -156,8 +147,7 @@ service cloud.firestore {
      * @principle Allows open access to downtime_agg information.
      */
     match /downtime_agg/{machineId}/{YYYYMM} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -169,8 +159,7 @@ service cloud.firestore {
      * @principle Allows open access to plan information.
      */
     match /plans/{planId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -182,8 +171,7 @@ service cloud.firestore {
      * @principle Allows open access to assignment information.
      */
     match /plans/{planId}/assignments/{assignmentId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -195,8 +183,7 @@ service cloud.firestore {
      * @principle Allows open access to production information.
      */
     match /production/{productionId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -208,8 +195,7 @@ service cloud.firestore {
      * @principle Allows open access to global settings.
      */
     match /settings/global {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
     
     /**
@@ -221,8 +207,7 @@ service cloud.firestore {
      * @principle Allows open access to remito settings.
      */
     match /settings/remitos {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -234,8 +219,7 @@ service cloud.firestore {
      * @principle Allows open access to client information.
      */
     match /clients/{clientId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
     
     /**
@@ -247,8 +231,7 @@ service cloud.firestore {
      * @principle Allows open access to supplier information.
      */
     match /suppliers/{supplierId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
     
     /**
@@ -260,8 +243,7 @@ service cloud.firestore {
      * @principle Allows open access to remito information.
      */
     match /remitos/{remitoId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
     
      /**
@@ -273,8 +255,7 @@ service cloud.firestore {
      * @principle Allows open access to machining process information.
      */
     match /machining/{machiningId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow read, write: if request.auth != null;
     }
   }
 }
