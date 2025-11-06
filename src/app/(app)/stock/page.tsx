@@ -147,9 +147,11 @@ export default function StockPage() {
                     stockListo: increment(-item.qty),
                     stockEnMecanizado: increment(item.qty),
                 });
-
-                const machiningDocRef = doc(collection(firestore, "machining"));
-                const machiningData: Omit<MachiningProcess, 'id'> = {
+                
+                const machiningId = `machining-${Date.now()}-${item.pieceId}`;
+                const machiningDocRef = doc(firestore, "machining", machiningId);
+                const machiningData: MachiningProcess = {
+                    id: machiningId,
                     remitoId: remitoRef.id,
                     pieceId: item.pieceId,
                     qtyEnviada: item.qty,
@@ -389,4 +391,3 @@ export default function StockPage() {
         </main>
     );
 }
-
