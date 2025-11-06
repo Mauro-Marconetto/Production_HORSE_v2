@@ -12,8 +12,8 @@ export const placeholderImages: PlaceholderImage[] = [
   ]
 
 export const machines: Machine[] = [
-  { id: 'M01', nombre: 'Colosio 2000', tonelaje: 2000, turnosSemana: 15, horasTurno: 8, OEE_obj: 0.85, OEE_hist: 0.82 },
-  { id: 'M02', nombre: 'Colosio 1600', tonelaje: 1600, turnosSemana: 15, horasTurno: 8, OEE_obj: 0.80, OEE_hist: 0.78 },
+  { id: 'M01', nombre: 'Colosio 2000', tonelaje: 2000, turnosSemana: 15, horasTurno: 8, OEE_obj: 0.85, OEE_hist: 0.82, type: 'inyectora', produccionHora: 80 },
+  { id: 'M02', nombre: 'Colosio 1600', tonelaje: 1600, turnosSemana: 15, horasTurno: 8, OEE_obj: 0.80, OEE_hist: 0.78, type: 'inyectora', produccionHora: 70 },
 ];
 
 export const clients: Client[] = [
@@ -23,19 +23,19 @@ export const clients: Client[] = [
 ]
 
 export const pieces: Piece[] = [
-  { id: 'P1001', codigo: '602', clienteId: 'C01', peso: 1.2, familia: 'Soportes', stockMin: 2000, stockMax: 8000 },
-  { id: 'P1002', codigo: '602', clienteId: 'C01', peso: 1.5, familia: 'Soportes', stockMin: 1500, stockMax: 6000 },
-  { id: 'P2001', codigo: '267', clienteId: 'C02', peso: 3.4, familia: 'Carcasas', stockMin: 500, stockMax: 2500 },
-  { id: 'P2002', codigo: '267', clienteId: 'C02', peso: 2.1, familia: 'Carcasas', stockMin: 600, stockMax: 3000 },
-  { id: 'P2003', codigo: '267', clienteId: 'C02', peso: 2.3, familia: 'Carcasas', stockMin: 700, stockMax: 3500 },
-  { id: 'P3001', codigo: '729', clienteId: 'C03', peso: 0.8, familia: 'Engranajes', stockMin: 3000, stockMax: 12000 },
-  { id: 'P3002', codigo: '729', clienteId: 'C03', peso: 0.9, familia: 'Engranajes', stockMin: 3000, stockMax: 12000 },
-  { id: 'P3003', codigo: '729', clienteId: 'C03', peso: 1.0, familia: 'Engranajes', stockMin: 3000, stockMax: 12000 },
-  { id: 'P4001', codigo: '243R', clienteId: 'C01', peso: 4.1, familia: 'Componentes Motor', stockMin: 400, stockMax: 1600 },
-  { id: 'P4002', codigo: '243R', clienteId: 'C01', peso: 4.5, familia: 'Componentes Motor', stockMin: 400, stockMax: 1600 },
-  { id: 'P5001', codigo: '774R', clienteId: 'C02', peso: 5.2, familia: 'Estructurales', stockMin: 300, stockMax: 1200 },
-  { id: 'P5002', codigo: '774R', clienteId: 'C02', peso: 5.5, familia: 'Estructurales', stockMin: 300, stockMax: 1200 },
-  { id: 'P5003', codigo: '774R', clienteId: 'C02', peso: 5.8, familia: 'Estructurales', stockMin: 300, stockMax: 1200 },
+  { id: 'P1001', codigo: '602', clienteId: 'C01', stockMin: 2000, stockMax: 8000 },
+  { id: 'P1002', codigo: '602', clienteId: 'C01', stockMin: 1500, stockMax: 6000 },
+  { id: 'P2001', codigo: '267', clienteId: 'C02', stockMin: 500, stockMax: 2500 },
+  { id: 'P2002', codigo: '267', clienteId: 'C02', stockMin: 600, stockMax: 3000 },
+  { id: 'P2003', codigo: '267', clienteId: 'C02', stockMin: 700, stockMax: 3500 },
+  { id: 'P3001', codigo: '729', clienteId: 'C03', stockMin: 3000, stockMax: 12000 },
+  { id: 'P3002', codigo: '729', clienteId: 'C03', stockMin: 3000, stockMax: 12000 },
+  { id: 'P3003', codigo: '729', clienteId: 'C03', stockMin: 3000, stockMax: 12000 },
+  { id: 'P4001', codigo: '243R', clienteId: 'C01', stockMin: 400, stockMax: 1600 },
+  { id: 'P4002', codigo: '243R', clienteId: 'C01', stockMin: 400, stockMax: 1600 },
+  { id: 'P5001', codigo: '774R', clienteId: 'C02', stockMin: 300, stockMax: 1200 },
+  { id: 'P5002', codigo: '774R', clienteId: 'C02', stockMin: 300, stockMax: 1200 },
+  { id: 'P5003', codigo: '774R', clienteId: 'C02', stockMin: 300, stockMax: 1200 },
 ];
 
 export const molds: Mold[] = [
@@ -111,10 +111,10 @@ export const inventory: CurrentInventory[] = [
 ]
 
 export const production: Production[] = [
-    { id: 'prod-1', fechaISO: '2024-06-24T08:00:00Z', machineId: 'M01', pieceId: 'P1001', moldId: 'MOLD-01', turno: 'mañana', unidades: 1200, scrapPct: 0.03 },
-    { id: 'prod-2', fechaISO: '2024-06-24T16:00:00Z', machineId: 'M01', pieceId: 'P1001', moldId: 'MOLD-01', turno: 'tarde', unidades: 1180, scrapPct: 0.04 },
-    { id: 'prod-3', fechaISO: '2024-06-25T08:00:00Z', machineId: 'M02', pieceId: 'P2001', moldId: 'MOLD-03', turno: 'mañana', unidades: 230, scrapPct: 0.05 },
-    { id: 'prod-4', fechaISO: '2024-06-25T16:00:00Z', machineId: 'M02', pieceId: 'P2001', moldId: 'MOLD-03', turno: 'tarde', unidades: 235, scrapPct: 0.02 },
+    { id: 'prod-1', fechaISO: '2024-06-24T08:00:00Z', machineId: 'M01', pieceId: 'P1001', moldId: 'MOLD-01', turno: 'mañana', qtyFinalizada: 1200, qtySinPrensar: 0, qtyScrap: 36, qtySegregada: 0, inspeccionadoCalidad: false },
+    { id: 'prod-2', fechaISO: '2024-06-24T16:00:00Z', machineId: 'M01', pieceId: 'P1001', moldId: 'MOLD-01', turno: 'tarde', qtyFinalizada: 1180, qtySinPrensar: 0, qtyScrap: 47, qtySegregada: 0, inspeccionadoCalidad: false },
+    { id: 'prod-3', fechaISO: '2024-06-25T08:00:00Z', machineId: 'M02', pieceId: 'P2001', moldId: 'MOLD-03', turno: 'mañana', qtyFinalizada: 230, qtySinPrensar: 0, qtyScrap: 12, qtySegregada: 0, inspeccionadoCalidad: false },
+    { id: 'prod-4', fechaISO: '2024-06-25T16:00:00Z', machineId: 'M02', pieceId: 'P2001', moldId: 'MOLD-03', turno: 'tarde', qtyFinalizada: 235, qtySinPrensar: 0, qtyScrap: 5, qtySegregada: 0, inspeccionadoCalidad: false },
 ]
 
 export const plans: Plan[] = [
