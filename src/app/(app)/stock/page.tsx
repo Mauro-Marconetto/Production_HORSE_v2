@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
@@ -11,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight } from "lucide-react";
+import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight, ShieldAlert } from "lucide-react";
 import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -22,7 +23,7 @@ import { Label } from "@/components/ui/label";
 
 interface InventoryRow {
     piece: Piece;
-    state: 'Sin Prensar' | 'En Mecanizado' | 'Mecanizado' | 'Granallado' | 'Listo';
+    state: 'Sin Prensar' | 'En Mecanizado' | 'Mecanizado' | 'Granallado' | 'Listo' | 'Pendiente Calidad';
     stock: number;
     totalStockForPiece: number;
 }
@@ -62,14 +63,16 @@ export default function StockPage() {
             const stockMecanizado = invItem.stockMecanizado || 0;
             const stockGranallado = invItem.stockGranallado || 0;
             const stockListo = invItem.stockListo || 0;
+            const stockPendienteCalidad = invItem.stockPendienteCalidad || 0;
 
-            const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo;
+            const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo + stockPendienteCalidad;
 
             if (stockInyectado > 0) rows.push({ piece, state: 'Sin Prensar', stock: stockInyectado, totalStockForPiece: totalStock });
             if (stockEnMecanizado > 0) rows.push({ piece, state: 'En Mecanizado', stock: stockEnMecanizado, totalStockForPiece: totalStock });
             if (stockMecanizado > 0) rows.push({ piece, state: 'Mecanizado', stock: stockMecanizado, totalStockForPiece: totalStock });
             if (stockGranallado > 0) rows.push({ piece, state: 'Granallado', stock: stockGranallado, totalStockForPiece: totalStock });
             if (stockListo > 0) rows.push({ piece, state: 'Listo', stock: stockListo, totalStockForPiece: totalStock });
+            if (stockPendienteCalidad > 0) rows.push({ piece, state: 'Pendiente Calidad', stock: stockPendienteCalidad, totalStockForPiece: totalStock });
              
             // Ensure every piece has at least one row even if all stock is 0
             const pieceHasRow = rows.some(r => r.piece.id === piece.id);
@@ -181,18 +184,16 @@ export default function StockPage() {
             case 'En Mecanizado': return 'destructive';
             case 'Mecanizado': return 'secondary';
             case 'Granallado': return 'secondary';
+            case 'Pendiente Calidad': return 'destructive';
             case 'Listo': return 'default';
             default: return 'secondary';
         }
     }
     
     const getStateBadgeIcon = (state: InventoryRow['state']) => {
-        if (state === 'En Mecanizado') {
-            return <Wrench className="mr-1 h-3 w-3" />;
-        }
-        if (state === 'Granallado') {
-             return <Wind className="mr-1 h-3 w-3" />;
-        }
+        if (state === 'En Mecanizado') return <Wrench className="mr-1 h-3 w-3" />;
+        if (state === 'Granallado') return <Wind className="mr-1 h-3 w-3" />;
+        if (state === 'Pendiente Calidad') return <ShieldAlert className="mr-1 h-3 w-3" />;
         return null;
     }
 

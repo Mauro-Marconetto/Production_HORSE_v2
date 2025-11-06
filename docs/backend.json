@@ -284,6 +284,10 @@
         "stockListo": {
           "type": "number",
           "description": "Finished goods stock, ready for delivery."
+        },
+        "stockPendienteCalidad": {
+          "type": "number",
+          "description": "Stock that has been segregated for quality inspection."
         }
       },
       "required": ["id"]

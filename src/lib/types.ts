@@ -75,6 +75,7 @@ export interface Inventory {
   stockMecanizado?: number; // retornado de proveedor
   stockGranallado?: number; // granallado
   stockListo?: number; // listo para entregar
+  stockPendienteCalidad?: number; // segregado y esperando inspeccion
 }
 
 
@@ -152,6 +153,7 @@ export interface Production {
   defecto?: string;
   defectoOtro?: string;
   tipoControl?: string;
+  origenSegregado?: keyof Inventory; // e.g. 'stockListo', 'stockInyectado'
 
   // Quality Inspection fields
   inspeccionadoCalidad: boolean;
