@@ -166,8 +166,10 @@ export default function SubprocessesPage() {
             }, { merge: true });
 
             // 5. Create a production record for traceability
-            const prodRecordRef = doc(collection(firestore, 'production'));
+            const prodRecordId = `prod-${Date.now()}`;
+            const prodRecordRef = doc(firestore, 'production', prodRecordId);
             const productionRecord: Partial<Production> = {
+                id: prodRecordId,
                 fechaISO: new Date().toISOString(),
                 pieceId: selectedPieceId,
                 machineId: 'mecanizado-externo',
