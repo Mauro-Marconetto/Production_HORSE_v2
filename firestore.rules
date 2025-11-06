@@ -110,26 +110,13 @@ service cloud.firestore {
 
     /**
      * @description Allows any user to read and write inventory information.
-     * @path /inventory/{pieceId}/{fechaISO}
+     * @path /inventory/{pieceId}
      * @allow (create, update, delete) - Any user can create, update, or delete inventory.
      * @allow (get, list) - Any user can read inventory.
      * @deny None - This rule provides open access.
      * @principle Allows open access to inventory information.
      */
-    match /inventory/{pieceId}/{fechaISO} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
-    }
-
-     /**
-     * @description Allows any user to read and write inventory information.
-     * @path /inventory/current/{pieceId}
-     * @allow (create, update, delete) - Any user can create, update, or delete inventory.
-     * @allow (get, list) - Any user can read inventory.
-     * @deny None - This rule provides open access.
-     * @principle Allows open access to inventory information.
-     */
-    match /inventory/current/{pieceId} {
+    match /inventory/{pieceId} {
       allow get, list: if true;
       allow create, update, delete: if true;
     }
@@ -201,13 +188,13 @@ service cloud.firestore {
 
     /**
      * @description Allows any user to read and write production information.
-     * @path /production/{fechaISO}
+     * @path /production/{productionId}
      * @allow (create, update, delete) - Any user can create, update, or delete production.
      * @allow (get, list) - Any user can read production.
      * @deny None - This rule provides open access.
      * @principle Allows open access to production information.
      */
-    match /production/{fechaISO} {
+    match /production/{productionId} {
       allow get, list: if true;
       allow create, update, delete: if true;
     }
@@ -224,6 +211,19 @@ service cloud.firestore {
       allow get, list: if true;
       allow create, update, delete: if true;
     }
+    
+    /**
+     * @description Allows any user to read and write remito settings.
+     * @path /settings/remitos
+     * @allow (create, update, delete) - Any user can create, update, or delete remito settings.
+     * @allow (get, list) - Any user can read remito settings.
+     * @deny None - This rule provides open access.
+     * @principle Allows open access to remito settings.
+     */
+    match /settings/remitos {
+      allow get, list: if true;
+      allow create, update, delete: if true;
+    }
 
     /**
      * @description Allows any user to read and write client information.
@@ -234,6 +234,45 @@ service cloud.firestore {
      * @principle Allows open access to client information.
      */
     match /clients/{clientId} {
+      allow get, list: if true;
+      allow create, update, delete: if true;
+    }
+    
+    /**
+     * @description Allows any user to read and write supplier information.
+     * @path /suppliers/{supplierId}
+     * @allow (create, update, delete) - Any user can create, update, or delete suppliers.
+     * @allow (get, list) - Any user can read suppliers.
+     * @deny None - This rule provides open access.
+     * @principle Allows open access to supplier information.
+     */
+    match /suppliers/{supplierId} {
+      allow get, list: if true;
+      allow create, update, delete: if true;
+    }
+    
+    /**
+     * @description Allows any user to read and write remito information.
+     * @path /remitos/{remitoId}
+     * @allow (create, update, delete) - Any user can create, update, or delete remitos.
+     * @allow (get, list) - Any user can read remitos.
+     * @deny None - This rule provides open access.
+     * @principle Allows open access to remito information.
+     */
+    match /remitos/{remitoId} {
+      allow get, list: if true;
+      allow create, update, delete: if true;
+    }
+    
+     /**
+     * @description Allows any user to read and write machining process information.
+     * @path /machining/{machiningId}
+     * @allow (create, update, delete) - Any user can create, update, or delete machining records.
+     * @allow (get, list) - Any user can read machining records.
+     * @deny None - This rule provides open access.
+     * @principle Allows open access to machining process information.
+     */
+    match /machining/{machiningId} {
       allow get, list: if true;
       allow create, update, delete: if true;
     }
