@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, doc, updateDoc, query, orderBy, addDoc, writeBatch, setDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy, addDoc, writeBatch, setDoc, increment } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +21,6 @@ import type { Production, Machine, Mold, Piece, Inventory } from "@/lib/types";
 import { addDays, format, isWithinInterval } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { increment } from "firebase/firestore";
 
 type QualityInspectionField = 'qtyAptaCalidad' | 'qtyAptaSinPrensarCalidad' | 'qtyScrapCalidad';
 
@@ -52,12 +51,6 @@ const defectOptions = [
     "Otros",
 ];
 const controlTypeOptions = ["RX", "Dimensional", "Visual", "Composición Química"];
-const origenSegregadoOptions: { value: keyof Inventory, label: string }[] = [
-    { value: 'stockListo', label: 'Stock Listo' },
-    { value: 'stockInyectado', label: 'Stock Inyectado' },
-    { value: 'stockMecanizado', label: 'Stock Mecanizado' },
-    { value: 'stockGranallado', label: 'Stock Granallado' },
-];
 
 
 export default function QualityPage() {
@@ -131,7 +124,6 @@ export default function QualityPage() {
         defectoOtro: '',
         tipoControl: '',
         qtySegregada: '',
-        origenSegregado: 'stockListo' as keyof Inventory,
     });
 
     const getMachineForProduction = (prod: Production | null) => {
@@ -149,20 +141,12 @@ export default function QualityPage() {
 
     useEffect(() => {
         if (selectedProduction) {
-            let defaultAptaField: QualityInspectionField = 'qtyAptaCalidad';
             let initialQuantities = { qtyAptaCalidad: 0, qtyAptaSinPrensarCalidad: 0, qtyScrapCalidad: 0 };
-            
-            // If the origin was inyectado, default to apta sin prensar
-            if(selectedProduction.origenSegregado === 'stockInyectado') {
-                defaultAptaField = 'qtyAptaSinPrensarCalidad';
-                initialQuantities.qtyAptaSinPrensarCalidad = selectedProduction.qtySegregada;
-            } else {
-                initialQuantities.qtyAptaCalidad = selectedProduction.qtySegregada;
-            }
+            initialQuantities.qtyAptaCalidad = selectedProduction.qtySegregada;
 
             setQuantities(initialQuantities);
             setCurrentInput(String(selectedProduction.qtySegregada));
-            setActiveField(defaultAptaField);
+            setActiveField('qtyAptaCalidad');
             setIsInspectionDialogOpen(true);
         }
     }, [selectedProduction]);
@@ -248,7 +232,6 @@ export default function QualityPage() {
         // 2. Update Inventory Document
         const inventoryDocRef = doc(firestore, 'inventory', selectedProduction.pieceId);
         const inventoryUpdateData = {
-            stockPendienteCalidad: increment(-totalInspectedInSession),
             stockListo: increment(quantities.qtyAptaCalidad),
             stockInyectado: increment(quantities.qtyAptaSinPrensarCalidad)
         };
@@ -288,7 +271,7 @@ export default function QualityPage() {
         const batch = writeBatch(firestore);
         
         try {
-            // 1. Create the segregation production record
+            // Create the segregation production record. This DOES NOT affect inventory.
             const segregationData: Omit<Production, 'id' > = {
                 ...segregateForm,
                 qtySegregada: qtyToSegregate,
@@ -303,26 +286,16 @@ export default function QualityPage() {
             };
             const newProdDocRef = doc(collection(firestore, "production"));
             batch.set(newProdDocRef, segregationData);
-            
-            // 2. Update the inventory
-            const inventoryDocRef = doc(firestore, 'inventory', pieceId);
-            const origenStockField = segregateForm.origenSegregado;
-            
-            const inventoryUpdate = {
-                [origenStockField]: increment(-qtyToSegregate),
-                stockPendienteCalidad: increment(qtyToSegregate)
-            };
-            batch.set(inventoryDocRef, inventoryUpdate, { merge: true });
 
             await batch.commit();
 
-            toast({ title: "Éxito", description: "Lote segregado y stock actualizado correctamente." });
+            toast({ title: "Éxito", description: "Lote segregado creado y pendiente de inspección." });
             setIsSegregateDialogOpen(false);
-            setSegregateForm({ turno: '', machineId: '', moldId: '', nroRack: '', defecto: '', defectoOtro: '', tipoControl: '', qtySegregada: '', origenSegregado: 'stockListo' });
+            setSegregateForm({ turno: '', machineId: '', moldId: '', nroRack: '', defecto: '', defectoOtro: '', tipoControl: '', qtySegregada: '' });
             forceRefresh();
 
         } catch(error) {
-            const contextualError = new FirestorePermissionError({ path: 'production/inventory', operation: 'write', requestResourceData: segregateForm });
+            const contextualError = new FirestorePermissionError({ path: 'production', operation: 'create', requestResourceData: segregateForm });
             errorEmitter.emit('permission-error', contextualError);
         } finally {
             setIsSaving(false);
@@ -597,17 +570,10 @@ export default function QualityPage() {
           <DialogHeader>
             <DialogTitle>Segregar Lote para Inspección</DialogTitle>
             <DialogDescription>
-              Crea un nuevo lote de piezas que requieren inspección de calidad.
+              Crea un nuevo lote de piezas que requieren inspección de calidad. Este lote no se descuenta del stock existente.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveSegregation} className="grid gap-4 py-4">
-               <div className="space-y-2">
-                    <Label htmlFor="seg-origen">Origen del Stock a Segregar</Label>
-                    <Select required value={segregateForm.origenSegregado} onValueChange={(v) => setSegregateForm(s => ({...s, origenSegregado: v as keyof Inventory}))}>
-                        <SelectTrigger id="seg-origen"><SelectValue placeholder="Selecciona origen..." /></SelectTrigger>
-                        <SelectContent>{origenSegregadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="seg-turno">Turno</Label>

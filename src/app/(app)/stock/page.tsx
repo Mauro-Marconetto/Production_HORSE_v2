@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight, ShieldAlert } from "lucide-react";
-import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings } from "@/lib/types";
+import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings, Production } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,6 +40,9 @@ export default function StockPage() {
     const inventoryCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
     const { data: inventory, isLoading: isLoadingInventory, forceRefresh } = useCollection<Inventory>(inventoryCollection);
     
+    const productionQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'production'), where('inspeccionadoCalidad', '==', false)) : null, [firestore]);
+    const { data: pendingProduction, isLoading: isLoadingProduction } = useCollection<Production>(productionQuery);
+
     const suppliersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'suppliers') : null, [firestore]);
     const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<Supplier>(suppliersCollection);
 
@@ -50,31 +53,36 @@ export default function StockPage() {
     const [isSaving, setIsSaving] = useState(false);
     
     const inventoryData = useMemo((): InventoryRow[] => {
-        if (!pieces || !inventory) return [];
+        if (!pieces || !inventory || !pendingProduction) return [];
         
         const rows: InventoryRow[] = [];
 
-        inventory.forEach(invItem => {
-            const piece = pieces.find(p => p.id === invItem.id);
-            if (!piece) return;
+        const pendingQualityStock = new Map<string, number>();
+        pendingProduction.forEach(prod => {
+            if (prod.qtySegregada > 0) {
+                pendingQualityStock.set(prod.pieceId, (pendingQualityStock.get(prod.pieceId) || 0) + prod.qtySegregada);
+            }
+        });
 
-            const stockInyectado = invItem.stockInyectado || 0;
-            const stockEnMecanizado = invItem.stockEnMecanizado || 0;
-            const stockMecanizado = invItem.stockMecanizado || 0;
-            const stockGranallado = invItem.stockGranallado || 0;
-            const stockListo = invItem.stockListo || 0;
-            const stockPendienteCalidad = invItem.stockPendienteCalidad || 0;
+        pieces.forEach(piece => {
+            const invItem = inventory.find(i => i.id === piece.id);
+            
+            const stockInyectado = invItem?.stockInyectado || 0;
+            const stockEnMecanizado = invItem?.stockEnMecanizado || 0;
+            const stockMecanizado = invItem?.stockMecanizado || 0;
+            const stockGranallado = invItem?.stockGranallado || 0;
+            const stockListo = invItem?.stockListo || 0;
+            const stockPendiente = pendingQualityStock.get(piece.id) || 0;
 
-            const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo + stockPendienteCalidad;
+            const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo;
 
             if (stockInyectado > 0) rows.push({ piece, state: 'Sin Prensar', stock: stockInyectado, totalStockForPiece: totalStock });
             if (stockEnMecanizado > 0) rows.push({ piece, state: 'En Mecanizado', stock: stockEnMecanizado, totalStockForPiece: totalStock });
             if (stockMecanizado > 0) rows.push({ piece, state: 'Mecanizado', stock: stockMecanizado, totalStockForPiece: totalStock });
             if (stockGranallado > 0) rows.push({ piece, state: 'Granallado', stock: stockGranallado, totalStockForPiece: totalStock });
             if (stockListo > 0) rows.push({ piece, state: 'Listo', stock: stockListo, totalStockForPiece: totalStock });
-            if (stockPendienteCalidad > 0) rows.push({ piece, state: 'Pendiente Calidad', stock: stockPendienteCalidad, totalStockForPiece: totalStock });
-             
-            // Ensure every piece has at least one row even if all stock is 0
+            if (stockPendiente > 0) rows.push({ piece, state: 'Pendiente Calidad', stock: stockPendiente, totalStockForPiece: totalStock });
+            
             const pieceHasRow = rows.some(r => r.piece.id === piece.id);
             if (!pieceHasRow) {
                  rows.push({ piece, state: 'Listo', stock: 0, totalStockForPiece: 0 });
@@ -82,9 +90,9 @@ export default function StockPage() {
         });
 
         return rows;
-    }, [pieces, inventory]);
+    }, [pieces, inventory, pendingProduction]);
     
-    const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers;
+    const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers || isLoadingProduction;
 
     const handleCreateRemito = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
