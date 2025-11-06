@@ -142,11 +142,16 @@ export default function QualityPage() {
 
     useEffect(() => {
         if (selectedProduction) {
-            let initialQuantities = { qtyAptaCalidad: 0, qtyAptaSinPrensarCalidad: 0, qtyScrapCalidad: 0 };
-            initialQuantities.qtyAptaCalidad = selectedProduction.qtySegregada;
-
+            // By default, assume all remaining segregated pieces are "Apta". User can then adjust.
+            const initialApta = selectedProduction.qtySegregada;
+            let initialQuantities = { 
+                qtyAptaCalidad: initialApta, 
+                qtyAptaSinPrensarCalidad: 0, 
+                qtyScrapCalidad: 0 
+            };
+            
             setQuantities(initialQuantities);
-            setCurrentInput(String(selectedProduction.qtySegregada));
+            setCurrentInput(String(initialApta));
             setActiveField('qtyAptaCalidad');
             setIsInspectionDialogOpen(true);
         }
@@ -198,7 +203,7 @@ export default function QualityPage() {
     const handleClear = () => setCurrentInput('');
 
     const totalInspectedInSession = quantities.qtyAptaCalidad + quantities.qtyAptaSinPrensarCalidad + quantities.qtyScrapCalidad;
-    const isInspectionAmountValid = totalInspectedInSession === (selectedProduction?.qtySegregada || 0);
+    const isInspectionAmountValid = totalInspectedInSession <= (selectedProduction?.qtySegregada || 0);
 
     const handleSaveInspection = async () => {
         if (!firestore || !selectedProduction || !user) {
@@ -210,7 +215,7 @@ export default function QualityPage() {
             return;
         }
         if (!isInspectionAmountValid) {
-            toast({ title: "Error de validación", description: `La cantidad inspeccionada (${totalInspectedInSession}) debe ser igual a la cantidad segregada (${selectedProduction.qtySegregada}).`, variant: "destructive" });
+            toast({ title: "Error de validación", description: `La cantidad inspeccionada (${totalInspectedInSession}) no puede superar la cantidad segregada (${selectedProduction.qtySegregada}).`, variant: "destructive" });
             return;
         }
 
@@ -220,10 +225,11 @@ export default function QualityPage() {
         // 1. Update Production Document
         const prodDocRef = doc(firestore, 'production', selectedProduction.id);
         const updatedProdData = {
-            qtySegregada: 0, // All have been inspected, so reset to 0
+            qtySegregada: increment(-totalInspectedInSession), // Decrement by the amount just inspected
             inspectedBy: user.uid,
             inspectionDate: new Date().toISOString(),
-            inspeccionadoCalidad: true,
+            // Only mark as fully inspected if all pieces are processed
+            inspeccionadoCalidad: totalInspectedInSession === selectedProduction.qtySegregada,
             qtyAptaCalidad: increment(quantities.qtyAptaCalidad),
             qtyAptaSinPrensarCalidad: increment(quantities.qtyAptaSinPrensarCalidad),
             qtyScrapCalidad: increment(quantities.qtyScrapCalidad),
@@ -530,7 +536,7 @@ export default function QualityPage() {
                             <p className="text-5xl font-bold">{totalInspectedInSession.toLocaleString()}</p>
                             {!isInspectionAmountValid && (
                                 <p className="text-sm text-destructive font-semibold mt-1">
-                                    La suma debe ser igual a la cantidad segregada.
+                                    La suma no puede superar la cantidad segregada.
                                 </p>
                             )}
                         </div>
