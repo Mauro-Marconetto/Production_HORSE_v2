@@ -255,6 +255,7 @@ export interface MachiningProcess {
   qtyMecanizada?: number;
   qtyEnsamblada?: number;
   qtySegregada?: number;
+  qtyScrap?: number;
   qtyScrapMecanizado?: number;
   qtyScrapEnsamblado?: number;
 }
