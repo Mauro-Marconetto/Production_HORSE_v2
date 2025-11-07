@@ -12,10 +12,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MoreHorizontal, Loader2, PlusCircle } from "lucide-react";
+import { MoreHorizontal, Loader2, PlusCircle, Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Remito, Piece, Supplier, MachiningProcess, Production, Inventory } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { addDays, format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 
 
 const statusConfig: { [key: string]: { label: string, color: string } } = {
@@ -59,6 +63,30 @@ export default function SubprocessesPage() {
     const inventoryQuery = useMemoFirebase(() => firestore ? collection(firestore, "inventory") : null, [firestore]);
     const { data: inventory, isLoading: isLoadingInventory } = useCollection<Inventory>(inventoryQuery);
 
+    const [date, setDate] = useState<DateRange | undefined>({
+        from: addDays(new Date(), -30),
+        to: new Date(),
+    });
+
+    const productionHistoryQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        let q = query(
+            collection(firestore, "production"), 
+            where("subproceso", "==", "mecanizado"), 
+            orderBy("fechaISO", "desc")
+        );
+
+        if (date?.from) {
+            q = query(q, where("fechaISO", ">=", date.from.toISOString()));
+        }
+        if (date?.to) {
+            q = query(q, where("fechaISO", "<=", addDays(date.to, 1).toISOString()));
+        }
+        return q;
+    }, [firestore, date]);
+    const { data: machiningHistory, isLoading: isLoadingHistory } = useCollection<Production>(productionHistoryQuery);
+
+
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [step, setStep] = useState<MachiningDeclarationStep>('selection');
     const [selectedPieceId, setSelectedPieceId] = useState('');
@@ -75,17 +103,12 @@ export default function SubprocessesPage() {
     const [isSaving, setIsSaving] = useState(false);
     
 
-    const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingInventory;
+    const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingInventory || isLoadingHistory;
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     
     const activeLots = useMemo(() => {
         if (!machiningProcesses) return [];
         return machiningProcesses.filter(p => p.status === 'Enviado' || p.status === 'En Proceso');
-    }, [machiningProcesses]);
-
-    const completedLots = useMemo(() => {
-        if (!machiningProcesses) return [];
-        return machiningProcesses.filter(p => p.status === 'Finalizado');
     }, [machiningProcesses]);
 
 
@@ -145,89 +168,74 @@ export default function SubprocessesPage() {
         
         try {
             const batch = writeBatch(firestore);
-    
-            // Separate quantities for assembly vs. other machining processes
-            const { qtyEnsamblada, ...otherQuantities } = quantities;
-            const totalOtherDeclared = Object.values(otherQuantities).reduce((sum, qty) => sum + qty, 0);
-    
-            // --- VALIDATION ---
-            // 1. Validate quantities for machining, segregation, and scrap (from lots)
-            const lotsForPiece = (machiningProcesses || [])
-                .filter(p => p.pieceId === selectedPieceId && (p.status === 'Enviado' || p.status === 'En Proceso'));
-            const totalStockEnProveedor = lotsForPiece.reduce((sum, lot) => sum + (lot.qtyEnviada || 0), 0);
             
-            if (totalOtherDeclared > totalStockEnProveedor) {
-                throw new Error(`No hay suficiente stock en proveedor para la pieza ${getPieceCode(selectedPieceId)}. Se intentan declarar ${totalOtherDeclared} (mecanizadas/scrap) y solo hay ${totalStockEnProveedor}.`);
-            }
+            // --- VALIDATION & PREPARATION ---
+            let { qtyMecanizada, qtyEnsamblada, qtySegregada, qtyScrap, qtyScrapMecanizado, qtyScrapEnsamblado } = quantities;
+            let remainingToDeductFromLots = qtyMecanizada + qtySegregada + qtyScrap + qtyScrapMecanizado + qtyScrapEnsamblado;
+            let remainingToDeductForAssembly = qtyEnsamblada;
     
-            // 2. Validate quantities for assembly (from lots + from machined stock)
+            const lotsForPiece = activeLots.filter(p => p.pieceId === selectedPieceId);
             const inventoryItem = inventory?.find(i => i.id === selectedPieceId);
             const stockMecanizado = inventoryItem?.stockMecanizado || 0;
-            const totalStockParaEnsamblar = totalStockEnProveedor + stockMecanizado;
-    
-            if (qtyEnsamblada > totalStockParaEnsamblar) {
-                throw new Error(`No hay suficiente stock para ensamblar la pieza ${getPieceCode(selectedPieceId)}. Se intentan ensamblar ${qtyEnsamblada} y solo hay ${totalStockParaEnsamblar} disponibles (proveedor + stock mecanizado).`);
+            const stockEnProveedor = lotsForPiece.reduce((sum, lot) => sum + lot.qtyEnviada, 0);
+            
+            if (remainingToDeductFromLots > stockEnProveedor) {
+                 throw new Error(`No hay suficiente stock en proveedor para la pieza ${getPieceCode(selectedPieceId)}. Se intentan declarar ${remainingToDeductFromLots} y solo hay ${stockEnProveedor}.`);
+            }
+            if (remainingToDeductForAssembly > (stockEnProveedor + stockMecanizado)) {
+                throw new Error(`No hay suficiente stock para ensamblar la pieza ${getPieceCode(selectedPieceId)}. Se intentan ensamblar ${remainingToDeductForAssembly} y solo hay ${stockEnProveedor + stockMecanizado} disponibles (proveedor + stock mecanizado).`);
             }
     
-            // --- PROCESSING ---
+            // --- INVENTORY & LOT UPDATES ---
             const inventoryDocRef = doc(firestore, 'inventory', selectedPieceId);
             
-            // 1. Process Assembly Quantity
-            let remainingEnsamblar = qtyEnsamblada;
-            if (remainingEnsamblar > 0) {
-                // First, consume from stockMecanizado
-                const fromStockMecanizado = Math.min(remainingEnsamblar, stockMecanizado);
-                if (fromStockMecanizado > 0) {
-                    batch.update(inventoryDocRef, { stockMecanizado: increment(-fromStockMecanizado) });
-                    remainingEnsamblar -= fromStockMecanizado;
-                }
+            // 1. Consume from stockMecanizado first for assembly
+            const fromStockMecanizado = Math.min(remainingToDeductForAssembly, stockMecanizado);
+            if (fromStockMecanizado > 0) {
+                batch.update(inventoryDocRef, { stockMecanizado: increment(-fromStockMecanizado) });
+                remainingToDeductForAssembly -= fromStockMecanizado;
             }
+            
+            // 2. Add remaining assembly qty to be deducted from lots
+            remainingToDeductFromLots += remainingToDeductForAssembly;
     
-            // Combine remaining assembly quantity with other declared quantities to be deducted from lots
-            let remainingQuantitiesFromLots = { ...otherQuantities, qtyEnsamblada: remainingEnsamblar };
-            const totalToDeductFromLots = Object.values(remainingQuantitiesFromLots).reduce((sum, q) => sum + q, 0);
-
-            if (totalToDeductFromLots > 0) {
-                const sortedLots = lotsForPiece
+            // 3. Consume from lots (FIFO)
+            if (remainingToDeductFromLots > 0) {
+                 const sortedLots = lotsForPiece
                     .map(lot => ({ ...lot, remitoDate: remitos?.find(r => r.id === lot.remitoId)?.fecha || '9999' }))
                     .sort((a, b) => a.remitoDate.localeCompare(b.remitoDate));
-        
+
                 for (const lot of sortedLots) {
-                    if (Object.values(remainingQuantitiesFromLots).every(q => q === 0)) break;
-        
+                    if (remainingToDeductFromLots <= 0) break;
                     const lotDocRef = doc(firestore, 'machining', lot.id);
-                    const updatePayload: { [key: string]: any } = {};
-    
-                    let totalDeductedFromThisLot = 0;
-                    const availableInThisLot = lot.qtyEnviada;
-    
-                    for (const key of Object.keys(remainingQuantitiesFromLots) as (keyof typeof remainingQuantitiesFromLots)[]) {
-                        if (remainingQuantitiesFromLots[key] > 0) {
-                            const amountToDeduct = Math.min(remainingQuantitiesFromLots[key], availableInThisLot - totalDeductedFromThisLot);
-                            
-                            if (amountToDeduct > 0) {
-                                // Add to the specific qty field (qtyMecanizada, qtyScrap, etc.)
-                                updatePayload[key] = increment(amountToDeduct); 
-                                remainingQuantitiesFromLots[key] -= amountToDeduct;
-                                totalDeductedFromThisLot += amountToDeduct;
-                            }
-                        }
-                    }
-        
-                    if (totalDeductedFromThisLot > 0) {
-                        const newQtyEnviada = availableInThisLot - totalDeductedFromThisLot;
-                        updatePayload['qtyEnviada'] = newQtyEnviada;
-                        updatePayload['status'] = newQtyEnviada > 0 ? "En Proceso" : "Finalizado";
-                        batch.update(lotDocRef, updatePayload);
-                    }
+                    const deductable = Math.min(remainingToDeductFromLots, lot.qtyEnviada);
+                    
+                    batch.update(lotDocRef, { 
+                        qtyEnviada: increment(-deductable),
+                        status: (lot.qtyEnviada - deductable) > 0 ? 'En Proceso' : 'Finalizado'
+                    });
+                    remainingToDeductFromLots -= deductable;
                 }
             }
-    
-            // 2. Update inventory with the final results
+
+            // 4. Update inventory with final results
             batch.set(inventoryDocRef, {
-                stockMecanizado: increment(quantities.qtyMecanizada),
-                stockEnsamblado: increment(quantities.qtyEnsamblada),
+                stockMecanizado: increment(qtyMecanizada),
+                stockEnsamblado: increment(qtyEnsamblada),
+                stockPendienteCalidad: increment(qtySegregada)
             }, { merge: true });
+
+            // --- CREATE PRODUCTION RECORD ---
+            const prodDocRef = doc(collection(firestore, "production"));
+            const productionRecord: Partial<Production> = {
+                fechaISO: new Date().toISOString(),
+                machineId: 'mecanizado-externo',
+                pieceId: selectedPieceId,
+                subproceso: 'mecanizado',
+                inspeccionadoCalidad: false, // Default value
+                ...quantities
+            };
+            batch.set(prodDocRef, productionRecord);
     
             await batch.commit();
             toast({ title: "Éxito", description: "Producción de mecanizado declarada y stock actualizado." });
@@ -308,15 +316,56 @@ export default function SubprocessesPage() {
 
        <Card>
         <CardHeader>
-          <CardTitle>Historial de Declaraciones de Mecanizado</CardTitle>
-          <CardDescription>
-            Registros de producción y scrap declarados para procesos externos.
-          </CardDescription>
+             <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle>Historial de Declaraciones de Mecanizado</CardTitle>
+                  <CardDescription>
+                    Registros de producción y scrap declarados para procesos externos.
+                  </CardDescription>
+                </div>
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn(
+                        "w-[260px] justify-start text-left font-normal",
+                        !date && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date?.from ? (
+                        date.to ? (
+                            <>
+                            {format(date.from, "LLL dd, y")} -{" "}
+                            {format(date.to, "LLL dd, y")}
+                            </>
+                        ) : (
+                            format(date.from, "LLL dd, y")
+                        )
+                        ) : (
+                        <span>Selecciona un rango</span>
+                        )}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={setDate}
+                        numberOfMonths={2}
+                    />
+                    </PopoverContent>
+                </Popover>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Fecha Declaración</TableHead>
                 <TableHead>Pieza</TableHead>
                 <TableHead className="text-right">Mecanizadas (OK)</TableHead>
                 <TableHead className="text-right">Ensambladas (OK)</TableHead>
@@ -326,15 +375,16 @@ export default function SubprocessesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-                {isLoading && (
+                {isLoadingHistory && (
                     <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center">
+                        <TableCell colSpan={7} className="h-24 text-center">
                             <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                         </TableCell>
                     </TableRow>
                 )}
-                {!isLoading && completedLots.map(prod => (
+                {!isLoadingHistory && machiningHistory?.map(prod => (
                     <TableRow key={prod.id}>
+                        <TableCell>{new Date(prod.fechaISO).toLocaleString('es-AR')}</TableCell>
                         <TableCell>{getPieceCode(prod.pieceId)}</TableCell>
                         <TableCell className="text-right">{((prod.qtyMecanizada || 0)).toLocaleString()}</TableCell>
                         <TableCell className="text-right">{((prod.qtyEnsamblada || 0)).toLocaleString()}</TableCell>
@@ -343,10 +393,10 @@ export default function SubprocessesPage() {
                         <TableCell className="text-right text-destructive">{((prod.qtyScrapEnsamblado || 0)).toLocaleString()}</TableCell>
                     </TableRow>
                 ))}
-                 {!isLoading && (!completedLots || completedLots.length === 0) && (
+                 {!isLoadingHistory && (!machiningHistory || machiningHistory.length === 0) && (
                     <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                            No hay declaraciones de mecanizado finalizadas.
+                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                            No hay declaraciones de mecanizado en el rango seleccionado.
                         </TableCell>
                     </TableRow>
                 )}
@@ -454,4 +504,5 @@ export default function SubprocessesPage() {
     </main>
   );
 }
+
 

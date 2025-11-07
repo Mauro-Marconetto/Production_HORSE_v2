@@ -163,6 +163,12 @@ export interface Production {
   qtyScrapCalidad?: number;
   inspectedBy?: string; // UID of user who inspected
   inspectionDate?: string; // ISO date of inspection
+
+  // Machining specific fields
+  qtyMecanizada?: number;
+  qtyEnsamblada?: number;
+  qtyScrapMecanizado?: number;
+  qtyScrapEnsamblado?: number;
 }
 
 
