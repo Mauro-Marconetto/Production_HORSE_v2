@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MoreHorizontal, Loader2, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Remito, Piece, Supplier, MachiningProcess, Production } from "@/lib/types";
+import type { Remito, Piece, Supplier, MachiningProcess, Production, Inventory } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -56,6 +56,9 @@ export default function SubprocessesPage() {
     const remitosQuery = useMemoFirebase(() => firestore ? collection(firestore, "remitos") : null, [firestore]);
     const { data: remitos, isLoading: isLoadingRemitos } = useCollection<Remito>(remitosQuery);
 
+    const inventoryQuery = useMemoFirebase(() => firestore ? collection(firestore, "inventory") : null, [firestore]);
+    const { data: inventory, isLoading: isLoadingInventory } = useCollection<Inventory>(inventoryQuery);
+
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [step, setStep] = useState<MachiningDeclarationStep>('selection');
     const [selectedPieceId, setSelectedPieceId] = useState('');
@@ -72,7 +75,7 @@ export default function SubprocessesPage() {
     const [isSaving, setIsSaving] = useState(false);
     
 
-    const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos;
+    const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingInventory;
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     
     const activeLots = useMemo(() => {
@@ -143,50 +146,84 @@ export default function SubprocessesPage() {
         try {
             const batch = writeBatch(firestore);
     
-            const lotsForPiece = (machiningProcesses || []).filter(p => p.pieceId === selectedPieceId && (p.status === 'Enviado' || p.status === 'En Proceso'));
+            // Separate quantities for assembly vs. other machining processes
+            const { qtyEnsamblada, ...otherQuantities } = quantities;
+            const totalOtherDeclared = Object.values(otherQuantities).reduce((sum, qty) => sum + qty, 0);
     
-            const sortedLots = lotsForPiece
-                .map(lot => ({ ...lot, remitoDate: remitos?.find(r => r.id === lot.remitoId)?.fecha || '9999' }))
-                .sort((a, b) => a.remitoDate.localeCompare(b.remitoDate));
-    
-            const totalStockEnMecanizado = sortedLots.reduce((sum, lot) => sum + (lot.qtyEnviada || 0), 0);
+            // --- VALIDATION ---
+            // 1. Validate quantities for machining, segregation, and scrap (from lots)
+            const lotsForPiece = (machiningProcesses || [])
+                .filter(p => p.pieceId === selectedPieceId && (p.status === 'Enviado' || p.status === 'En Proceso'));
+            const totalStockEnProveedor = lotsForPiece.reduce((sum, lot) => sum + (lot.qtyEnviada || 0), 0);
             
-            if (totalDeclared > totalStockEnMecanizado) {
-                 throw new Error(`No hay suficiente stock en mecanizado para la pieza ${getPieceCode(selectedPieceId)}. Se intentan declarar ${totalDeclared} y solo hay ${totalStockEnMecanizado}.`);
+            if (totalOtherDeclared > totalStockEnProveedor) {
+                throw new Error(`No hay suficiente stock en proveedor para la pieza ${getPieceCode(selectedPieceId)}. Se intentan declarar ${totalOtherDeclared} (mecanizadas/scrap) y solo hay ${totalStockEnProveedor}.`);
             }
     
-            let remainingQuantities = { ...quantities };
+            // 2. Validate quantities for assembly (from lots + from machined stock)
+            const inventoryItem = inventory?.find(i => i.id === selectedPieceId);
+            const stockMecanizado = inventoryItem?.stockMecanizado || 0;
+            const totalStockParaEnsamblar = totalStockEnProveedor + stockMecanizado;
     
-            for (const lot of sortedLots) {
-                if (Object.values(remainingQuantities).every(q => q === 0)) break;
+            if (qtyEnsamblada > totalStockParaEnsamblar) {
+                throw new Error(`No hay suficiente stock para ensamblar la pieza ${getPieceCode(selectedPieceId)}. Se intentan ensamblar ${qtyEnsamblada} y solo hay ${totalStockParaEnsamblar} disponibles (proveedor + stock mecanizado).`);
+            }
     
-                const lotDocRef = doc(firestore, 'machining', lot.id);
-                const updatePayload: { [key in DeclarationField | 'status']?: any } = {};
+            // --- PROCESSING ---
+            const inventoryDocRef = doc(firestore, 'inventory', selectedPieceId);
+            
+            // 1. Process Assembly Quantity
+            let remainingEnsamblar = qtyEnsamblada;
+            if (remainingEnsamblar > 0) {
+                // First, consume from stockMecanizado
+                const fromStockMecanizado = Math.min(remainingEnsamblar, stockMecanizado);
+                if (fromStockMecanizado > 0) {
+                    batch.update(inventoryDocRef, { stockMecanizado: increment(-fromStockMecanizado) });
+                    remainingEnsamblar -= fromStockMecanizado;
+                }
+            }
+    
+            // Combine remaining assembly quantity with other declared quantities to be deducted from lots
+            let remainingQuantitiesFromLots = { ...otherQuantities, qtyEnsamblada: remainingEnsamblar };
+            const totalToDeductFromLots = Object.values(remainingQuantitiesFromLots).reduce((sum, q) => sum + q, 0);
 
-                let totalDeductedFromLot = 0;
-                
-                for (const key of Object.keys(remainingQuantities) as DeclarationField[]) {
-                    if (remainingQuantities[key] > 0) {
-                        const availableInLot = (lot.qtyEnviada || 0) - totalDeductedFromLot;
-                        const amountToDeduct = Math.min(remainingQuantities[key], availableInLot);
-                        
-                        if (amountToDeduct > 0) {
-                            updatePayload[key] = increment(amountToDeduct);
-                            remainingQuantities[key] -= amountToDeduct;
-                            totalDeductedFromLot += amountToDeduct;
+            if (totalToDeductFromLots > 0) {
+                const sortedLots = lotsForPiece
+                    .map(lot => ({ ...lot, remitoDate: remitos?.find(r => r.id === lot.remitoId)?.fecha || '9999' }))
+                    .sort((a, b) => a.remitoDate.localeCompare(b.remitoDate));
+        
+                for (const lot of sortedLots) {
+                    if (Object.values(remainingQuantitiesFromLots).every(q => q === 0)) break;
+        
+                    const lotDocRef = doc(firestore, 'machining', lot.id);
+                    const updatePayload: { [key: string]: any } = {};
+    
+                    let totalDeductedFromThisLot = 0;
+                    const availableInThisLot = lot.qtyEnviada;
+    
+                    for (const key of Object.keys(remainingQuantitiesFromLots) as (keyof typeof remainingQuantitiesFromLots)[]) {
+                        if (remainingQuantitiesFromLots[key] > 0) {
+                            const amountToDeduct = Math.min(remainingQuantitiesFromLots[key], availableInThisLot - totalDeductedFromThisLot);
+                            
+                            if (amountToDeduct > 0) {
+                                // Add to the specific qty field (qtyMecanizada, qtyScrap, etc.)
+                                updatePayload[key] = increment(amountToDeduct); 
+                                remainingQuantitiesFromLots[key] -= amountToDeduct;
+                                totalDeductedFromThisLot += amountToDeduct;
+                            }
                         }
                     }
-                }
-    
-                if (totalDeductedFromLot > 0) {
-                    const newQtyEnviada = (lot.qtyEnviada || 0) - totalDeductedFromLot;
-                    updatePayload['qtyEnviada'] = newQtyEnviada;
-                    updatePayload['status'] = newQtyEnviada > 0 ? "En Proceso" : "Finalizado";
-                    batch.update(lotDocRef, updatePayload);
+        
+                    if (totalDeductedFromThisLot > 0) {
+                        const newQtyEnviada = availableInThisLot - totalDeductedFromThisLot;
+                        updatePayload['qtyEnviada'] = newQtyEnviada;
+                        updatePayload['status'] = newQtyEnviada > 0 ? "En Proceso" : "Finalizado";
+                        batch.update(lotDocRef, updatePayload);
+                    }
                 }
             }
     
-            const inventoryDocRef = doc(firestore, 'inventory', selectedPieceId);
+            // 2. Update inventory with the final results
             batch.set(inventoryDocRef, {
                 stockMecanizado: increment(quantities.qtyMecanizada),
                 stockEnsamblado: increment(quantities.qtyEnsamblada),
@@ -417,3 +454,4 @@ export default function SubprocessesPage() {
     </main>
   );
 }
+
