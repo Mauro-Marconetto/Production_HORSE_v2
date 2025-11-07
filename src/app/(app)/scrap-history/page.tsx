@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2 } from "lucide-react";
 import type { Production, Piece, Client } from "@/lib/types";
+import { format } from 'date-fns';
 
 interface AggregatedScrapEntry {
     id: string;
