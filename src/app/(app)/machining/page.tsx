@@ -24,13 +24,14 @@ const statusConfig: { [key: string]: { label: string, color: string } } = {
     retornado_completo: { label: "Retornado Completo", color: "bg-green-500" },
 };
 
-type DeclarationField = 'qtyMecanizada' | 'qtyEnsamblada' | 'qtySegregada' | 'qtyScrapMecanizado' | 'qtyScrapEnsamblado';
+type DeclarationField = 'qtyMecanizada' | 'qtyEnsamblada' | 'qtySegregada' | 'qtyScrap' | 'qtyScrapMecanizado' | 'qtyScrapEnsamblado';
 type MachiningDeclarationStep = 'selection' | 'declaration' | 'summary';
 
 const declarationFieldsConfig: { key: DeclarationField, label: string }[] = [
     { key: 'qtyMecanizada', label: 'Piezas Mecanizadas' },
     { key: 'qtyEnsamblada', label: 'Piezas Ensambladas' },
     { key: 'qtySegregada', label: 'Piezas Segregadas' },
+    { key: 'qtyScrap', label: 'Scrap' },
     { key: 'qtyScrapMecanizado', label: 'Scrap (Mecanizado)' },
     { key: 'qtyScrapEnsamblado', label: 'Scrap (Ensamblado)' },
 ];
@@ -61,6 +62,7 @@ export default function SubprocessesPage() {
         qtyMecanizada: 0,
         qtyEnsamblada: 0,
         qtySegregada: 0,
+        qtyScrap: 0,
         qtyScrapMecanizado: 0,
         qtyScrapEnsamblado: 0,
     });
@@ -94,7 +96,7 @@ export default function SubprocessesPage() {
         if (isDialogOpen) {
             setStep('selection');
             setSelectedPieceId('');
-            setQuantities({ qtyMecanizada: 0, qtyEnsamblada: 0, qtySegregada: 0, qtyScrapMecanizado: 0, qtyScrapEnsamblado: 0 });
+            setQuantities({ qtyMecanizada: 0, qtyEnsamblada: 0, qtySegregada: 0, qtyScrap: 0, qtyScrapMecanizado: 0, qtyScrapEnsamblado: 0 });
             setActiveField('qtyMecanizada');
             setCurrentInput('');
         }
@@ -103,6 +105,26 @@ export default function SubprocessesPage() {
      useEffect(() => {
         setQuantities(q => ({ ...q, [activeField]: Number(currentInput) || 0 }));
     }, [currentInput, activeField]);
+
+    // Keyboard support for numeric pad
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!isDialogOpen || step !== 'declaration') return;
+
+            if (e.key >= '0' && e.key <= '9') {
+                handleNumericButton(e.key);
+            } else if (e.key === 'Backspace') {
+                handleBackspace();
+            } else if (e.key === 'Escape') {
+                setIsDialogOpen(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isDialogOpen, step]);
 
     const handleNumericButton = (value: string) => setCurrentInput(prev => prev + value);
     const handleBackspace = () => setCurrentInput(prev => prev.slice(0, -1));
@@ -129,7 +151,7 @@ export default function SubprocessesPage() {
                 .sort((a, b) => a.remitoDate.localeCompare(b.remitoDate));
     
             // 3. Check if there's enough stock across all lots
-            const totalStockEnMecanizado = sortedLots.reduce((sum, lot) => sum + lot.qtyEnviada, 0);
+            const totalStockEnMecanizado = sortedLots.reduce((sum, lot) => sum + (lot.qtyEnviada || 0), 0);
             if (totalDeclared > totalStockEnMecanizado) {
                 throw new Error(`No hay suficiente stock en mecanizado para la pieza ${getPieceCode(selectedPieceId)}. Se intentan declarar ${totalDeclared} y solo hay ${totalStockEnMecanizado}.`);
             }
@@ -147,7 +169,8 @@ export default function SubprocessesPage() {
                 // Iterate over each quantity type to deduct from the lot
                 for (const key of Object.keys(remainingQuantities) as DeclarationField[]) {
                     if (remainingQuantities[key] > 0) {
-                        const amountToProcessFromLot = Math.min(lot.qtyEnviada - lotDeductionTotal, remainingQuantities[key]);
+                        const availableInLot = (lot.qtyEnviada || 0) - lotDeductionTotal;
+                        const amountToProcessFromLot = Math.min(availableInLot, remainingQuantities[key]);
                         if (amountToProcessFromLot > 0) {
                             updatePayload[key] = increment(amountToProcessFromLot);
                             lotDeductionTotal += amountToProcessFromLot;
@@ -157,7 +180,7 @@ export default function SubprocessesPage() {
                 }
     
                 if (lotDeductionTotal > 0) {
-                    const newQtyEnviada = lot.qtyEnviada - lotDeductionTotal;
+                    const newQtyEnviada = (lot.qtyEnviada || 0) - lotDeductionTotal;
                     updatePayload['qtyEnviada'] = newQtyEnviada;
                     updatePayload['status'] = newQtyEnviada > 0 ? "En Proceso" : "Finalizado";
                     batch.update(lotDocRef, updatePayload);
@@ -280,7 +303,7 @@ export default function SubprocessesPage() {
                         <TableCell>{getPieceCode(prod.pieceId)}</TableCell>
                         <TableCell className="text-right">{((prod.qtyMecanizada || 0)).toLocaleString()}</TableCell>
                         <TableCell className="text-right">{((prod.qtyEnsamblada || 0)).toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-destructive">{((prod.qtyScrapMecanizado || 0) + (prod.qtyScrapEnsamblado || 0)).toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-destructive">{((prod.qtyScrapMecanizado || 0) + (prod.qtyScrapEnsamblado || 0) + (prod.qtyScrap || 0)).toLocaleString()}</TableCell>
                     </TableRow>
                 ))}
                  {!isLoading && (!completedLots || completedLots.length === 0) && (
