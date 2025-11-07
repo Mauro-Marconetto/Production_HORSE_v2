@@ -573,13 +573,9 @@ export default function ProductionPage() {
                                 </Button>
                             ))}
                              <div className="h-16 text-base justify-between flex items-center px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
-                                <span>Piezas Segregadas</span>
+                                <span>Total Turno Anterior</span>
                                 <span className="font-bold text-lg">{previousSegregatedQty.toLocaleString()}</span>
                              </div>
-                            <div className="grid grid-cols-2 gap-2 mt-auto">
-                                <Button type="button" variant="destructive" className="h-16 text-lg" onClick={() => setStep('selection')}>Cancelar</Button>
-                                <Button type="button" className="h-16 text-lg bg-green-600 hover:bg-green-700" onClick={() => setStep('summary')}>Declarar</Button>
-                            </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
@@ -636,7 +632,8 @@ export default function ProductionPage() {
                     )}
                      {step === 'declaration' && (
                         <>
-                           {/* Buttons are now inside the main content for this step */}
+                            <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={() => setStep('selection')}>Anterior</Button>
+                            <Button type="button" className="w-48 h-12 text-lg" onClick={() => setStep('summary')}>Revisar</Button>
                         </>
                     )}
                      {step === 'summary' && (
@@ -653,7 +650,7 @@ export default function ProductionPage() {
       </Dialog>
 
       <Dialog open={isPressingDialogOpen} onOpenChange={setIsPressingDialogOpen}>
-          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
+          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Prensado</DialogTitle>
                      <DialogDescription className="text-base">Procesa las piezas que están pendientes de prensado y muévelas a inventario finalizado.</DialogDescription>
@@ -705,25 +702,25 @@ export default function ProductionPage() {
                             </Card>
                             <Button
                                 variant={pressingActiveField === 'pressedQty' ? "default" : "secondary"}
-                                className="h-16 text-base justify-between"
+                                className="h-20 text-lg justify-between"
                                 onClick={() => {
                                     setPressingActiveField('pressedQty');
                                     setPressingCurrentInput(String(pressingQuantities.pressedQty || ''));
                                 }}
                             >
                                 <span>Piezas Prensadas (OK)</span>
-                                <span className="font-bold text-lg">{pressingQuantities.pressedQty.toLocaleString()}</span>
+                                <span className="font-bold text-xl">{pressingQuantities.pressedQty.toLocaleString()}</span>
                             </Button>
                              <Button
                                 variant={pressingActiveField === 'scrapQty' ? "destructive" : "secondary"}
-                                className={`h-16 text-base justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
+                                className={`h-20 text-lg justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
                                 onClick={() => {
                                     setPressingActiveField('scrapQty');
                                     setPressingCurrentInput(String(pressingQuantities.scrapQty || ''));
                                 }}
                             >
                                 <span>Scrap de Prensado</span>
-                                <span className="font-bold text-lg">{pressingQuantities.scrapQty.toLocaleString()}</span>
+                                <span className="font-bold text-xl">{pressingQuantities.scrapQty.toLocaleString()}</span>
                             </Button>
                          </div>
                          <div className="grid grid-cols-3 gap-2">
@@ -758,5 +755,3 @@ export default function ProductionPage() {
     </main>
   );
 }
-
-    
