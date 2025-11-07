@@ -432,7 +432,7 @@ export default function ProductionPage() {
                 <TableHead className="text-right text-destructive">Rechazo Interno</TableHead>
                 <TableHead className="text-right">Unidades Producidas</TableHead>
                 <TableHead className="text-right">Rechazo Interno (%)</TableHead>
-                <TableHead className="text-center">Calidad</TableHead>
+                <TableHead className="text-center">Calidad </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
