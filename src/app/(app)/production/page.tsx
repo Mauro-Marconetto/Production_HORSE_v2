@@ -196,6 +196,45 @@ export default function ProductionPage() {
     const handleProdNumericButton = (value: string) => setProdCurrentInput(prev => prev + value);
     const handleProdBackspace = () => setProdCurrentInput(prev => prev.slice(0, -1));
     const handleProdClear = () => setProdCurrentInput('');
+
+    // Keyboard support for production numeric pad
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!isProdDialogOpen || step !== 'declaration') return;
+
+            if (e.key >= '0' && e.key <= '9') {
+                handleProdNumericButton(e.key);
+            } else if (e.key === 'Backspace') {
+                handleProdBackspace();
+            } else if (e.key === 'Escape') {
+                setIsProdDialogOpen(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isProdDialogOpen, step]);
+
+    // Keyboard support for pressing numeric pad
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!isPressingDialogOpen || pressingStep !== 'declaration') return;
+
+            if (e.key >= '0' && e.key <= '9') {
+                setPressingCurrentInput(prev => prev + e.key);
+            } else if (e.key === 'Backspace') {
+                setPressingCurrentInput(prev => prev.slice(0, -1));
+            } else if (e.key === 'Escape') {
+                setIsPressingDialogOpen(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isPressingDialogOpen, pressingStep]);
     
     const handleGoToDeclaration = () => {
         setProdCurrentInput(''); // Reset keyboard input when moving to declaration step
