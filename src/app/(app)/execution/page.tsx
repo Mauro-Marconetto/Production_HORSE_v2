@@ -1,3 +1,6 @@
+
+export const dynamic = 'force-dynamic';
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -41,12 +44,12 @@ export default function ExecutionPage() {
 
                 return (
                   <TableRow key={p.id}>
-                    <TableCell>{new Date(p.fechaISO).toLocaleDateString()}</TableCell>
+                    <TableCell>{p.fechaISO != null ? new Date(p.fechaISO).toLocaleString('es-AR', { timeZone: 'America/Argentina/Cordoba' }) : ''}</TableCell>
                     <TableCell className="font-medium">{machine?.nombre}</TableCell>
                     <TableCell>{piece?.codigo}</TableCell>
                     <TableCell>{mold?.nombre}</TableCell>
                     <TableCell className="text-right">{p.horas}</TableCell>
-                    <TableCell className="text-right">{p.unidades.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{p.unidades != null ? p.unidades.toLocaleString('es-AR') : ''}</TableCell>
                     <TableCell className={`text-right ${isScrapHigh ? 'text-destructive' : ''}`}>
                       {(p.scrapPct * 100).toFixed(1)}%
                     </TableCell>
