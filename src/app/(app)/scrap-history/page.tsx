@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useMemo } from "react";
@@ -74,6 +75,26 @@ export default function ScrapHistoryPage() {
                     pieceId: prod.pieceId,
                     qty: prod.qtyArranque,
                     origen: 'Piezas de Arranque',
+                    causa: 'N/A',
+                });
+            }
+             if (prod.qtyScrapMecanizado > 0) {
+                scrapEntries.push({
+                    id: `${prod.id}-scrap-mecanizado`,
+                    periodo: monthYear,
+                    pieceId: prod.pieceId,
+                    qty: prod.qtyScrapMecanizado,
+                    origen: 'Mecanizado (Scrap)',
+                    causa: 'N/A',
+                });
+            }
+            if (prod.qtyScrapEnsamblado > 0) {
+                scrapEntries.push({
+                    id: `${prod.id}-scrap-ensamblado`,
+                    periodo: monthYear,
+                    pieceId: prod.pieceId,
+                    qty: prod.qtyScrapEnsamblado,
+                    origen: 'Ensamblado (Scrap)',
                     causa: 'N/A',
                 });
             }

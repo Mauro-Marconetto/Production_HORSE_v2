@@ -70,21 +70,22 @@ export default function SubprocessesPage() {
 
     const productionHistoryQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        let q = query(
-            collection(firestore, "production"), 
-            where("subproceso", "==", "mecanizado"), 
-            orderBy("fechaISO", "desc")
-        );
+        return query(collection(firestore, "production"), orderBy("fechaISO", "desc"));
+    }, [firestore]);
+    const { data: allProduction, isLoading: isLoadingHistory } = useCollection<Production>(productionHistoryQuery);
 
-        if (date?.from) {
-            q = query(q, where("fechaISO", ">=", date.from.toISOString()));
-        }
-        if (date?.to) {
-            q = query(q, where("fechaISO", "<=", addDays(date.to, 1).toISOString()));
-        }
-        return q;
-    }, [firestore, date]);
-    const { data: machiningHistory, isLoading: isLoadingHistory } = useCollection<Production>(productionHistoryQuery);
+
+    const machiningHistory = useMemo(() => {
+        if (!allProduction) return [];
+        return allProduction.filter(p => {
+             if (p.subproceso !== 'mecanizado') return false;
+             if (!date?.from) return true;
+             const prodDate = new Date(p.fechaISO);
+             const fromDate = date.from;
+             const toDate = date.to ? addDays(date.to, 1) : addDays(fromDate, 1);
+             return prodDate >= fromDate && prodDate < toDate;
+        });
+    }, [allProduction, date]);
 
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -504,5 +505,6 @@ export default function SubprocessesPage() {
     </main>
   );
 }
+
 
 
