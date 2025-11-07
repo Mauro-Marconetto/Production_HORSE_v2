@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -502,7 +501,7 @@ export default function ProductionPage() {
                     <div className="flex-grow p-6 flex flex-col gap-8">
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             <div className="flex flex-col gap-4">
-                                <h3 className="text-xl font-semibold text-center">1. Selecciona Turno</h3>
+                                <h3 className="text-xl font-semibold text-center">1. Turno</h3>
                                 <Select onValueChange={(v) => setTurno(v as any)} value={turno}>
                                     <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un turno..." /></SelectTrigger>
                                     <SelectContent>
@@ -513,7 +512,7 @@ export default function ProductionPage() {
                                 </Select>
                             </div>
                             <div className="flex flex-col gap-4">
-                                <h3 className="text-xl font-semibold text-center">2. Selecciona Máquina</h3>
+                                <h3 className="text-xl font-semibold text-center">2. Máquina</h3>
                                 <Select onValueChange={setMachineId} value={machineId}>
                                     <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige una máquina..." /></SelectTrigger>
                                     <SelectContent>
@@ -524,7 +523,7 @@ export default function ProductionPage() {
 
                             {selectedMachine?.type === 'inyectora' && (
                                 <div className="flex flex-col gap-4">
-                                    <h3 className="text-xl font-semibold text-center">3. Selecciona Molde</h3>
+                                    <h3 className="text-xl font-semibold text-center">3. Molde</h3>
                                     <Select onValueChange={setMoldId} value={moldId} disabled={!!existingProduction || isAssignmentActive(selectedMachine)}>
                                         <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
                                         <SelectContent>
@@ -573,7 +572,7 @@ export default function ProductionPage() {
                                 </Button>
                             ))}
                              <div className="h-16 text-base justify-between flex items-center px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
-                                <span>Total Turno Anterior</span>
+                                <span>Piezas Segregadas</span>
                                 <span className="font-bold text-lg">{previousSegregatedQty.toLocaleString()}</span>
                              </div>
                         </div>
@@ -632,8 +631,8 @@ export default function ProductionPage() {
                     )}
                      {step === 'declaration' && (
                         <>
-                            <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={() => setStep('selection')}>Anterior</Button>
-                            <Button type="button" className="w-48 h-12 text-lg" onClick={() => setStep('summary')}>Revisar</Button>
+                            <Button type="button" variant="destructive" className="w-48 h-12 text-lg" onClick={() => setStep('selection')}>Cancelar</Button>
+                            <Button type="button" className="w-48 h-12 text-lg bg-green-600 hover:bg-green-700" onClick={() => setStep('summary')}>Declarar</Button>
                         </>
                     )}
                      {step === 'summary' && (
@@ -650,7 +649,7 @@ export default function ProductionPage() {
       </Dialog>
 
       <Dialog open={isPressingDialogOpen} onOpenChange={setIsPressingDialogOpen}>
-          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Prensado</DialogTitle>
                      <DialogDescription className="text-base">Procesa las piezas que están pendientes de prensado y muévelas a inventario finalizado.</DialogDescription>
@@ -702,25 +701,25 @@ export default function ProductionPage() {
                             </Card>
                             <Button
                                 variant={pressingActiveField === 'pressedQty' ? "default" : "secondary"}
-                                className="h-20 text-lg justify-between"
+                                className="h-16 text-base justify-between"
                                 onClick={() => {
                                     setPressingActiveField('pressedQty');
                                     setPressingCurrentInput(String(pressingQuantities.pressedQty || ''));
                                 }}
                             >
                                 <span>Piezas Prensadas (OK)</span>
-                                <span className="font-bold text-xl">{pressingQuantities.pressedQty.toLocaleString()}</span>
+                                <span className="font-bold text-lg">{pressingQuantities.pressedQty.toLocaleString()}</span>
                             </Button>
                              <Button
                                 variant={pressingActiveField === 'scrapQty' ? "destructive" : "secondary"}
-                                className={`h-20 text-lg justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
+                                className={`h-16 text-base justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
                                 onClick={() => {
                                     setPressingActiveField('scrapQty');
                                     setPressingCurrentInput(String(pressingQuantities.scrapQty || ''));
                                 }}
                             >
                                 <span>Scrap de Prensado</span>
-                                <span className="font-bold text-xl">{pressingQuantities.scrapQty.toLocaleString()}</span>
+                                <span className="font-bold text-lg">{pressingQuantities.scrapQty.toLocaleString()}</span>
                             </Button>
                          </div>
                          <div className="grid grid-cols-3 gap-2">
