@@ -31,7 +31,7 @@ const declarationFieldsConfig: { key: DeclarationField, label: string }[] = [
     { key: 'qtyMecanizada', label: 'Piezas Mecanizadas' },
     { key: 'qtyEnsamblada', label: 'Piezas Ensambladas' },
     { key: 'qtySegregada', label: 'Piezas Segregadas' },
-    { key: 'qtyScrap', label: 'Scrap' },
+    { key: 'qtyScrap', label: 'Scrap General' },
     { key: 'qtyScrapMecanizado', label: 'Scrap (Mecanizado)' },
     { key: 'qtyScrapEnsamblado', label: 'Scrap (Ensamblado)' },
 ];
@@ -124,7 +124,7 @@ export default function SubprocessesPage() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isDialogOpen, step]);
+    }, [isDialogOpen, step, currentInput]);
 
     const handleNumericButton = (value: string) => setCurrentInput(prev => prev + value);
     const handleBackspace = () => setCurrentInput(prev => prev.slice(0, -1));
@@ -142,58 +142,53 @@ export default function SubprocessesPage() {
         try {
             const batch = writeBatch(firestore);
     
-            // 1. Find all pending machining lots for the selected piece
             const lotsForPiece = (machiningProcesses || []).filter(p => p.pieceId === selectedPieceId && (p.status === 'Enviado' || p.status === 'En Proceso'));
     
-            // 2. Sort lots by remito date (oldest first) - FIFO
             const sortedLots = lotsForPiece
                 .map(lot => ({ ...lot, remitoDate: remitos?.find(r => r.id === lot.remitoId)?.fecha || '9999' }))
                 .sort((a, b) => a.remitoDate.localeCompare(b.remitoDate));
     
-            // 3. Check if there's enough stock across all lots
             const totalStockEnMecanizado = sortedLots.reduce((sum, lot) => sum + (lot.qtyEnviada || 0), 0);
+            
             if (totalDeclared > totalStockEnMecanizado) {
-                throw new Error(`No hay suficiente stock en mecanizado para la pieza ${getPieceCode(selectedPieceId)}. Se intentan declarar ${totalDeclared} y solo hay ${totalStockEnMecanizado}.`);
+                 throw new Error(`No hay suficiente stock en mecanizado para la pieza ${getPieceCode(selectedPieceId)}. Se intentan declarar ${totalDeclared} y solo hay ${totalStockEnMecanizado}.`);
             }
     
-            // 4. Distribute declared quantities across lots
             let remainingQuantities = { ...quantities };
     
             for (const lot of sortedLots) {
                 if (Object.values(remainingQuantities).every(q => q === 0)) break;
     
                 const lotDocRef = doc(firestore, 'machining', lot.id);
-                let lotDeductionTotal = 0;
-                const updatePayload: Record<string, any> = {};
-    
-                // Iterate over each quantity type to deduct from the lot
+                const updatePayload: { [key in DeclarationField | 'status']?: any } = {};
+
+                let totalDeductedFromLot = 0;
+                
                 for (const key of Object.keys(remainingQuantities) as DeclarationField[]) {
                     if (remainingQuantities[key] > 0) {
-                        const availableInLot = (lot.qtyEnviada || 0) - lotDeductionTotal;
-                        const amountToProcessFromLot = Math.min(availableInLot, remainingQuantities[key]);
-                        if (amountToProcessFromLot > 0) {
-                            updatePayload[key] = increment(amountToProcessFromLot);
-                            lotDeductionTotal += amountToProcessFromLot;
-                            remainingQuantities[key] -= amountToProcessFromLot;
+                        const availableInLot = (lot.qtyEnviada || 0) - totalDeductedFromLot;
+                        const amountToDeduct = Math.min(remainingQuantities[key], availableInLot);
+                        
+                        if (amountToDeduct > 0) {
+                            updatePayload[key] = increment(amountToDeduct);
+                            remainingQuantities[key] -= amountToDeduct;
+                            totalDeductedFromLot += amountToDeduct;
                         }
                     }
                 }
     
-                if (lotDeductionTotal > 0) {
-                    const newQtyEnviada = (lot.qtyEnviada || 0) - lotDeductionTotal;
+                if (totalDeductedFromLot > 0) {
+                    const newQtyEnviada = (lot.qtyEnviada || 0) - totalDeductedFromLot;
                     updatePayload['qtyEnviada'] = newQtyEnviada;
                     updatePayload['status'] = newQtyEnviada > 0 ? "En Proceso" : "Finalizado";
                     batch.update(lotDocRef, updatePayload);
                 }
             }
     
-            // 5. Update main inventory
             const inventoryDocRef = doc(firestore, 'inventory', selectedPieceId);
             batch.set(inventoryDocRef, {
                 stockMecanizado: increment(quantities.qtyMecanizada),
                 stockListo: increment(quantities.qtyEnsamblada),
-                // Note: segregada/scrap are just for record-keeping in the machining process
-                // and don't affect main inventory until a quality process decides so.
             }, { merge: true });
     
             await batch.commit();
@@ -287,13 +282,15 @@ export default function SubprocessesPage() {
                 <TableHead>Pieza</TableHead>
                 <TableHead className="text-right">Mecanizadas (OK)</TableHead>
                 <TableHead className="text-right">Ensambladas (OK)</TableHead>
-                <TableHead className="text-right text-destructive">Scrap Total</TableHead>
+                <TableHead className="text-right text-destructive">Scrap General</TableHead>
+                <TableHead className="text-right text-destructive">Scrap Mecanizado</TableHead>
+                <TableHead className="text-right text-destructive">Scrap Ensamblado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
                 {isLoading && (
                     <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center">
+                        <TableCell colSpan={6} className="h-24 text-center">
                             <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                         </TableCell>
                     </TableRow>
@@ -303,12 +300,14 @@ export default function SubprocessesPage() {
                         <TableCell>{getPieceCode(prod.pieceId)}</TableCell>
                         <TableCell className="text-right">{((prod.qtyMecanizada || 0)).toLocaleString()}</TableCell>
                         <TableCell className="text-right">{((prod.qtyEnsamblada || 0)).toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-destructive">{((prod.qtyScrapMecanizado || 0) + (prod.qtyScrapEnsamblado || 0) + (prod.qtyScrap || 0)).toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-destructive">{((prod.qtyScrap || 0)).toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-destructive">{((prod.qtyScrapMecanizado || 0)).toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-destructive">{((prod.qtyScrapEnsamblado || 0)).toLocaleString()}</TableCell>
                     </TableRow>
                 ))}
                  {!isLoading && (!completedLots || completedLots.length === 0) && (
                     <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                             No hay declaraciones de mecanizado finalizadas.
                         </TableCell>
                     </TableRow>
@@ -417,4 +416,3 @@ export default function SubprocessesPage() {
     </main>
   );
 }
-
