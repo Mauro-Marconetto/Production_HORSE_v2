@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useMemo, useState, useEffect } from "react";
@@ -188,7 +189,7 @@ export default function SubprocessesPage() {
             const inventoryDocRef = doc(firestore, 'inventory', selectedPieceId);
             batch.set(inventoryDocRef, {
                 stockMecanizado: increment(quantities.qtyMecanizada),
-                stockListo: increment(quantities.qtyEnsamblada),
+                stockEnsamblado: increment(quantities.qtyEnsamblada),
             }, { merge: true });
     
             await batch.commit();

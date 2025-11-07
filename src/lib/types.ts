@@ -76,6 +76,7 @@ export interface Inventory {
   stockGranallado?: number; // granallado
   stockListo?: number; // listo para entregar
   stockPendienteCalidad?: number; // segregado y esperando inspeccion
+  stockEnsamblado?: number; // Ensamblado y listo para entregar
 }
 
 
