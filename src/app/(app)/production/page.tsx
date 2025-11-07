@@ -535,7 +535,7 @@ export default function ProductionPage() {
 
                              {selectedMachine?.type === 'granalladora' && (
                                 <div className="flex flex-col gap-4">
-                                    <h3 className="text-xl font-semibold text-center">3. Selecciona Referencia</h3>
+                                    <h3 className="text-xl font-semibold text-center">3. Referencia</h3>
                                     <Select onValueChange={setPieceId} value={pieceId} disabled={!!existingProduction || isAssignmentActive(selectedMachine)}>
                                         <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige una referencia..." /></SelectTrigger>
                                         <SelectContent>
@@ -588,8 +588,8 @@ export default function ProductionPage() {
                 )}
 
                 {step === 'summary' && (
-                    <div className="flex-grow p-6 flex flex-col items-center justify-center gap-6">
-                        <Card className="w-full max-w-3xl">
+                    <div className="flex-grow p-6 overflow-auto">
+                        <Card>
                             <CardHeader>
                                 <CardTitle className="text-2xl">Resumen de la Declaración</CardTitle>
                                 <CardDescription>Confirma los datos antes de guardar.</CardDescription>
