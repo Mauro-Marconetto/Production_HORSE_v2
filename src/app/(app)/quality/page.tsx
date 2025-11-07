@@ -215,7 +215,7 @@ export default function QualityPage() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isInspectionDialogOpen]);
+    }, [isInspectionDialogOpen, currentInput]);
 
 
     const handleCloseInspectionDialog = () => {
@@ -540,7 +540,7 @@ export default function QualityPage() {
 
 
       <Dialog open={isInspectionDialogOpen} onOpenChange={setIsInspectionDialogOpen}>
-          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Inspección de Calidad</DialogTitle>
                     {selectedProduction && (
@@ -752,4 +752,6 @@ export default function QualityPage() {
     </main>
   );
 }
+    
+
     

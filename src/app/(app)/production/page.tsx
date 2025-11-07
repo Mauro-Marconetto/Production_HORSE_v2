@@ -215,7 +215,7 @@ export default function ProductionPage() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isProdDialogOpen, step]);
+    }, [isProdDialogOpen, step, prodCurrentInput]);
 
     // Keyboard support for pressing numeric pad
     useEffect(() => {
@@ -234,7 +234,7 @@ export default function ProductionPage() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isPressingDialogOpen, pressingStep]);
+    }, [isPressingDialogOpen, pressingStep, pressingCurrentInput]);
     
     const handleGoToDeclaration = () => {
         setProdCurrentInput(''); // Reset keyboard input when moving to declaration step
@@ -493,7 +493,7 @@ export default function ProductionPage() {
       </Card>
 
       <Dialog open={isProdDialogOpen} onOpenChange={setIsProdDialogOpen}>
-          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Producción</DialogTitle>
                 </DialogHeader>
@@ -653,7 +653,7 @@ export default function ProductionPage() {
       </Dialog>
 
       <Dialog open={isPressingDialogOpen} onOpenChange={setIsPressingDialogOpen}>
-          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Prensado</DialogTitle>
                      <DialogDescription className="text-base">Procesa las piezas que están pendientes de prensado y muévelas a inventario finalizado.</DialogDescription>
@@ -758,3 +758,5 @@ export default function ProductionPage() {
     </main>
   );
 }
+
+    
