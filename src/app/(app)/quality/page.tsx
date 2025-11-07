@@ -109,7 +109,7 @@ export default function QualityPage() {
     const [activeField, setActiveField] = useState<QualityInspectionField>('qtyAptaCalidad');
     const [quantities, setQuantities] = useState({ 
         qtyAptaCalidad: 0, 
-        qtyAptaSinPrensarCalidad: 0,
+        qtyAptaSinPrensarCalidad: 0, 
         qtyScrapCalidad: 0,
     });
     const [currentInput, setCurrentInput] = useState('');
@@ -193,14 +193,35 @@ export default function QualityPage() {
         }
     }, [segregateForm.machineId, machines]);
 
+    const handleNumericButton = (value: string) => setCurrentInput(prev => prev + value);
+    const handleBackspace = () => setCurrentInput(prev => prev.slice(0, -1));
+    const handleClear = () => setCurrentInput('');
+
+     // Keyboard support for inspection numeric pad
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!isInspectionDialogOpen) return;
+
+            if (e.key >= '0' && e.key <= '9') {
+                handleNumericButton(e.key);
+            } else if (e.key === 'Backspace') {
+                handleBackspace();
+            } else if (e.key === 'Escape') {
+                setIsInspectionDialogOpen(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isInspectionDialogOpen]);
+
 
     const handleCloseInspectionDialog = () => {
         setIsInspectionDialogOpen(false);
     }
     
-    const handleNumericButton = (value: string) => setCurrentInput(prev => prev + value);
-    const handleBackspace = () => setCurrentInput(prev => prev.slice(0, -1));
-    const handleClear = () => setCurrentInput('');
 
     const totalInspectedInSession = quantities.qtyAptaCalidad + quantities.qtyAptaSinPrensarCalidad + quantities.qtyScrapCalidad;
     const isInspectionAmountValid = totalInspectedInSession <= (selectedProduction?.qtySegregada || 0);
@@ -731,5 +752,4 @@ export default function QualityPage() {
     </main>
   );
 }
-
     
