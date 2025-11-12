@@ -7,8 +7,16 @@ backends:
       maxInstances: 1
     labels: {}
     branch: main
+    environment:
+      variables:
+        NEXT_PUBLIC_EXPORT_ENABLED: "1"
+
   pre-produccion:
     runConfig:
       maxInstances: 1
     labels: {}
     branch: develop
+    environment:
+      variables:
+        NEXT_PUBLIC_EXPORT_ENABLED: "1"
+
