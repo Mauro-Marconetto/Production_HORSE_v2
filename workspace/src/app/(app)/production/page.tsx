@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { collection, doc, addDoc, updateDoc, serverTimestamp, Timestamp, query, orderBy, where, getDoc, writeBatch, Firestore, increment } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
@@ -94,7 +94,7 @@ export default function ProductionPage() {
 
     const lotsToPress = useMemo(() => {
         if (!inventory) return [];
-        return inventory.filter(item => (item.stockInyectado || 0) > 0);
+        return inventory.filter((item: { stockInyectado: any; }) => (item.stockInyectado || 0) > 0);
     }, [inventory]);
 
     const declarationFields = useMemo(() => {
@@ -105,7 +105,7 @@ export default function ProductionPage() {
     }, [selectedMachine]);
 
 
-    const resetProdDialogState = () => {
+    const resetProdDialogState = useCallback(() => {
         setStep('selection');
         setTurno('');
         setMachineId('');
@@ -116,27 +116,27 @@ export default function ProductionPage() {
         setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
         setProdCurrentInput('');
         setProdActiveField('qtyFinalizada');
-    }
+    }, []);
     
-    const resetPressingDialogState = () => {
+    const resetPressingDialogState = useCallback(() => {
         setPressingStep('list');
         setSelectedLotForPressing(null);
         setPressingQuantities({ pressedQty: 0, scrapQty: 0 });
         setPressingCurrentInput('');
         setPressingActiveField('pressedQty');
-    }
+    }, []);
 
     useEffect(() => {
         if(isProdDialogOpen) {
             resetProdDialogState();
         }
-    }, [isProdDialogOpen]);
+    }, [isProdDialogOpen, resetProdDialogState]);
     
     useEffect(() => {
         if(isPressingDialogOpen) {
             resetPressingDialogState();
         }
-    }, [isPressingDialogOpen]);
+    }, [isPressingDialogOpen, resetPressingDialogState]);
     
      useEffect(() => {
         const machine = machines?.find(m => m.id === machineId) || null;
@@ -145,7 +145,7 @@ export default function ProductionPage() {
     
     useEffect(() => {
         async function checkForExisting() {
-            if (turno && machineId && firestore && production) {
+            if (turno && machineId && firestore && production !== undefined) {
                 const existing = await findExistingProduction(firestore, production, machineId, turno);
                 setExistingProduction(existing);
                 if (existing) {
@@ -215,7 +215,7 @@ export default function ProductionPage() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isProdDialogOpen, step, prodCurrentInput]);
+    }, [isProdDialogOpen, step]);
 
     // Keyboard support for pressing numeric pad
     useEffect(() => {
@@ -234,7 +234,7 @@ export default function ProductionPage() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isPressingDialogOpen, pressingStep, pressingCurrentInput]);
+    }, [isPressingDialogOpen, pressingStep]);
     
     const handleGoToDeclaration = () => {
         setProdCurrentInput(''); // Reset keyboard input when moving to declaration step
@@ -388,8 +388,6 @@ export default function ProductionPage() {
     
     const isStep1Valid = turno && machineId && (selectedMachine?.type === 'inyectora' ? moldId : pieceId);
     const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap + (prodQuantities.qtyArranque || 0);
-    
-    const previousSegregatedQty = existingProduction?.qtySegregada || 0;
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
@@ -574,7 +572,7 @@ export default function ProductionPage() {
                             ))}
                              <div className="h-16 text-base justify-between flex items-center px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
                                 <span>Piezas Segregadas</span>
-                                <span className="font-bold text-lg">{previousSegregatedQty.toLocaleString()}</span>
+                                <span className="font-bold text-lg">{(existingProduction?.qtySegregada || 0).toLocaleString()}</span>
                              </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
@@ -669,9 +667,9 @@ export default function ProductionPage() {
                             <TableBody>
                                 {isLoadingInventory && <TableRow><TableCell colSpan={3} className="text-center h-24"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground"/></TableCell></TableRow>}
                                 {!isLoadingInventory && lotsToPress.length === 0 && <TableRow><TableCell colSpan={3} className="text-center h-24">No hay lotes pendientes de prensado.</TableCell></TableRow>}
-                                {!isLoadingInventory && lotsToPress.map(lot => (
+                                {!isLoadingInventory && lotsToPress.map((lot: { id: React.Key | null | undefined; stockInyectado: any; }) => (
                                     <TableRow key={lot.id}>
-                                        <TableCell>{getPieceCode(lot.id)}</TableCell>
+                                        <TableCell>{getPieceCode(lot.id as string)}</TableCell>
                                         <TableCell className="text-right font-bold">
                                             {(lot.stockInyectado || 0).toLocaleString()}
                                         </TableCell>
