@@ -1,21 +1,17 @@
 # Settings to manage and configure a Firebase App Hosting backend.
 # https://firebase.google.com/docs/app-hosting/configure
 
-backends:
-  produccion:
-    runConfig:
-      maxInstances: 1
-    labels: {}
-    branch: main
-    environment:
-      variables:
-        NEXT_PUBLIC_EXPORT_ENABLED: "1"
+app:
+  dir: .                # o p.ej. "studio" / "apps/web"
+  build:
+    command: npm ci && npm run build
+    output_dir: .next
 
-  pre-produccion:
+backends:
+  pre-production:
+    branch: develop
     runConfig:
       maxInstances: 1
-    labels: {}
-    branch: develop
     environment:
       variables:
         NEXT_PUBLIC_EXPORT_ENABLED: "1"
