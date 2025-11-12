@@ -388,6 +388,8 @@ export default function ProductionPage() {
     
     const isStep1Valid = turno && machineId && (selectedMachine?.type === 'inyectora' ? moldId : pieceId);
     const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap + (prodQuantities.qtyArranque || 0);
+    
+    const previousSegregatedQty = existingProduction?.qtySegregada || 0;
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
@@ -572,7 +574,7 @@ export default function ProductionPage() {
                             ))}
                              <div className="h-16 text-base justify-between flex items-center px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
                                 <span>Piezas Segregadas</span>
-                                <span className="font-bold text-lg">{(existingProduction?.qtySegregada || 0).toLocaleString()}</span>
+                                <span className="font-bold text-lg">{previousSegregatedQty.toLocaleString()}</span>
                              </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
