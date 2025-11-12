@@ -1,7 +1,6 @@
-
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { collection, doc, addDoc, updateDoc, serverTimestamp, Timestamp, query, orderBy, where, getDoc, writeBatch, Firestore, increment } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
@@ -94,7 +93,7 @@ export default function ProductionPage() {
 
     const lotsToPress = useMemo(() => {
         if (!inventory) return [];
-        return inventory.filter((item: { stockInyectado: any; }) => (item.stockInyectado || 0) > 0);
+        return inventory.filter(item => (item.stockInyectado || 0) > 0);
     }, [inventory]);
 
     const declarationFields = useMemo(() => {
@@ -105,7 +104,7 @@ export default function ProductionPage() {
     }, [selectedMachine]);
 
 
-    const resetProdDialogState = useCallback(() => {
+    const resetProdDialogState = () => {
         setStep('selection');
         setTurno('');
         setMachineId('');
@@ -116,27 +115,27 @@ export default function ProductionPage() {
         setProdQuantities({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
         setProdCurrentInput('');
         setProdActiveField('qtyFinalizada');
-    }, []);
+    }
     
-    const resetPressingDialogState = useCallback(() => {
+    const resetPressingDialogState = () => {
         setPressingStep('list');
         setSelectedLotForPressing(null);
         setPressingQuantities({ pressedQty: 0, scrapQty: 0 });
         setPressingCurrentInput('');
         setPressingActiveField('pressedQty');
-    }, []);
+    }
 
     useEffect(() => {
         if(isProdDialogOpen) {
             resetProdDialogState();
         }
-    }, [isProdDialogOpen, resetProdDialogState]);
+    }, [isProdDialogOpen]);
     
     useEffect(() => {
         if(isPressingDialogOpen) {
             resetPressingDialogState();
         }
-    }, [isPressingDialogOpen, resetPressingDialogState]);
+    }, [isPressingDialogOpen]);
     
      useEffect(() => {
         const machine = machines?.find(m => m.id === machineId) || null;
@@ -145,7 +144,7 @@ export default function ProductionPage() {
     
     useEffect(() => {
         async function checkForExisting() {
-            if (turno && machineId && firestore && production !== undefined) {
+            if (turno && machineId && firestore && production) {
                 const existing = await findExistingProduction(firestore, production, machineId, turno);
                 setExistingProduction(existing);
                 if (existing) {
@@ -215,7 +214,7 @@ export default function ProductionPage() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isProdDialogOpen, step]);
+    }, [isProdDialogOpen, step, prodCurrentInput]);
 
     // Keyboard support for pressing numeric pad
     useEffect(() => {
@@ -234,7 +233,7 @@ export default function ProductionPage() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isPressingDialogOpen, pressingStep]);
+    }, [isPressingDialogOpen, pressingStep, pressingCurrentInput]);
     
     const handleGoToDeclaration = () => {
         setProdCurrentInput(''); // Reset keyboard input when moving to declaration step
@@ -632,8 +631,8 @@ export default function ProductionPage() {
                     )}
                      {step === 'declaration' && (
                         <>
-                            <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={() => setStep('selection')}>Anterior</Button>
-                            <Button type="button" className="w-48 h-12 text-lg" onClick={() => setStep('summary')}>Revisar</Button>
+                            <Button type="button" variant="destructive" className="w-48 h-12 text-lg" onClick={() => setStep('selection')}>Cancelar</Button>
+                            <Button type="button" className="w-48 h-12 text-lg bg-green-600 hover:bg-green-700" onClick={() => setStep('summary')}>Declarar</Button>
                         </>
                     )}
                      {step === 'summary' && (
@@ -669,9 +668,9 @@ export default function ProductionPage() {
                             <TableBody>
                                 {isLoadingInventory && <TableRow><TableCell colSpan={3} className="text-center h-24"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground"/></TableCell></TableRow>}
                                 {!isLoadingInventory && lotsToPress.length === 0 && <TableRow><TableCell colSpan={3} className="text-center h-24">No hay lotes pendientes de prensado.</TableCell></TableRow>}
-                                {!isLoadingInventory && lotsToPress.map((lot: { id: React.Key | null | undefined; stockInyectado: any; }) => (
+                                {!isLoadingInventory && lotsToPress.map(lot => (
                                     <TableRow key={lot.id}>
-                                        <TableCell>{getPieceCode(lot.id as string)}</TableCell>
+                                        <TableCell>{getPieceCode(lot.id)}</TableCell>
                                         <TableCell className="text-right font-bold">
                                             {(lot.stockInyectado || 0).toLocaleString()}
                                         </TableCell>
@@ -702,34 +701,34 @@ export default function ProductionPage() {
                             </Card>
                             <Button
                                 variant={pressingActiveField === 'pressedQty' ? "default" : "secondary"}
-                                className="h-20 text-xl justify-between"
+                                className="h-16 text-base justify-between"
                                 onClick={() => {
                                     setPressingActiveField('pressedQty');
                                     setPressingCurrentInput(String(pressingQuantities.pressedQty || ''));
                                 }}
                             >
                                 <span>Piezas Prensadas (OK)</span>
-                                <span className="font-bold text-2xl">{pressingQuantities.pressedQty.toLocaleString()}</span>
+                                <span className="font-bold text-lg">{pressingQuantities.pressedQty.toLocaleString()}</span>
                             </Button>
                              <Button
                                 variant={pressingActiveField === 'scrapQty' ? "destructive" : "secondary"}
-                                className={`h-20 text-xl justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
+                                className={`h-16 text-base justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
                                 onClick={() => {
                                     setPressingActiveField('scrapQty');
                                     setPressingCurrentInput(String(pressingQuantities.scrapQty || ''));
                                 }}
                             >
                                 <span>Scrap de Prensado</span>
-                                <span className="font-bold text-2xl">{pressingQuantities.scrapQty.toLocaleString()}</span>
+                                <span className="font-bold text-lg">{pressingQuantities.scrapQty.toLocaleString()}</span>
                             </Button>
                          </div>
                          <div className="grid grid-cols-3 gap-2">
                             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
-                                <Button key={n} variant="outline" className="h-full text-2xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + n)}>{n}</Button>
+                                <Button key={n} variant="outline" className="h-full text-xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + n)}>{n}</Button>
                             ))}
-                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={() => setPressingCurrentInput('')}>C</Button>
-                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + '0')}>0</Button>
-                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={() => setPressingCurrentInput(p => p.slice(0, -1))}>←</Button>
+                            <Button variant="outline" className="h-full text-xl font-bold" onClick={() => setPressingCurrentInput('')}>C</Button>
+                            <Button variant="outline" className="h-full text-xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + '0')}>0</Button>
+                            <Button variant="outline" className="h-full text-xl font-bold" onClick={() => setPressingCurrentInput(p => p.slice(0, -1))}>←</Button>
                         </div>
                     </div>
                 )}
