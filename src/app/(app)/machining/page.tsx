@@ -407,7 +407,7 @@ export default function SubprocessesPage() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Producción de Mecanizado</DialogTitle>
                 </DialogHeader>
@@ -433,24 +433,24 @@ export default function SubprocessesPage() {
                                 <Button
                                     key={key}
                                     variant={activeField === key ? "default" : "secondary"}
-                                    className="h-20 text-xl justify-between"
+                                    className="h-16 text-base justify-between"
                                     onClick={() => {
                                         setActiveField(key);
                                         setCurrentInput(String(quantities[key] || ''));
                                     }}
                                 >
                                     <span>{label}</span>
-                                    <span className="font-bold text-2xl">{quantities[key].toLocaleString()}</span>
+                                    <span className="font-bold text-lg">{quantities[key].toLocaleString()}</span>
                                 </Button>
                             ))}
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
-                                <Button key={n} variant="outline" className="h-full text-3xl font-bold" onClick={() => handleNumericButton(n)}>{n}</Button>
+                                <Button key={n} variant="outline" className="h-full text-2xl font-bold" onClick={() => handleNumericButton(n)}>{n}</Button>
                             ))}
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={handleClear}>C</Button>
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={() => handleNumericButton('0')}>0</Button>
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={handleBackspace}>←</Button>
+                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={handleClear}>C</Button>
+                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={() => handleNumericButton('0')}>0</Button>
+                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={handleBackspace}>←</Button>
                         </div>
                     </div>
                 )}
@@ -505,6 +505,7 @@ export default function SubprocessesPage() {
     </main>
   );
 }
+
 
 
 
