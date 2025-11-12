@@ -196,6 +196,45 @@ export default function ProductionPage() {
     const handleProdNumericButton = (value: string) => setProdCurrentInput(prev => prev + value);
     const handleProdBackspace = () => setProdCurrentInput(prev => prev.slice(0, -1));
     const handleProdClear = () => setProdCurrentInput('');
+
+    // Keyboard support for production numeric pad
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!isProdDialogOpen || step !== 'declaration') return;
+
+            if (e.key >= '0' && e.key <= '9') {
+                handleProdNumericButton(e.key);
+            } else if (e.key === 'Backspace') {
+                handleProdBackspace();
+            } else if (e.key === 'Escape') {
+                setIsProdDialogOpen(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isProdDialogOpen, step, prodCurrentInput]);
+
+    // Keyboard support for pressing numeric pad
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!isPressingDialogOpen || pressingStep !== 'declaration') return;
+
+            if (e.key >= '0' && e.key <= '9') {
+                setPressingCurrentInput(prev => prev + e.key);
+            } else if (e.key === 'Backspace') {
+                setPressingCurrentInput(prev => prev.slice(0, -1));
+            } else if (e.key === 'Escape') {
+                setIsPressingDialogOpen(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isPressingDialogOpen, pressingStep, pressingCurrentInput]);
     
     const handleGoToDeclaration = () => {
         setProdCurrentInput(''); // Reset keyboard input when moving to declaration step
@@ -348,16 +387,9 @@ export default function ProductionPage() {
     };
     
     const isStep1Valid = turno && machineId && (selectedMachine?.type === 'inyectora' ? moldId : pieceId);
-    const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap + prodQuantities.qtyArranque;
+    const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap + (prodQuantities.qtyArranque || 0);
     
-    // Total declared in previous sessions for this turn
-    const previousTotalDeclared = (existingProduction?.qtyFinalizada || 0) + 
-                                  (existingProduction?.qtySinPrensar || 0) +
-                                  (existingProduction?.qtyScrap || 0) +
-                                  (existingProduction?.qtyArranque || 0) +
-                                  (existingProduction?.qtySegregada || 0);
-
-    const totalDeclared = totalDeclaredInSession + previousTotalDeclared;
+    const previousSegregatedQty = existingProduction?.qtySegregada || 0;
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
@@ -366,7 +398,7 @@ export default function ProductionPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-headline font-bold">Producción</h1>
           <p className="text-muted-foreground">Monitoriza y declara el progreso de la producción real.</p>
@@ -397,15 +429,16 @@ export default function ProductionPage() {
                 <TableHead>Turno</TableHead>
                 <TableHead className="text-right">Unidades OK</TableHead>
                 <TableHead className="text-right">Unidades Sin Prensar</TableHead>
+                <TableHead className="text-right text-destructive">Rechazo Interno</TableHead>
                 <TableHead className="text-right">Unidades Producidas</TableHead>
-                <TableHead className="text-right">Scrap (%)</TableHead>
-                <TableHead className="text-center">Calidad</TableHead>
+                <TableHead className="text-right">Rechazo Interno (%)</TableHead>
+                <TableHead className="text-center">Calidad </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {(isLoadingProd || isLoadingMachines || isLoadingMolds || isLoadingPieces) && (
                 <TableRow>
-                    <TableCell colSpan={10} className="h-24 text-center">
+                    <TableCell colSpan={11} className="h-24 text-center">
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                     </TableCell>
                 </TableRow>
@@ -413,9 +446,9 @@ export default function ProductionPage() {
               {production?.map((p) => {
                 const unidadesOK = (p.qtyFinalizada || 0) + (p.qtyAptaCalidad || 0);
                 const unidadesSinPrensar = (p.qtySinPrensar || 0) + (p.qtyAptaSinPrensarCalidad || 0);
-                const scrapTotal = (p.qtyScrap || 0) + (p.qtyScrapCalidad || 0);
+                const scrapTotal = (p.qtyScrap || 0) + (p.qtyScrapCalidad || 0) + (p.qtyArranque || 0);
                 const totalUnitsForScrapCalc = unidadesOK + unidadesSinPrensar + scrapTotal + (p.qtySegregada || 0);
-                const totalUnits = totalUnitsForScrapCalc + (p.qtyArranque || 0);
+                const totalUnits = totalUnitsForScrapCalc;
                 const scrapPct = totalUnitsForScrapCalc > 0 ? scrapTotal / totalUnitsForScrapCalc : 0;
                 const isScrapHigh = scrapPct > 0.05;
 
@@ -428,7 +461,8 @@ export default function ProductionPage() {
                     <TableCell className="capitalize">{p.turno}</TableCell>
                     <TableCell className="text-right font-semibold">{unidadesOK.toLocaleString()}</TableCell>
                     <TableCell className="text-right">{unidadesSinPrensar.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{totalUnits.toLocaleString()}</TableCell>
+                    <TableCell className="text-right text-destructive">{scrapTotal.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-bold">{totalUnits.toLocaleString()}</TableCell>
                     <TableCell className={`text-right ${isScrapHigh ? 'text-destructive' : ''}`}>
                       {(scrapPct * 100).toFixed(1)}%
                     </TableCell>
@@ -448,7 +482,7 @@ export default function ProductionPage() {
               })}
               {!isLoadingProd && (!production || production.length === 0) && (
                  <TableRow>
-                    <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                         No hay registros de producción.
                     </TableCell>
                 </TableRow>
@@ -459,7 +493,7 @@ export default function ProductionPage() {
       </Card>
 
       <Dialog open={isProdDialogOpen} onOpenChange={setIsProdDialogOpen}>
-          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Producción</DialogTitle>
                 </DialogHeader>
@@ -468,7 +502,7 @@ export default function ProductionPage() {
                     <div className="flex-grow p-6 flex flex-col gap-8">
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             <div className="flex flex-col gap-4">
-                                <h3 className="text-xl font-semibold text-center">1. Selecciona Turno</h3>
+                                <h3 className="text-xl font-semibold text-center">1. Turno</h3>
                                 <Select onValueChange={(v) => setTurno(v as any)} value={turno}>
                                     <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un turno..." /></SelectTrigger>
                                     <SelectContent>
@@ -479,7 +513,7 @@ export default function ProductionPage() {
                                 </Select>
                             </div>
                             <div className="flex flex-col gap-4">
-                                <h3 className="text-xl font-semibold text-center">2. Selecciona Máquina</h3>
+                                <h3 className="text-xl font-semibold text-center">2. Máquina</h3>
                                 <Select onValueChange={setMachineId} value={machineId}>
                                     <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige una máquina..." /></SelectTrigger>
                                     <SelectContent>
@@ -490,7 +524,7 @@ export default function ProductionPage() {
 
                             {selectedMachine?.type === 'inyectora' && (
                                 <div className="flex flex-col gap-4">
-                                    <h3 className="text-xl font-semibold text-center">3. Selecciona Molde</h3>
+                                    <h3 className="text-xl font-semibold text-center">3. Molde</h3>
                                     <Select onValueChange={setMoldId} value={moldId} disabled={!!existingProduction || isAssignmentActive(selectedMachine)}>
                                         <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige un molde..." /></SelectTrigger>
                                         <SelectContent>
@@ -502,7 +536,7 @@ export default function ProductionPage() {
 
                              {selectedMachine?.type === 'granalladora' && (
                                 <div className="flex flex-col gap-4">
-                                    <h3 className="text-xl font-semibold text-center">3. Selecciona Referencia</h3>
+                                    <h3 className="text-xl font-semibold text-center">3. Referencia</h3>
                                     <Select onValueChange={setPieceId} value={pieceId} disabled={!!existingProduction || isAssignmentActive(selectedMachine)}>
                                         <SelectTrigger className="h-16 text-lg"><SelectValue placeholder="Elige una referencia..." /></SelectTrigger>
                                         <SelectContent>
@@ -528,35 +562,35 @@ export default function ProductionPage() {
                                 <Button
                                     key={key}
                                     variant={prodActiveField === key ? "default" : "secondary"}
-                                    className="h-20 text-xl justify-between"
+                                    className="h-16 text-base justify-between"
                                     onClick={() => {
                                         setProdActiveField(key);
                                         setProdCurrentInput(String(prodQuantities[key] || ''));
                                     }}
                                 >
                                     <span>{label}</span>
-                                    <span className="font-bold text-2xl">{prodQuantities[key].toLocaleString()}</span>
+                                    <span className="font-bold text-lg">{prodQuantities[key].toLocaleString()}</span>
                                 </Button>
                             ))}
-                             <div className="h-20 text-xl justify-between flex items-center px-4 py-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
-                                <span>Total Turno Anterior</span>
-                                <span className="font-bold text-2xl">{previousTotalDeclared.toLocaleString()}</span>
+                             <div className="h-16 text-base justify-between flex items-center px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
+                                <span>Piezas Segregadas</span>
+                                <span className="font-bold text-lg">{previousSegregatedQty.toLocaleString()}</span>
                              </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
-                                <Button key={n} variant="outline" className="h-full text-3xl font-bold" onClick={() => handleProdNumericButton(n)}>{n}</Button>
+                                <Button key={n} variant="outline" className="h-full text-xl font-bold" onClick={() => handleProdNumericButton(n)}>{n}</Button>
                             ))}
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={handleProdClear}>C</Button>
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={() => handleProdNumericButton('0')}>0</Button>
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={handleProdBackspace}>←</Button>
+                            <Button variant="outline" className="h-full text-xl font-bold" onClick={handleProdClear}>C</Button>
+                            <Button variant="outline" className="h-full text-xl font-bold" onClick={() => handleProdNumericButton('0')}>0</Button>
+                            <Button variant="outline" className="h-full text-xl font-bold" onClick={handleProdBackspace}>←</Button>
                         </div>
                     </div>
                 )}
 
                 {step === 'summary' && (
-                    <div className="flex-grow p-6 flex flex-col items-center justify-center gap-6">
-                        <Card className="w-full max-w-3xl">
+                    <div className="flex-grow p-6 overflow-auto">
+                        <Card>
                             <CardHeader>
                                 <CardTitle className="text-2xl">Resumen de la Declaración</CardTitle>
                                 <CardDescription>Confirma los datos antes de guardar.</CardDescription>
@@ -616,7 +650,7 @@ export default function ProductionPage() {
       </Dialog>
 
       <Dialog open={isPressingDialogOpen} onOpenChange={setIsPressingDialogOpen}>
-          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Prensado</DialogTitle>
                      <DialogDescription className="text-base">Procesa las piezas que están pendientes de prensado y muévelas a inventario finalizado.</DialogDescription>
@@ -691,11 +725,11 @@ export default function ProductionPage() {
                          </div>
                          <div className="grid grid-cols-3 gap-2">
                             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
-                                <Button key={n} variant="outline" className="h-full text-3xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + n)}>{n}</Button>
+                                <Button key={n} variant="outline" className="h-full text-2xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + n)}>{n}</Button>
                             ))}
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={() => setPressingCurrentInput('')}>C</Button>
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + '0')}>0</Button>
-                            <Button variant="outline" className="h-full text-3xl font-bold" onClick={() => setPressingCurrentInput(p => p.slice(0, -1))}>←</Button>
+                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={() => setPressingCurrentInput('')}>C</Button>
+                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + '0')}>0</Button>
+                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={() => setPressingCurrentInput(p => p.slice(0, -1))}>←</Button>
                         </div>
                     </div>
                 )}

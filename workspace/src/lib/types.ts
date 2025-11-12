@@ -13,6 +13,7 @@ export interface Piece {
   stockMax?: number;
   requiereGranallado?: boolean;
   requiereMecanizado?: boolean;
+  tiempoDeCiclo?: number;
 }
 
 export interface Mold {
@@ -74,6 +75,8 @@ export interface Inventory {
   stockMecanizado?: number; // retornado de proveedor
   stockGranallado?: number; // granallado
   stockListo?: number; // listo para entregar
+  stockPendienteCalidad?: number; // segregado y esperando inspeccion
+  stockEnsamblado?: number; // Ensamblado y listo para entregar
 }
 
 
@@ -141,8 +144,8 @@ export interface Production {
   nroRack?: string;
   qtyFinalizada: number;
   qtySinPrensar: number;
-  qtyScrap: number;
-  qtyArranque?: number;
+  qtyScrap: number; // Represents "Rechazo Interno" -> both scrap and start-up pieces
+  qtyArranque?: number; // Legacy or specific start-up quantity
   qtySegregada: number;
   subproceso?: 'mecanizado' | 'granallado';
   createdBy?: string; // UID of user who declared production
@@ -159,6 +162,12 @@ export interface Production {
   qtyScrapCalidad?: number;
   inspectedBy?: string; // UID of user who inspected
   inspectionDate?: string; // ISO date of inspection
+
+  // Machining specific fields
+  qtyMecanizada?: number;
+  qtyEnsamblada?: number;
+  qtyScrapMecanizado?: number;
+  qtyScrapEnsamblado?: number;
 }
 
 
@@ -240,4 +249,28 @@ export interface RemitoSettings {
   caiExpiration: string; // ISO Date string
 }
 
-    
+
+export interface MachiningProcess {
+  id: string;
+  remitoId: string;
+  pieceId: string;
+  qtyEnviada: number;
+  status: 'Enviado' | 'En Proceso' | 'Finalizado';
+  
+  // Quantities declared during the process
+  qtyMecanizada?: number;
+  qtyEnsamblada?: number;
+  qtySegregada?: number;
+  qtyScrap?: number;
+  qtyScrapMecanizado?: number;
+  qtyScrapEnsamblado?: number;
+}
+
+export interface Export {
+  id: string;
+  clientId: string;
+  pieceId: string;
+  qty: number;
+  origenStock: 'stockListo' | 'stockEnsamblado';
+  fecha: string; // ISO Date
+}
