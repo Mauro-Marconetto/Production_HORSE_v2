@@ -1,5 +1,6 @@
 
 
+
 export interface Client {
   id: string;
   nombre: string;
@@ -265,4 +266,13 @@ export interface MachiningProcess {
   qtyScrap?: number;
   qtyScrapMecanizado?: number;
   qtyScrapEnsamblado?: number;
+}
+
+export interface Export {
+  id: string;
+  clientId: string;
+  pieceId: string;
+  qty: number;
+  origenStock: 'stockListo' | 'stockEnsamblado';
+  fecha: string; // ISO Date
 }

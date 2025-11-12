@@ -303,6 +303,10 @@
         "stockPendienteCalidad": {
           "type": "number",
           "description": "Stock that has been segregated for quality inspection."
+        },
+        "stockEnsamblado": {
+          "type": "number",
+          "description": "Stock of assembled pieces, ready for delivery."
         }
       },
       "required": ["id"]
@@ -768,6 +772,47 @@
         "qtyEnviada",
         "status"
       ]
+    },
+    "Export": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Export",
+      "description": "Represents a record of pieces exported to a client.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the export record."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to the client the pieces were exported to."
+        },
+        "pieceId": {
+          "type": "string",
+          "description": "Reference to the piece that was exported."
+        },
+        "qty": {
+          "type": "number",
+          "description": "The quantity of pieces exported."
+        },
+        "origenStock": {
+            "type": "string",
+            "enum": ["stockListo", "stockEnsamblado"]
+        },
+        "fecha": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date the export was made."
+        }
+      },
+      "required": [
+        "id",
+        "clientId",
+        "pieceId",
+        "qty",
+        "origenStock",
+        "fecha"
+      ]
     }
   },
   "auth": {
@@ -1086,6 +1131,22 @@
             {
               "name": "machiningId",
               "description": "Unique identifier for the machining process record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "exports/{exportId}",
+        "definition": {
+          "entityName": "Export",
+          "schema": {
+            "$ref": "#/backend/entities/Export"
+          },
+          "description": "Stores records of pieces exported to clients.",
+          "params": [
+            {
+              "name": "exportId",
+              "description": "Unique identifier for the export record."
             }
           ]
         }
