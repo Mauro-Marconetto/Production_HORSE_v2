@@ -12,8 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight, ShieldAlert, Package } from "lucide-react";
-import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings, Production, MachiningProcess } from "@/lib/types";
+import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight, ShieldAlert, Package, Ship } from "lucide-react";
+import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings, Production, MachiningProcess, Client, Export } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,6 +26,12 @@ interface InventoryRow {
     state: 'Sin Prensar' | 'En Mecanizado' | 'Mecanizado' | 'Granallado' | 'Listo' | 'Pendiente Calidad' | 'Ensamblado';
     stock: number;
     totalStockForPiece: number;
+}
+
+interface ExportItem {
+    pieceId: string;
+    qty: number;
+    origenStock: 'stockListo' | 'stockEnsamblado';
 }
 
 
@@ -45,24 +51,35 @@ export default function StockPage() {
 
     const suppliersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'suppliers') : null, [firestore]);
     const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<Supplier>(suppliersCollection);
+    
+    const clientsCollection = useMemoFirebase(() => firestore ? collection(firestore, 'clients') : null, [firestore]);
+    const { data: clients, isLoading: isLoadingClients } = useCollection<Client>(clientsCollection);
 
     const [isRemitoDialogOpen, setIsRemitoDialogOpen] = useState(false);
+    const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
     const [createdRemitoId, setCreatedRemitoId] = useState<string | null>(null);
     const [remitoForm, setRemitoForm] = useState({ supplierId: '' });
     const [remitoItems, setRemitoItems] = useState<RemitoItem[]>([]);
+    
+    const [exportForm, setExportForm] = useState({ clientId: '' });
+    const [exportItems, setExportItems] = useState<ExportItem[]>([]);
+
     const [isSaving, setIsSaving] = useState(false);
     
     const inventoryData = useMemo((): InventoryRow[] => {
-        if (!pieces || !inventory || !pendingProduction) return [];
+        if (!pieces || !inventory) return [];
         
         const rows: InventoryRow[] = [];
 
         const pendingQualityStock = new Map<string, number>();
-        pendingProduction.forEach(prod => {
-            if (prod.qtySegregada > 0) {
-                pendingQualityStock.set(prod.pieceId, (pendingQualityStock.get(prod.pieceId) || 0) + prod.qtySegregada);
-            }
-        });
+        if(pendingProduction) {
+            pendingProduction.forEach(prod => {
+                if (prod.qtySegregada > 0) {
+                    pendingQualityStock.set(prod.pieceId, (pendingQualityStock.get(prod.pieceId) || 0) + prod.qtySegregada);
+                }
+            });
+        }
+
 
         pieces.forEach(piece => {
             const invItem = inventory.find(i => i.id === piece.id);
@@ -94,7 +111,7 @@ export default function StockPage() {
         return rows;
     }, [pieces, inventory, pendingProduction]);
     
-    const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers || isLoadingProduction;
+    const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers || isLoadingProduction || isLoadingClients;
 
     const handleCreateRemito = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -148,7 +165,6 @@ export default function StockPage() {
                 const inventoryDocRef = doc(firestore, "inventory", item.pieceId);
                 batch.update(inventoryDocRef, {
                     stockListo: increment(-item.qty),
-                    stockEnMecanizado: increment(item.qty),
                 });
                 
                 const machiningId = `machining-${Date.now()}-${item.pieceId}`;
@@ -181,24 +197,83 @@ export default function StockPage() {
             setIsSaving(false);
         }
     };
+
+     const handleCreateExport = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!firestore) return;
+        
+        if (exportItems.length === 0 || exportItems.some(item => !item.pieceId || !item.qty || item.qty <= 0)) {
+            toast({ title: "Error", description: "Completa todos los ítems de la exportación.", variant: "destructive"});
+            return;
+        }
+
+        for (const item of exportItems) {
+            const invItem = inventory?.find(i => i.id === item.pieceId);
+            const availableStock = invItem?.[item.origenStock] || 0;
+            if (item.qty > availableStock) {
+                const pieceCode = pieces?.find(p => p.id === item.pieceId)?.codigo;
+                const stockName = item.origenStock === 'stockListo' ? 'Listo' : 'Ensamblado';
+                toast({ title: "Error de Stock", description: `No hay suficiente stock "${stockName}" para la pieza ${pieceCode}. Disponible: ${availableStock}`, variant: "destructive" });
+                return;
+            }
+        }
+
+        setIsSaving(true);
+        
+        try {
+            const batch = writeBatch(firestore);
+            
+            for (const item of exportItems) {
+                 const exportData: Omit<Export, 'id'> = {
+                    clientId: exportForm.clientId,
+                    pieceId: item.pieceId,
+                    qty: item.qty,
+                    origenStock: item.origenStock,
+                    fecha: new Date().toISOString(),
+                };
+                const exportDocRef = doc(collection(firestore, "exports"));
+                batch.set(exportDocRef, exportData);
+                
+                const inventoryDocRef = doc(firestore, "inventory", item.pieceId);
+                batch.update(inventoryDocRef, {
+                    [item.origenStock]: increment(-item.qty),
+                });
+            }
+
+            await batch.commit();
+            
+            toast({ title: "Éxito", description: "Exportación registrada y stock actualizado." });
+            setIsExportDialogOpen(false);
+            setExportForm({ clientId: '' });
+            setExportItems([]);
+            forceRefresh();
+
+        } catch (error) {
+             console.error('Error creating export:', error);
+             toast({ title: 'Error', description: 'No se pudo registrar la exportación.', variant: 'destructive'});
+        } finally {
+            setIsSaving(false);
+        }
+    };
     
-    const addRemitoItem = () => {
-        setRemitoItems([...remitoItems, { pieceId: '', qty: 0 }]);
-    }
-    
+    const addRemitoItem = () => setRemitoItems([...remitoItems, { pieceId: '', qty: 0 }]);
     const updateRemitoItem = (index: number, field: keyof RemitoItem, value: string | number) => {
         const newItems = [...remitoItems];
         (newItems[index] as any)[field] = value;
         setRemitoItems(newItems);
     }
-    
-    const removeRemitoItem = (index: number) => {
-        setRemitoItems(remitoItems.filter((_, i) => i !== index));
-    }
+    const removeRemitoItem = (index: number) => setRemitoItems(remitoItems.filter((_, i) => i !== index));
 
-    const closeSuccessDialog = () => {
-        setCreatedRemitoId(null);
-    };
+    const addExportItem = () => setExportItems([...exportItems, { pieceId: '', qty: 0, origenStock: 'stockListo' }]);
+    const updateExportItem = (index: number, field: keyof ExportItem, value: string | number) => {
+        const newItems = [...exportItems];
+        (newItems[index] as any)[field] = value;
+        setExportItems(newItems);
+    }
+    const removeExportItem = (index: number) => setExportItems(exportItems.filter((_, i) => i !== index));
+
+
+    const closeSuccessDialog = () => setCreatedRemitoId(null);
 
     const getStateBadgeVariant = (state: InventoryRow['state']) => {
         switch(state) {
@@ -231,6 +306,9 @@ export default function StockPage() {
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => setIsRemitoDialogOpen(true)}>
                         <Wrench className="mr-2 h-4 w-4" /> Enviar a Mecanizado
+                    </Button>
+                    <Button variant="default" onClick={() => setIsExportDialogOpen(true)}>
+                        <Ship className="mr-2 h-4 w-4" /> Exportar a Cliente
                     </Button>
                 </div>
             </div>
@@ -372,6 +450,76 @@ export default function StockPage() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+                <DialogContent className="sm:max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Exportar a Cliente</DialogTitle>
+                        <DialogDescription>Prepara un envío de piezas terminadas para un cliente.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateExport}>
+                        <div className="grid gap-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="exp-client">Cliente</Label>
+                                <Select required value={exportForm.clientId} onValueChange={(v) => setExportForm(s => ({...s, clientId: v}))}>
+                                    <SelectTrigger id="exp-client"><SelectValue placeholder="Selecciona un cliente..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {clients?.map(c => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <Label>Ítems a Exportar</Label>
+                                <div className="space-y-2 rounded-md border p-2 max-h-60 overflow-y-auto">
+                                    {exportItems.map((item, index) => {
+                                        const availablePieces = pieces?.filter(p => {
+                                            const inv = inventory?.find(i => i.id === p.id);
+                                            return (inv?.stockListo || 0) > 0 || (inv?.stockEnsamblado || 0) > 0;
+                                        });
+
+                                        const selectedInv = inventory?.find(i => i.id === item.pieceId);
+
+                                        return (
+                                        <div key={index} className="grid grid-cols-[1fr_120px_150px_auto] items-center gap-2">
+                                            <Select value={item.pieceId} onValueChange={(v) => updateExportItem(index, 'pieceId', v)}>
+                                                <SelectTrigger><SelectValue placeholder="Selecciona pieza..." /></SelectTrigger>
+                                                <SelectContent>
+                                                    {availablePieces?.map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                             <Input 
+                                                type="number" 
+                                                placeholder="Cantidad" 
+                                                value={item.qty || ''} 
+                                                onChange={(e) => updateExportItem(index, 'qty', Number(e.target.value))}
+                                            />
+                                            <Select value={item.origenStock} onValueChange={(v) => updateExportItem(index, 'origenStock', v)}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {selectedInv?.stockListo && <SelectItem value="stockListo">Listo ({selectedInv.stockListo})</SelectItem>}
+                                                    {selectedInv?.stockEnsamblado && <SelectItem value="stockEnsamblado">Ensamblado ({selectedInv.stockEnsamblado})</SelectItem>}
+                                                </SelectContent>
+                                            </Select>
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeExportItem(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                        </div>
+                                    )})}
+                                     <Button type="button" variant="outline" size="sm" onClick={addExportItem} className="w-full">
+                                        <Plus className="mr-2 h-4 w-4" /> Añadir Ítem
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setIsExportDialogOpen(false)}>Cancelar</Button>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                Confirmar Exportación
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
             <Dialog open={!!createdRemitoId} onOpenChange={(open) => !open && closeSuccessDialog()}>
                 <DialogContent>
                     <DialogHeader>
@@ -396,3 +544,4 @@ export default function StockPage() {
         </main>
     );
 }
+
