@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useMemo, useTransition, useCallback, useEffect } from 'react';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { initializeApp } from 'firebase/app';
 import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
@@ -37,7 +37,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, PlusCircle, Trash2, Edit, RefreshCw } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, Edit, RefreshCw, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { UserProfile, Role } from '@/lib/types';
 
@@ -56,6 +56,7 @@ function AdminUsersPageClient() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -194,6 +195,30 @@ function AdminUsersPageClient() {
     }
   };
 
+  const handleResetPassword = async (email: string) => {
+    if (!window.confirm(`¿Estás seguro de que quieres enviar un correo para restablecer la contraseña a ${email}?`)) {
+        return;
+    }
+    setIsResetting(true);
+    const auth = getAuth();
+    try {
+        await sendPasswordResetEmail(auth, email);
+        toast({
+            title: 'Correo Enviado',
+            description: `Se ha enviado un correo para restablecer la contraseña a ${email}.`,
+        });
+    } catch (error: any) {
+        console.error('Error sending password reset email:', error);
+        toast({
+            title: 'Error',
+            description: 'No se pudo enviar el correo de restablecimiento.',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsResetting(false);
+    }
+  };
+
   return (
     <>
       <div className="flex items-center justify-between">
@@ -248,10 +273,13 @@ function AdminUsersPageClient() {
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{user.role}</TableCell>
                     <TableCell className="text-right">
-                       <Button variant="ghost" size="icon" onClick={() => openEditUserDialog(user)}>
+                       <Button variant="ghost" size="icon" onClick={() => openEditUserDialog(user)} title="Editar usuario">
                           <Edit className="h-4 w-4" />
                        </Button>
-                       <Button variant="ghost" size="icon" onClick={() => handleDelete(user.id)} disabled={isDeleting} className="text-destructive hover:text-destructive/80">
+                       <Button variant="ghost" size="icon" onClick={() => handleResetPassword(user.email)} disabled={isResetting} title="Restablecer contraseña">
+                          <KeyRound className="h-4 w-4" />
+                       </Button>
+                       <Button variant="ghost" size="icon" onClick={() => handleDelete(user.id)} disabled={isDeleting} className="text-destructive hover:text-destructive/80" title="Eliminar usuario">
                           <Trash2 className="h-4 w-4" />
                        </Button>
                     </TableCell>
