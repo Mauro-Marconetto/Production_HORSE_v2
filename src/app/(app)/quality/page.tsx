@@ -115,6 +115,7 @@ export default function QualityPage() {
         turno: '',
         machineId: '',
         moldId: '',
+        pieceId: '', // Added for Pertrak
         nroRack: '',
         defecto: '',
         defectoOtro: '',
@@ -268,10 +269,16 @@ export default function QualityPage() {
     const handleSaveSegregation = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!firestore || !user) return;
+
+        let finalPieceId = '';
+        if (segregateForm.origen === 'Pertrak') {
+            finalPieceId = segregateForm.pieceId;
+        } else {
+            finalPieceId = molds?.find(m => m.id === segregateForm.moldId)?.pieces[0] || '';
+        }
         
-        const pieceId = molds?.find(m => m.id === segregateForm.moldId)?.pieces[0];
-        if (!pieceId) {
-            toast({ title: "Error", description: "El molde seleccionado no tiene una pieza asociada.", variant: "destructive" });
+        if (!finalPieceId) {
+            toast({ title: "Error", description: "La pieza no pudo ser determinada.", variant: "destructive" });
             return;
         }
         
@@ -285,19 +292,24 @@ export default function QualityPage() {
         
         try {
             const segregationData: Omit<QualityLot, 'id'> = {
-                ...segregateForm,
+                turno: segregateForm.turno as QualityLot['turno'],
+                nroRack: segregateForm.nroRack,
+                defecto: segregateForm.defecto,
+                defectoOtro: segregateForm.defectoOtro,
+                tipoControl: segregateForm.tipoControl,
                 qtySegregada: qtyToSegregate,
-                pieceId: pieceId,
+                pieceId: finalPieceId,
                 createdBy: user.uid,
                 createdAt: new Date().toISOString(),
                 status: 'pending',
                 machineId: segregateForm.origen === 'Pertrak' ? 'mecanizado-externo' : segregateForm.machineId,
+                moldId: segregateForm.origen === 'Pertrak' ? '' : segregateForm.moldId,
             };
             await addDoc(collection(firestore, 'quality'), segregationData);
 
             toast({ title: "Éxito", description: "Lote segregado creado y pendiente de inspección." });
             setIsSegregateDialogOpen(false);
-            setSegregateForm({ turno: '', machineId: '', moldId: '', nroRack: '', defecto: '', defectoOtro: '', tipoControl: '', qtySegregada: '', origen: 'Interno' });
+            setSegregateForm({ turno: '', machineId: '', moldId: '', pieceId: '', nroRack: '', defecto: '', defectoOtro: '', tipoControl: '', qtySegregada: '', origen: 'Interno' });
             forceRefresh();
 
         } catch(error) {
@@ -503,7 +515,9 @@ export default function QualityPage() {
                         return (
                         <TableRow key={p.id}>
                             <TableCell>{new Date(p.inspectionDate || p.createdAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
-                            <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
+                            <TableCell className="font-medium">
+                                {p.machineId === 'mecanizado-externo' ? <Badge variant="outline">Pertrak</Badge> : getMachineName(p.machineId)}
+                            </TableCell>
                             <TableCell>{getPieceCode(p.pieceId)} / {getMoldName(p.moldId)}</TableCell>
                             <TableCell>{p.nroRack}</TableCell>
                             <TableCell className="text-right font-medium">{p.qtySegregada.toLocaleString()}</TableCell>
@@ -589,7 +603,7 @@ export default function QualityPage() {
           <form onSubmit={handleSaveSegregation} className="grid gap-4 py-4">
                <div className="space-y-2">
                     <Label htmlFor="seg-origen">Origen</Label>
-                    <Select required value={segregateForm.origen} onValueChange={(v) => setSegregateForm(s => ({...s, origen: v, machineId: '', moldId: ''}))}>
+                    <Select required value={segregateForm.origen} onValueChange={(v) => setSegregateForm(s => ({...s, origen: v, machineId: '', moldId: '', pieceId: ''}))}>
                         <SelectTrigger id="seg-origen"><SelectValue placeholder="Selecciona origen..." /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="Interno">Producción Interna</SelectItem>
@@ -614,22 +628,32 @@ export default function QualityPage() {
                     <Input id="seg-rack" required value={segregateForm.nroRack} onChange={(e) => setSegregateForm(s => ({...s, nroRack: e.target.value}))} />
                 </div>
               </div>
-              {segregateForm.origen === 'Interno' && (
+              {segregateForm.origen === 'Interno' ? (
+                <>
+                    <div className="space-y-2">
+                        <Label htmlFor="seg-machine">Máquina</Label>
+                        <Select required value={segregateForm.machineId} onValueChange={(v) => setSegregateForm(s => ({...s, machineId: v}))}>
+                            <SelectTrigger id="seg-machine"><SelectValue placeholder="Selecciona máquina..." /></SelectTrigger>
+                            <SelectContent>{machines?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="seg-mold">Molde</Label>
+                        <Select required value={segregateForm.moldId} onValueChange={(v) => setSegregateForm(s => ({...s, moldId: v}))} disabled={!!machines?.find(m=>m.id === segregateForm.machineId)?.assignments?.some(a => isWithinInterval(new Date(), { start: new Date(a.startDate), end: new Date(a.endDate) }))}>
+                            <SelectTrigger id="seg-mold"><SelectValue placeholder="Selecciona molde..." /></SelectTrigger>
+                            <SelectContent>{molds?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                </>
+              ) : (
                 <div className="space-y-2">
-                    <Label htmlFor="seg-machine">Máquina</Label>
-                    <Select required value={segregateForm.machineId} onValueChange={(v) => setSegregateForm(s => ({...s, machineId: v}))}>
-                        <SelectTrigger id="seg-machine"><SelectValue placeholder="Selecciona máquina..." /></SelectTrigger>
-                        <SelectContent>{machines?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>)}</SelectContent>
+                    <Label htmlFor="seg-piece">Pieza</Label>
+                    <Select required value={segregateForm.pieceId} onValueChange={(v) => setSegregateForm(s => ({...s, pieceId: v}))}>
+                        <SelectTrigger id="seg-piece"><SelectValue placeholder="Selecciona pieza..." /></SelectTrigger>
+                        <SelectContent>{pieces?.map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="seg-mold">Molde</Label>
-                <Select required value={segregateForm.moldId} onValueChange={(v) => setSegregateForm(s => ({...s, moldId: v}))} disabled={!!machines?.find(m=>m.id === segregateForm.machineId)?.assignments?.some(a => isWithinInterval(new Date(), { start: new Date(a.startDate), end: new Date(a.endDate) }))}>
-                    <SelectTrigger id="seg-mold"><SelectValue placeholder="Selecciona molde..." /></SelectTrigger>
-                    <SelectContent>{molds?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre} ({getPieceCode(m.pieces[0])})</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
                     <Label htmlFor="seg-defecto">Defecto</Label>
@@ -749,3 +773,4 @@ export default function QualityPage() {
     </main>
   );
 }
+
