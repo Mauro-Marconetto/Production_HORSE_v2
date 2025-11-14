@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -492,7 +493,7 @@ export default function ProductionPage() {
       </Card>
 
       <Dialog open={isProdDialogOpen} onOpenChange={setIsProdDialogOpen}>
-          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
+          <DialogContent className="max-w-3xl flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Producción</DialogTitle>
                 </DialogHeader>
@@ -561,28 +562,28 @@ export default function ProductionPage() {
                                 <Button
                                     key={key}
                                     variant={prodActiveField === key ? "default" : "secondary"}
-                                    className="h-16 text-base justify-between"
+                                    className="h-auto py-4 text-lg justify-between"
                                     onClick={() => {
                                         setProdActiveField(key);
                                         setProdCurrentInput(String(prodQuantities[key] || ''));
                                     }}
                                 >
                                     <span>{label}</span>
-                                    <span className="font-bold text-lg">{prodQuantities[key].toLocaleString()}</span>
+                                    <span className="font-bold text-2xl">{prodQuantities[key].toLocaleString()}</span>
                                 </Button>
                             ))}
-                             <div className="h-16 text-base justify-between flex items-center px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
+                             <div className="py-4 text-lg justify-between flex items-center px-4 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
                                 <span>Piezas Segregadas</span>
-                                <span className="font-bold text-lg">{previousSegregatedQty.toLocaleString()}</span>
+                                <span className="font-bold text-2xl">{previousSegregatedQty.toLocaleString()}</span>
                              </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
-                                <Button key={n} variant="outline" className="h-full text-xl font-bold" onClick={() => handleProdNumericButton(n)}>{n}</Button>
+                                <Button key={n} variant="outline" className="h-full text-4xl font-bold" onClick={() => handleProdNumericButton(n)}>{n}</Button>
                             ))}
-                            <Button variant="outline" className="h-full text-xl font-bold" onClick={handleProdClear}>C</Button>
-                            <Button variant="outline" className="h-full text-xl font-bold" onClick={() => handleProdNumericButton('0')}>0</Button>
-                            <Button variant="outline" className="h-full text-xl font-bold" onClick={handleProdBackspace}>←</Button>
+                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={handleProdClear}>C</Button>
+                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={() => handleProdNumericButton('0')}>0</Button>
+                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={handleProdBackspace}>←</Button>
                         </div>
                     </div>
                 )}
@@ -649,7 +650,7 @@ export default function ProductionPage() {
       </Dialog>
 
       <Dialog open={isPressingDialogOpen} onOpenChange={setIsPressingDialogOpen}>
-          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
+          <DialogContent className="max-w-3xl flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Prensado</DialogTitle>
                      <DialogDescription className="text-base">Procesa las piezas que están pendientes de prensado y muévelas a inventario finalizado.</DialogDescription>
@@ -701,34 +702,34 @@ export default function ProductionPage() {
                             </Card>
                             <Button
                                 variant={pressingActiveField === 'pressedQty' ? "default" : "secondary"}
-                                className="h-16 text-base justify-between"
+                                className="h-16 text-lg justify-between"
                                 onClick={() => {
                                     setPressingActiveField('pressedQty');
                                     setPressingCurrentInput(String(pressingQuantities.pressedQty || ''));
                                 }}
                             >
                                 <span>Piezas Prensadas (OK)</span>
-                                <span className="font-bold text-lg">{pressingQuantities.pressedQty.toLocaleString()}</span>
+                                <span className="font-bold text-2xl">{pressingQuantities.pressedQty.toLocaleString()}</span>
                             </Button>
                              <Button
                                 variant={pressingActiveField === 'scrapQty' ? "destructive" : "secondary"}
-                                className={`h-16 text-base justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
+                                className={`h-16 text-lg justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
                                 onClick={() => {
                                     setPressingActiveField('scrapQty');
                                     setPressingCurrentInput(String(pressingQuantities.scrapQty || ''));
                                 }}
                             >
                                 <span>Scrap de Prensado</span>
-                                <span className="font-bold text-lg">{pressingQuantities.scrapQty.toLocaleString()}</span>
+                                <span className="font-bold text-2xl">{pressingQuantities.scrapQty.toLocaleString()}</span>
                             </Button>
                          </div>
                          <div className="grid grid-cols-3 gap-2">
                             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
-                                <Button key={n} variant="outline" className="h-full text-xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + n)}>{n}</Button>
+                                <Button key={n} variant="outline" className="h-full text-4xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + n)}>{n}</Button>
                             ))}
-                            <Button variant="outline" className="h-full text-xl font-bold" onClick={() => setPressingCurrentInput('')}>C</Button>
-                            <Button variant="outline" className="h-full text-xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + '0')}>0</Button>
-                            <Button variant="outline" className="h-full text-xl font-bold" onClick={() => setPressingCurrentInput(p => p.slice(0, -1))}>←</Button>
+                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={() => setPressingCurrentInput('')}>C</Button>
+                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + '0')}>0</Button>
+                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={() => setPressingCurrentInput(p => p.slice(0, -1))}>←</Button>
                         </div>
                     </div>
                 )}
