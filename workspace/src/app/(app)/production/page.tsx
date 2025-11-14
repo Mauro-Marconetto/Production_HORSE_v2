@@ -1,17 +1,18 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from "react";
 import { collection, doc, addDoc, updateDoc, serverTimestamp, Timestamp, query, orderBy, where, getDoc, writeBatch, Firestore, increment } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
+import { useFirestore, useCollection, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle, PlusCircle, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle, PlusCircle, Loader2, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Production, Machine, Mold, Piece } from "@/lib/types";
+import type { Production, Machine, Mold, Piece, UserProfile } from "@/lib/types";
 import { isToday, isWithinInterval } from "date-fns";
 
 type ProductionStep = 'selection' | 'declaration' | 'summary';
@@ -50,6 +51,9 @@ export default function ProductionPage() {
     const { user } = useUser();
     const { toast } = useToast();
 
+    const userProfileRef = useMemoFirebase(() => user && firestore ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
+    const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+
     const prodQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'production'), orderBy('fechaISO', 'desc')) : null, [firestore]);
     const { data: production, isLoading: isLoadingProd, forceRefresh } = useCollection<Production>(prodQuery);
 
@@ -68,6 +72,8 @@ export default function ProductionPage() {
 
     const [isProdDialogOpen, setIsProdDialogOpen] = useState(false);
     const [isPressingDialogOpen, setIsPressingDialogOpen] = useState(false);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
 
     const [step, setStep] = useState<ProductionStep>('selection');
     const [isSaving, setIsSaving] = useState(false);
@@ -89,6 +95,10 @@ export default function ProductionPage() {
     const [pressingQuantities, setPressingQuantities] = useState({ pressedQty: 0, scrapQty: 0 });
     const [pressingCurrentInput, setPressingCurrentInput] = useState('');
     const [pressingActiveField, setPressingActiveField] = useState<PressingDeclarationField>('pressedQty');
+
+    // Edit Dialog State
+    const [editingProduction, setEditingProduction] = useState<Production | null>(null);
+    const [editQuantities, setEditQuantities] = useState({ qtyFinalizada: 0, qtySinPrensar: 0, qtyScrap: 0, qtyArranque: 0 });
 
 
     const lotsToPress = useMemo(() => {
@@ -124,6 +134,18 @@ export default function ProductionPage() {
         setPressingCurrentInput('');
         setPressingActiveField('pressedQty');
     }
+
+     const openEditDialog = (prod: Production) => {
+        setEditingProduction(prod);
+        setEditQuantities({
+            qtyFinalizada: prod.qtyFinalizada || 0,
+            qtySinPrensar: prod.qtySinPrensar || 0,
+            qtyScrap: prod.qtyScrap || 0,
+            qtyArranque: prod.qtyArranque || 0,
+        });
+        setIsEditDialogOpen(true);
+    };
+
 
     useEffect(() => {
         if(isProdDialogOpen) {
@@ -384,10 +406,55 @@ export default function ProductionPage() {
             setIsSaving(false);
         }
     };
+
+    const handleSaveEdit = async () => {
+        if (!firestore || !editingProduction || !user) return;
+
+        setIsSaving(true);
+        const batch = writeBatch(firestore);
+        const prodDocRef = doc(firestore, 'production', editingProduction.id);
+        const inventoryDocRef = doc(firestore, 'inventory', editingProduction.pieceId);
+
+        // Calculate differences
+        const diffFinalizada = editQuantities.qtyFinalizada - (editingProduction.qtyFinalizada || 0);
+        const diffSinPrensar = editQuantities.qtySinPrensar - (editingProduction.qtySinPrensar || 0);
+        // Scrap and Arranque are just records, they don't affect main inventory here.
+
+        // Update Production document
+        const updatedProdData: Partial<Production> = {
+            ...editQuantities,
+            lastEditedBy: user.uid,
+        };
+        batch.update(prodDocRef, updatedProdData);
+
+        // Update Inventory document with the differences
+        const inventoryUpdateData = {
+            stockListo: increment(diffFinalizada),
+            stockInyectado: increment(diffSinPrensar),
+        };
+        batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
+
+        try {
+            await batch.commit();
+            toast({ title: "Éxito", description: "Registro de producción actualizado correctamente." });
+            setIsEditDialogOpen(false);
+            setEditingProduction(null);
+            forceRefresh();
+        } catch (error) {
+            const contextualError = new FirestorePermissionError({
+                path: prodDocRef.path,
+                operation: 'update',
+                requestResourceData: updatedProdData,
+            });
+            errorEmitter.emit('permission-error', contextualError);
+        } finally {
+            setIsSaving(false);
+        }
+    };
     
     const isStep1Valid = turno && machineId && (selectedMachine?.type === 'inyectora' ? moldId : pieceId);
     const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap + (prodQuantities.qtyArranque || 0);
-    
+    const canEditProduction = userProfile?.role === 'Admin' || userProfile?.role === 'Editor de Producción';
     const previousSegregatedQty = existingProduction?.qtySegregada || 0;
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
@@ -421,23 +488,24 @@ export default function ProductionPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Máquina</TableHead>
-                <TableHead>Pieza</TableHead>
-                <TableHead>Molde</TableHead>
-                <TableHead>Turno</TableHead>
-                <TableHead className="text-right">Unidades OK</TableHead>
-                <TableHead className="text-right">Unidades Sin Prensar</TableHead>
-                <TableHead className="text-right text-destructive">Rechazo Interno</TableHead>
-                <TableHead className="text-right">Unidades Producidas</TableHead>
-                <TableHead className="text-right">Rechazo Interno (%)</TableHead>
-                <TableHead className="text-center">Calidad </TableHead>
+                <TableHead className="p-2">Fecha</TableHead>
+                <TableHead className="p-2">Máquina</TableHead>
+                <TableHead className="p-2">Pieza</TableHead>
+                <TableHead className="p-2">Molde</TableHead>
+                <TableHead className="p-2">Turno</TableHead>
+                <TableHead className="p-2 text-right">OK</TableHead>
+                <TableHead className="p-2 text-right">Sin Prensar</TableHead>
+                <TableHead className="p-2 text-right text-destructive">Rechazo</TableHead>
+                <TableHead className="p-2 text-right">Total</TableHead>
+                <TableHead className="p-2 text-right">Rechazo (%)</TableHead>
+                <TableHead className="p-2 text-center">Calidad </TableHead>
+                {canEditProduction && <TableHead className="p-2 text-right">Acciones</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {(isLoadingProd || isLoadingMachines || isLoadingMolds || isLoadingPieces) && (
                 <TableRow>
-                    <TableCell colSpan={11} className="h-24 text-center">
+                    <TableCell colSpan={canEditProduction ? 12 : 11} className="h-24 text-center">
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                     </TableCell>
                 </TableRow>
@@ -453,19 +521,19 @@ export default function ProductionPage() {
 
                 return (
                   <TableRow key={p.id}>
-                    <TableCell>{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
-                    <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
-                    <TableCell>{getPieceCode(p.pieceId)}</TableCell>
-                    <TableCell>{getMoldName(p.moldId)}</TableCell>
-                    <TableCell className="capitalize">{p.turno}</TableCell>
-                    <TableCell className="text-right font-semibold">{unidadesOK.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{unidadesSinPrensar.toLocaleString()}</TableCell>
-                    <TableCell className="text-right text-destructive">{scrapTotal.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-bold">{totalUnits.toLocaleString()}</TableCell>
-                    <TableCell className={`text-right ${isScrapHigh ? 'text-destructive' : ''}`}>
+                    <TableCell className="p-2">{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
+                    <TableCell className="p-2 font-medium">{getMachineName(p.machineId)}</TableCell>
+                    <TableCell className="p-2">{getPieceCode(p.pieceId)}</TableCell>
+                    <TableCell className="p-2">{getMoldName(p.moldId)}</TableCell>
+                    <TableCell className="p-2 capitalize">{p.turno}</TableCell>
+                    <TableCell className="p-2 text-right font-semibold">{unidadesOK.toLocaleString()}</TableCell>
+                    <TableCell className="p-2 text-right">{unidadesSinPrensar.toLocaleString()}</TableCell>
+                    <TableCell className="p-2 text-right text-destructive">{scrapTotal.toLocaleString()}</TableCell>
+                    <TableCell className="p-2 text-right font-bold">{totalUnits.toLocaleString()}</TableCell>
+                    <TableCell className={`p-2 text-right ${isScrapHigh ? 'text-destructive' : ''}`}>
                       {(scrapPct * 100).toFixed(1)}%
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="p-2 text-center">
                       {(p.qtySegregada || 0) > 0 ? (
                         p.inspeccionadoCalidad ? (
                           <Badge variant="secondary">Inspeccionado</Badge>
@@ -476,12 +544,19 @@ export default function ProductionPage() {
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
+                     {canEditProduction && (
+                        <TableCell className="p-2 text-right">
+                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(p)}>
+                                <Edit className="h-4 w-4" />
+                            </Button>
+                        </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
               {!isLoadingProd && (!production || production.length === 0) && (
                  <TableRow>
-                    <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={canEditProduction ? 12 : 11} className="h-24 text-center text-muted-foreground">
                         No hay registros de producción.
                     </TableCell>
                 </TableRow>
@@ -492,7 +567,7 @@ export default function ProductionPage() {
       </Card>
 
       <Dialog open={isProdDialogOpen} onOpenChange={setIsProdDialogOpen}>
-          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
+          <DialogContent className="max-w-3xl flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Producción</DialogTitle>
                 </DialogHeader>
@@ -561,28 +636,28 @@ export default function ProductionPage() {
                                 <Button
                                     key={key}
                                     variant={prodActiveField === key ? "default" : "secondary"}
-                                    className="h-16 text-base justify-between"
+                                    className="h-auto py-4 text-lg justify-between text-center"
                                     onClick={() => {
                                         setProdActiveField(key);
                                         setProdCurrentInput(String(prodQuantities[key] || ''));
                                     }}
                                 >
                                     <span>{label}</span>
-                                    <span className="font-bold text-lg">{prodQuantities[key].toLocaleString()}</span>
+                                    <span className="font-bold text-2xl">{prodQuantities[key].toLocaleString()}</span>
                                 </Button>
                             ))}
-                             <div className="h-16 text-base justify-between flex items-center px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
+                             <div className="h-auto py-4 text-lg justify-between flex items-center px-4 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md opacity-50 cursor-not-allowed">
                                 <span>Piezas Segregadas</span>
-                                <span className="font-bold text-lg">{previousSegregatedQty.toLocaleString()}</span>
+                                <span className="font-bold text-2xl">{previousSegregatedQty.toLocaleString()}</span>
                              </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
-                                <Button key={n} variant="outline" className="h-full text-xl font-bold" onClick={() => handleProdNumericButton(n)}>{n}</Button>
+                                <Button key={n} variant="outline" className="h-full text-4xl font-bold" onClick={() => handleProdNumericButton(n)}>{n}</Button>
                             ))}
-                            <Button variant="outline" className="h-full text-xl font-bold" onClick={handleProdClear}>C</Button>
-                            <Button variant="outline" className="h-full text-xl font-bold" onClick={() => handleProdNumericButton('0')}>0</Button>
-                            <Button variant="outline" className="h-full text-xl font-bold" onClick={handleProdBackspace}>←</Button>
+                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={handleProdClear}>C</Button>
+                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={() => handleProdNumericButton('0')}>0</Button>
+                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={handleProdBackspace}>←</Button>
                         </div>
                     </div>
                 )}
@@ -750,7 +825,40 @@ export default function ProductionPage() {
                 </DialogFooter>
           </DialogContent>
       </Dialog>
+      
+       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Editar Registro de Producción</DialogTitle>
+                <DialogDescription>
+                    Ajusta las cantidades declaradas. El inventario se actualizará automáticamente.
+                </DialogDescription>
+            </DialogHeader>
+            {editingProduction && (
+                <div className="space-y-4 py-4">
+                    {Object.keys(editQuantities).map((key) => (
+                        <div key={key} className="grid grid-cols-3 items-center gap-4">
+                            <label className="capitalize text-right">{key.replace('qty', '')}</label>
+                            <input
+                                type="number"
+                                value={(editQuantities as any)[key]}
+                                onChange={(e) => setEditQuantities({ ...editQuantities, [key]: Number(e.target.value) })}
+                                className="col-span-2 p-2 border rounded-md"
+                            />
+                        </div>
+                    ))}
+                </div>
+            )}
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
+                <Button onClick={handleSaveEdit} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Guardar Cambios"}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </main>
   );
 }
+
