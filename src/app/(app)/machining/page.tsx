@@ -29,16 +29,15 @@ const statusConfig: { [key: string]: { label: string, color: string } } = {
     retornado_completo: { label: "Retornado Completo", color: "bg-green-500" },
 };
 
-type DeclarationField = 'qtyMecanizada' | 'qtyEnsamblada' | 'qtySegregada' | 'qtyScrap' | 'qtyScrapMecanizado' | 'qtyScrapEnsamblado';
+type DeclarationField = 'qtyMecanizada' | 'qtyEnsamblada' | 'qtySegregada' | 'qtyScrapMecanizado' | 'qtyScrapEnsamblado';
 type MachiningDeclarationStep = 'selection' | 'declaration' | 'summary';
 
 const declarationFieldsConfig: { key: DeclarationField, label: string }[] = [
     { key: 'qtyMecanizada', label: 'Piezas Mecanizadas' },
     { key: 'qtyEnsamblada', label: 'Piezas Ensambladas' },
     { key: 'qtySegregada', label: 'Piezas Segregadas' },
-    { key: 'qtyScrap', label: 'Scrap General' },
-    { key: 'qtyScrapMecanizado', label: 'Scrap (Mecanizado)' },
-    { key: 'qtyScrapEnsamblado', label: 'Scrap (Ensamblado)' },
+    { key: 'qtyScrapMecanizado', label: 'MMU (Mecanizado)' },
+    { key: 'qtyScrapEnsamblado', label: 'MMU (Ensamblado)' },
 ];
 
 
@@ -95,7 +94,6 @@ export default function SubprocessesPage() {
         qtyMecanizada: 0,
         qtyEnsamblada: 0,
         qtySegregada: 0,
-        qtyScrap: 0,
         qtyScrapMecanizado: 0,
         qtyScrapEnsamblado: 0,
     });
@@ -124,7 +122,7 @@ export default function SubprocessesPage() {
         if (isDialogOpen) {
             setStep('selection');
             setSelectedPieceId('');
-            setQuantities({ qtyMecanizada: 0, qtyEnsamblada: 0, qtySegregada: 0, qtyScrap: 0, qtyScrapMecanizado: 0, qtyScrapEnsamblado: 0 });
+            setQuantities({ qtyMecanizada: 0, qtyEnsamblada: 0, qtySegregada: 0, qtyScrapMecanizado: 0, qtyScrapEnsamblado: 0 });
             setActiveField('qtyMecanizada');
             setCurrentInput('');
         }
@@ -171,8 +169,8 @@ export default function SubprocessesPage() {
             const batch = writeBatch(firestore);
             
             // --- VALIDATION & PREPARATION ---
-            let { qtyMecanizada, qtyEnsamblada, qtySegregada, qtyScrap, qtyScrapMecanizado, qtyScrapEnsamblado } = quantities;
-            let remainingToDeductFromLots = qtyMecanizada + qtySegregada + qtyScrap + qtyScrapMecanizado + qtyScrapEnsamblado;
+            let { qtyMecanizada, qtyEnsamblada, qtySegregada, qtyScrapMecanizado, qtyScrapEnsamblado } = quantities;
+            let remainingToDeductFromLots = qtyMecanizada + qtySegregada + qtyScrapMecanizado + qtyScrapEnsamblado;
             let remainingToDeductForAssembly = qtyEnsamblada;
     
             const lotsForPiece = activeLots.filter(p => p.pieceId === selectedPieceId);
@@ -370,15 +368,14 @@ export default function SubprocessesPage() {
                 <TableHead>Pieza</TableHead>
                 <TableHead className="text-right">Mecanizadas (OK)</TableHead>
                 <TableHead className="text-right">Ensambladas (OK)</TableHead>
-                <TableHead className="text-right text-destructive">Scrap General</TableHead>
-                <TableHead className="text-right text-destructive">Scrap Mecanizado</TableHead>
-                <TableHead className="text-right text-destructive">Scrap Ensamblado</TableHead>
+                <TableHead className="text-right text-destructive">MMU (Mecanizado)</TableHead>
+                <TableHead className="text-right text-destructive">MMU (Ensamblado)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
                 {isLoadingHistory && (
                     <TableRow>
-                        <TableCell colSpan={7} className="h-24 text-center">
+                        <TableCell colSpan={6} className="h-24 text-center">
                             <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                         </TableCell>
                     </TableRow>
@@ -389,14 +386,13 @@ export default function SubprocessesPage() {
                         <TableCell>{getPieceCode(prod.pieceId)}</TableCell>
                         <TableCell className="text-right">{((prod.qtyMecanizada || 0)).toLocaleString()}</TableCell>
                         <TableCell className="text-right">{((prod.qtyEnsamblada || 0)).toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-destructive">{((prod.qtyScrap || 0)).toLocaleString()}</TableCell>
                         <TableCell className="text-right text-destructive">{((prod.qtyScrapMecanizado || 0)).toLocaleString()}</TableCell>
                         <TableCell className="text-right text-destructive">{((prod.qtyScrapEnsamblado || 0)).toLocaleString()}</TableCell>
                     </TableRow>
                 ))}
                  {!isLoadingHistory && (!machiningHistory || machiningHistory.length === 0) && (
                     <TableRow>
-                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                             No hay declaraciones de mecanizado en el rango seleccionado.
                         </TableCell>
                     </TableRow>
@@ -432,7 +428,7 @@ export default function SubprocessesPage() {
                             {declarationFieldsConfig.map(({key, label}) => (
                                 <Button
                                     key={key}
-                                    variant={activeField === key ? "default" : "secondary"}
+                                    variant={activeField === key ? (key.includes('Scrap') ? 'destructive' : 'default') : "secondary"}
                                     className="h-14 text-sm justify-between"
                                     onClick={() => {
                                         setActiveField(key);
@@ -510,3 +506,6 @@ export default function SubprocessesPage() {
 
 
 
+
+
+    

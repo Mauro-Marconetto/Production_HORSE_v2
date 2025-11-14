@@ -311,6 +311,7 @@ export default function QualityPage() {
                 createdBy: user.uid,
                 inspeccionadoCalidad: false,
                 fechaISO: new Date().toISOString(),
+                origenSegregado: "Pertrak",
             };
             const newProdDocRef = doc(collection(firestore, "production"));
             batch.set(newProdDocRef, segregationData);
@@ -397,7 +398,7 @@ export default function QualityPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Fecha</TableHead>
-                <TableHead>Máquina</TableHead>
+                <TableHead>Máquina / Origen</TableHead>
                 <TableHead>Pieza / Molde</TableHead>
                 <TableHead>Turno</TableHead>
                 <TableHead>Nro. Rack</TableHead>
@@ -416,7 +417,10 @@ export default function QualityPage() {
               {!isLoading && pendingInspection.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
-                    <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
+                    <TableCell className="font-medium">
+                        {getMachineName(p.machineId)}
+                        {p.origenSegregado === 'Pertrak' && <Badge variant="outline" className="ml-2">Pertrak</Badge>}
+                    </TableCell>
                     <TableCell>{getPieceCode(p.pieceId)} / {getMoldName(p.moldId)}</TableCell>
                     <TableCell className="capitalize">{p.turno}</TableCell>
                     <TableCell>{p.nroRack}</TableCell>
@@ -752,6 +756,8 @@ export default function QualityPage() {
     </main>
   );
 }
+    
+
     
 
     

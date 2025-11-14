@@ -2,6 +2,7 @@
 
 
 
+
 export interface Client {
   id: string;
   nombre: string;
@@ -154,6 +155,7 @@ export interface Production {
   lastEditedBy?: string; // UID of user who last edited
   
   // Quality Segregation fields
+  origenSegregado?: 'Pertrak' | 'Interno'; // New field to identify origin
   defecto?: string;
   defectoOtro?: string;
   tipoControl?: string;
@@ -277,3 +279,5 @@ export interface Export {
   origenStock: 'stockListo' | 'stockEnsamblado';
   fecha: string; // ISO Date
 }
+
+    
