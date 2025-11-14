@@ -3,8 +3,8 @@
 'use client';
 
 import { useMemo, useState, useEffect } from "react";
-import { collection, writeBatch, query, where, getDocs, orderBy, doc, increment } from "firebase/firestore";
-import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, writeBatch, query, where, getDocs, orderBy, doc, increment, addDoc } from "firebase/firestore";
+import { useFirestore, useCollection, useMemoFirebase, useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MoreHorizontal, Loader2, PlusCircle, Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Remito, Piece, Supplier, MachiningProcess, Production, Inventory } from "@/lib/types";
+import type { Remito, Piece, Supplier, MachiningProcess, Production, Inventory, QualityLot } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -44,6 +44,7 @@ const declarationFieldsConfig: { key: DeclarationField, label: string }[] = [
 export default function SubprocessesPage() {
     const firestore = useFirestore();
     const router = useRouter();
+    const { user } = useUser();
     const { toast } = useToast();
 
     // Data Hooks
@@ -158,7 +159,7 @@ export default function SubprocessesPage() {
     const totalDeclared = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
 
     const handleSaveProduction = async () => {
-        if (!firestore || !selectedPieceId || totalDeclared <= 0) {
+        if (!firestore || !selectedPieceId || totalDeclared <= 0 || !user) {
             toast({ title: "Error", description: "Selecciona una pieza y declara al menos una cantidad.", variant: "destructive" });
             return;
         }
@@ -217,11 +218,10 @@ export default function SubprocessesPage() {
                 }
             }
 
-            // 4. Update inventory with final results
+            // 4. Update inventory with final results from machining and assembly. Segregated items are handled separately.
             batch.set(inventoryDocRef, {
                 stockMecanizado: increment(qtyMecanizada),
                 stockEnsamblado: increment(qtyEnsamblada),
-                stockPendienteCalidad: increment(qtySegregada)
             }, { merge: true });
 
             // --- CREATE PRODUCTION RECORD ---
@@ -231,10 +231,27 @@ export default function SubprocessesPage() {
                 machineId: 'mecanizado-externo',
                 pieceId: selectedPieceId,
                 subproceso: 'mecanizado',
-                inspeccionadoCalidad: false, // Default value
                 ...quantities
             };
             batch.set(prodDocRef, productionRecord);
+            
+            // --- CREATE QUALITY LOT if segregated ---
+            if (qtySegregada > 0) {
+                const qualityLotData: Omit<QualityLot, 'id'> = {
+                    createdAt: new Date().toISOString(),
+                    createdBy: user.uid,
+                    pieceId: selectedPieceId,
+                    machineId: 'mecanizado-externo',
+                    turno: '',
+                    nroRack: '',
+                    defecto: 'Segregado en Proveedor',
+                    tipoControl: 'Dimensional/Visual',
+                    qtySegregada: qtySegregada,
+                    status: 'pending',
+                };
+                const qualityLotRef = doc(collection(firestore, 'quality'));
+                batch.set(qualityLotRef, qualityLotData);
+            }
     
             await batch.commit();
             toast({ title: "Éxito", description: "Producción de mecanizado declarada y stock actualizado." });
