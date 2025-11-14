@@ -36,11 +36,16 @@ const allNavItems = [
     { href: "/planner", label: "Planificador" },
     { href: "/calendar", label: "Calendario" },
     { href: "/demand", label: "Demanda" },
-    { href: "/inventory", label: "Inventario" },
-    { href: "/machining", label: "Mecanizado" },
+    { href: "/stock", label: "Stock" },
+    { href: "/machines", label: "Máquinas" },
+    { href: "/pieces", label: "Piezas" },
+    { href: "/clients", label: "Clientes" },
     { href: "/production", label: "Producción" },
+    { href: "/machining", label: "Mecanizado" },
+    { href: "/remitos", label: "Remitos" },
     { href: "/downtime", label: "Inactividad" },
     { href: "/quality", label: "Calidad" },
+    { href: "/scrap-history", label: "Historial Scrap" },
   ];
 
 export default function AdminRolesPage() {
