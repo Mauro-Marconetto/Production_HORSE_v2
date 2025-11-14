@@ -418,8 +418,11 @@ export default function QualityPage() {
                   <TableRow key={p.id}>
                     <TableCell>{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                     <TableCell className="font-medium">
-                        {getMachineName(p.machineId)}
-                        {p.origenSegregado === 'Pertrak' && <Badge variant="outline" className="ml-2">Pertrak</Badge>}
+                        {p.origenSegregado === 'Pertrak' ? (
+                            <Badge variant="outline">Pertrak</Badge>
+                        ) : (
+                            getMachineName(p.machineId)
+                        )}
                     </TableCell>
                     <TableCell>{getPieceCode(p.pieceId)} / {getMoldName(p.moldId)}</TableCell>
                     <TableCell className="capitalize">{p.turno}</TableCell>
@@ -544,7 +547,7 @@ export default function QualityPage() {
 
 
       <Dialog open={isInspectionDialogOpen} onOpenChange={setIsInspectionDialogOpen}>
-          <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0">
+          <DialogContent className="max-w-3xl flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Inspección de Calidad</DialogTitle>
                     {selectedProduction && (
