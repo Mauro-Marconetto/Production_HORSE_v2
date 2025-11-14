@@ -1,6 +1,7 @@
 
 
 
+
 export interface Client {
   id: string;
   nombre: string;
@@ -150,9 +151,9 @@ export interface Production {
   qtySegregada: number;
   subproceso?: 'mecanizado' | 'granallado';
   createdBy?: string; // UID of user who declared production
+  lastEditedBy?: string; // UID of user who last edited
   
   // Quality Segregation fields
-  origenSegregado?: 'stockListo' | 'stockInyectado';
   defecto?: string;
   defectoOtro?: string;
   tipoControl?: string;
