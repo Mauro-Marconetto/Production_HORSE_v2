@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight, ShieldAlert, Package, Ship } from "lucide-react";
-import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings, Production, MachiningProcess, Client, Export } from "@/lib/types";
+import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings, Production, MachiningProcess, Client, Export, QualityLot } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,8 +46,8 @@ export default function StockPage() {
     const inventoryCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
     const { data: inventory, isLoading: isLoadingInventory, forceRefresh } = useCollection<Inventory>(inventoryCollection);
     
-    const productionQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'production'), where('inspeccionadoCalidad', '==', false)) : null, [firestore]);
-    const { data: pendingProduction, isLoading: isLoadingProduction } = useCollection<Production>(productionQuery);
+    const qualityQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'quality'), where('status', '==', 'pending')) : null, [firestore]);
+    const { data: pendingQualityLots, isLoading: isLoadingQuality } = useCollection<QualityLot>(qualityQuery);
 
     const suppliersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'suppliers') : null, [firestore]);
     const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<Supplier>(suppliersCollection);
@@ -72,11 +72,9 @@ export default function StockPage() {
         const rows: InventoryRow[] = [];
 
         const pendingQualityStock = new Map<string, number>();
-        if(pendingProduction) {
-            pendingProduction.forEach(prod => {
-                if (prod.qtySegregada > 0) {
-                    pendingQualityStock.set(prod.pieceId, (pendingQualityStock.get(prod.pieceId) || 0) + prod.qtySegregada);
-                }
+        if(pendingQualityLots) {
+            pendingQualityLots.forEach(lot => {
+                pendingQualityStock.set(lot.pieceId, (pendingQualityStock.get(lot.pieceId) || 0) + lot.qtySegregada);
             });
         }
 
@@ -92,7 +90,7 @@ export default function StockPage() {
             const stockEnsamblado = invItem?.stockEnsamblado || 0;
             const stockPendiente = pendingQualityStock.get(piece.id) || 0;
 
-            const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo + stockEnsamblado;
+            const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo + stockEnsamblado + stockPendiente;
 
             if (stockInyectado > 0) rows.push({ piece, state: 'Sin Prensar', stock: stockInyectado, totalStockForPiece: totalStock });
             if (stockEnMecanizado > 0) rows.push({ piece, state: 'En Mecanizado', stock: stockEnMecanizado, totalStockForPiece: totalStock });
@@ -109,9 +107,9 @@ export default function StockPage() {
         });
 
         return rows;
-    }, [pieces, inventory, pendingProduction]);
+    }, [pieces, inventory, pendingQualityLots]);
     
-    const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers || isLoadingProduction || isLoadingClients;
+    const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers || isLoadingQuality || isLoadingClients;
 
     const handleCreateRemito = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -165,6 +163,7 @@ export default function StockPage() {
                 const inventoryDocRef = doc(firestore, "inventory", item.pieceId);
                 batch.update(inventoryDocRef, {
                     stockListo: increment(-item.qty),
+                    stockEnMecanizado: increment(item.qty)
                 });
                 
                 const machiningId = `machining-${Date.now()}-${item.pieceId}`;
@@ -544,4 +543,3 @@ export default function StockPage() {
         </main>
     );
 }
-
