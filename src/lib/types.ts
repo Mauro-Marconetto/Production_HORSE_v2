@@ -3,6 +3,7 @@
 
 
 
+
 export interface Client {
   id: string;
   nombre: string;
@@ -144,35 +145,44 @@ export interface Production {
   pieceId: string;
   moldId: string;
   turno: 'mañana' | 'tarde' | 'noche' | '';
-  nroRack?: string;
   qtyFinalizada: number;
   qtySinPrensar: number;
-  qtyScrap: number; // Represents "Rechazo Interno" -> both scrap and start-up pieces
-  qtyArranque?: number; // Legacy or specific start-up quantity
-  qtySegregada: number;
-  subproceso?: 'mecanizado' | 'granallado';
+  qtyScrap: number; 
+  qtyArranque?: number;
   createdBy?: string; // UID of user who declared production
   lastEditedBy?: string; // UID of user who last edited
-  
-  // Quality Segregation fields
-  origenSegregado?: 'Pertrak' | 'Interno'; // New field to identify origin
-  defecto?: string;
-  defectoOtro?: string;
-  tipoControl?: string;
-
-  // Quality Inspection fields
-  inspeccionadoCalidad: boolean;
-  qtyAptaCalidad?: number;
-  qtyAptaSinPrensarCalidad?: number; // New field for "Apta - Sin Prensar (OK)" from quality inspection
-  qtyScrapCalidad?: number;
-  inspectedBy?: string; // UID of user who inspected
-  inspectionDate?: string; // ISO date of inspection
+  subproceso?: 'mecanizado' | 'granallado';
 
   // Machining specific fields
   qtyMecanizada?: number;
   qtyEnsamblada?: number;
   qtyScrapMecanizado?: number;
   qtyScrapEnsamblado?: number;
+}
+
+export interface QualityLot {
+  id: string;
+  createdAt: string;
+  createdBy: string;
+  
+  // Segregation Info
+  pieceId: string;
+  machineId: string; // Can be 'mecanizado-externo' or a machine id
+  moldId?: string;
+  turno: 'mañana' | 'tarde' | 'noche' | '';
+  nroRack: string;
+  defecto: string;
+  defectoOtro?: string;
+  tipoControl: string;
+  qtySegregada: number;
+  
+  // Inspection Info
+  status: 'pending' | 'inspected';
+  inspectionDate?: string;
+  inspectedBy?: string;
+  qtyAptaCalidad?: number;
+  qtyAptaSinPrensarCalidad?: number;
+  qtyScrapCalidad?: number;
 }
 
 
@@ -279,5 +289,3 @@ export interface Export {
   origenStock: 'stockListo' | 'stockEnsamblado';
   fecha: string; // ISO Date
 }
-
-    

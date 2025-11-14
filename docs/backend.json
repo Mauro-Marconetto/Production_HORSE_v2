@@ -517,6 +517,9 @@
       "type": "object",
       "description": "Represents the actual production data for a specific date.",
       "properties": {
+        "id": {
+          "type": "string"
+        },
         "fechaISO": {
           "type": "string",
           "description": "The date in ISO format."
@@ -533,28 +536,53 @@
           "type": "string",
           "description": "Reference to Mold. (Relationship: Production 1:N Mold)"
         },
-        "horas": {
-          "type": "number",
-          "description": "The number of hours of production."
+        "qtyFinalizada": {
+          "type": "number"
         },
-        "unidades": {
-          "type": "number",
-          "description": "The number of units produced."
+        "qtySinPrensar": {
+          "type": "number"
         },
-        "scrapPct": {
-          "type": "number",
-          "description": "The scrap percentage."
+        "qtyScrap": {
+          "type": "number"
+        },
+        "qtyArranque": {
+          "type": "number"
         }
       },
       "required": [
+        "id",
         "fechaISO",
         "machineId",
         "pieceId",
-        "moldId",
-        "horas",
-        "unidades",
-        "scrapPct"
+        "moldId"
       ]
+    },
+    "QualityLot": {
+       "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Quality Lot",
+      "type": "object",
+      "description": "Represents a lot of segregated pieces pending quality inspection.",
+      "properties": {
+        "id": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" },
+        "pieceId": { "type": "string" },
+        "machineId": { "type": "string" },
+        "moldId": { "type": "string" },
+        "turno": { "type": "string" },
+        "nroRack": { "type": "string" },
+        "defecto": { "type": "string" },
+        "defectoOtro": { "type": "string" },
+        "tipoControl": { "type": "string" },
+        "qtySegregada": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "inspected"] },
+        "inspectionDate": { "type": "string", "format": "date-time" },
+        "inspectedBy": { "type": "string" },
+        "qtyAptaCalidad": { "type": "number" },
+        "qtyAptaSinPrensarCalidad": { "type": "number" },
+        "qtyScrapCalidad": { "type": "number" }
+      },
+      "required": ["id", "createdAt", "createdBy", "pieceId", "qtySegregada", "status"]
     },
     "Setting": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1047,6 +1075,22 @@
             {
               "name": "productionId",
               "description": "Unique identifier for the production record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "quality/{qualityLotId}",
+        "definition": {
+          "entityName": "QualityLot",
+          "schema": {
+            "$ref": "#/backend/entities/QualityLot"
+          },
+          "description": "Stores segregated lots pending quality inspection.",
+          "params": [
+            {
+              "name": "qualityLotId",
+              "description": "Unique identifier for the quality lot."
             }
           ]
         }

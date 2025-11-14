@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, Edit, Loader2, Calendar as CalendarIcon, PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Production, Machine, Mold, Piece, Inventory } from "@/lib/types";
+import type { Production, Machine, Mold, Piece, Inventory, QualityLot } from "@/lib/types";
 import { addDays, format, isWithinInterval } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
@@ -58,13 +58,13 @@ export default function QualityPage() {
     const { user } = useUser();
     const { toast } = useToast();
 
-    const productionQuery = useMemoFirebase(() => 
+    const qualityQuery = useMemoFirebase(() => 
         firestore 
-            ? query(collection(firestore, 'production'), orderBy('fechaISO', 'desc'))
+            ? query(collection(firestore, 'quality'), orderBy('createdAt', 'desc'))
             : null, 
     [firestore]);
     
-    const { data: allProduction, isLoading: isLoadingProd, forceRefresh } = useCollection<Production>(productionQuery);
+    const { data: allQualityLots, isLoading: isLoadingQuality, forceRefresh } = useCollection<QualityLot>(qualityQuery);
 
     const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]));
     const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]));
@@ -74,8 +74,8 @@ export default function QualityPage() {
     const [isSegregateDialogOpen, setIsSegregateDialogOpen] = useState(false);
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
     
-    const [selectedProduction, setSelectedProduction] = useState<Production | null>(null);
-    const [lotToEdit, setLotToEdit] = useState<Production | null>(null);
+    const [selectedLot, setSelectedLot] = useState<QualityLot | null>(null);
+    const [lotToEdit, setLotToEdit] = useState<QualityLot | null>(null);
 
     const [isSaving, setIsSaving] = useState(false);
     
@@ -84,28 +84,25 @@ export default function QualityPage() {
         to: new Date(),
     });
 
-    // Client-side filtering for pending inspections
     const pendingInspection = useMemo(() => {
-        if (!allProduction) return [];
-        return allProduction.filter(p => (p.qtySegregada || 0) > 0 && !p.inspeccionadoCalidad);
-    }, [allProduction]);
+        if (!allQualityLots) return [];
+        return allQualityLots.filter(p => p.status === 'pending');
+    }, [allQualityLots]);
 
-    // Client-side filtering for history
     const inspectedHistory = useMemo(() => {
-        if (!allProduction) return [];
-        return allProduction.filter(p => {
-            const isInspected = p.inspectionDate;
+        if (!allQualityLots) return [];
+        return allQualityLots.filter(p => {
+            const isInspected = p.status === 'inspected' && p.inspectionDate;
             if (!isInspected || !date?.from) return false;
             
-            const inspectionDate = new Date(p.inspectionDate);
+            const inspectionDate = new Date(p.inspectionDate!);
             const fromDate = date.from;
             const toDate = date.to ? addDays(date.to, 1) : addDays(fromDate, 1);
 
             return inspectionDate >= fromDate && inspectionDate < toDate;
         });
-    }, [allProduction, date]);
+    }, [allQualityLots, date]);
 
-    // Inspection Dialog State
     const [activeField, setActiveField] = useState<QualityInspectionField>('qtyAptaCalidad');
     const [quantities, setQuantities] = useState({ 
         qtyAptaCalidad: 0, 
@@ -114,7 +111,6 @@ export default function QualityPage() {
     });
     const [currentInput, setCurrentInput] = useState('');
     
-    // Segregation Dialog State
     const [segregateForm, setSegregateForm] = useState({
         turno: '',
         machineId: '',
@@ -124,26 +120,26 @@ export default function QualityPage() {
         defectoOtro: '',
         tipoControl: '',
         qtySegregada: '',
+        origen: 'Interno'
     });
 
-    const getMachineForProduction = (prod: Production | null) => {
-        if (!prod || !machines) return null;
-        return machines.find(m => m.id === prod.machineId) || null;
+    const getMachineForLot = (lot: QualityLot | null) => {
+        if (!lot || !machines) return null;
+        return machines.find(m => m.id === lot.machineId) || null;
     }
 
     const inspectionFields = useMemo(() => {
-        const machine = getMachineForProduction(selectedProduction);
+        const machine = getMachineForLot(selectedLot);
         if (machine?.type === 'granalladora') {
              return allInspectionFields.filter(field => field.key !== 'qtyAptaSinPrensarCalidad');
         }
         return allInspectionFields;
-    }, [selectedProduction, machines]);
+    }, [selectedLot, machines]);
 
 
     useEffect(() => {
-        if (selectedProduction) {
-            // By default, assume all remaining segregated pieces are "Apta". User can then adjust.
-            const initialApta = selectedProduction.qtySegregada;
+        if (selectedLot) {
+            const initialApta = selectedLot.qtySegregada;
             let initialQuantities = { 
                 qtyAptaCalidad: initialApta, 
                 qtyAptaSinPrensarCalidad: 0, 
@@ -155,7 +151,7 @@ export default function QualityPage() {
             setActiveField('qtyAptaCalidad');
             setIsInspectionDialogOpen(true);
         }
-    }, [selectedProduction]);
+    }, [selectedLot]);
 
     useEffect(() => {
         if(lotToEdit) {
@@ -165,7 +161,7 @@ export default function QualityPage() {
     
     useEffect(() => {
         if (!isInspectionDialogOpen) {
-            setSelectedProduction(null);
+            setSelectedLot(null);
         }
     }, [isInspectionDialogOpen]);
     
@@ -197,7 +193,6 @@ export default function QualityPage() {
     const handleBackspace = () => setCurrentInput(prev => prev.slice(0, -1));
     const handleClear = () => setCurrentInput('');
 
-     // Keyboard support for inspection numeric pad
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (!isInspectionDialogOpen) return;
@@ -217,17 +212,15 @@ export default function QualityPage() {
         };
     }, [isInspectionDialogOpen, currentInput]);
 
-
     const handleCloseInspectionDialog = () => {
         setIsInspectionDialogOpen(false);
     }
     
-
     const totalInspectedInSession = quantities.qtyAptaCalidad + quantities.qtyAptaSinPrensarCalidad + quantities.qtyScrapCalidad;
-    const isInspectionAmountValid = totalInspectedInSession <= (selectedProduction?.qtySegregada || 0);
+    const isInspectionAmountValid = totalInspectedInSession <= (selectedLot?.qtySegregada || 0);
 
     const handleSaveInspection = async () => {
-        if (!firestore || !selectedProduction || !user) {
+        if (!firestore || !selectedLot || !user) {
             toast({ title: "Error", description: "No se puede guardar. Falta información de usuario o de base de datos.", variant: "destructive" });
             return;
         }
@@ -235,44 +228,37 @@ export default function QualityPage() {
             toast({ title: "Información", description: "Debes clasificar al menos una pieza.", variant: "default" });
             return;
         }
-        if (!isInspectionAmountValid) {
-            toast({ title: "Error de validación", description: `La cantidad inspeccionada (${totalInspectedInSession}) no puede superar la cantidad segregada (${selectedProduction.qtySegregada}).`, variant: "destructive" });
+        if (totalInspectedInSession !== selectedLot.qtySegregada) {
+             toast({ title: "Error de validación", description: `La cantidad inspeccionada (${totalInspectedInSession}) debe ser igual a la cantidad segregada (${selectedLot.qtySegregada}).`, variant: "destructive" });
             return;
         }
 
         setIsSaving(true);
         const batch = writeBatch(firestore);
         
-        // 1. Update Production Document
-        const prodDocRef = doc(firestore, 'production', selectedProduction.id);
-        const updatedProdData = {
-            qtySegregada: increment(-totalInspectedInSession), // Decrement by the amount just inspected
-            inspectedBy: user.uid,
+        const lotDocRef = doc(firestore, 'quality', selectedLot.id);
+        const updatedLotData = {
+            ...quantities,
+            status: 'inspected',
             inspectionDate: new Date().toISOString(),
-            // Only mark as fully inspected if all pieces are processed
-            inspeccionadoCalidad: totalInspectedInSession === selectedProduction.qtySegregada,
-            qtyAptaCalidad: increment(quantities.qtyAptaCalidad),
-            qtyAptaSinPrensarCalidad: increment(quantities.qtyAptaSinPrensarCalidad),
-            qtyScrapCalidad: increment(quantities.qtyScrapCalidad),
+            inspectedBy: user.uid,
         };
-        batch.update(prodDocRef, updatedProdData);
+        batch.update(lotDocRef, updatedLotData);
 
-        // 2. Update Inventory Document by adding the newly approved quantities
-        const inventoryDocRef = doc(firestore, 'inventory', selectedProduction.pieceId);
+        const inventoryDocRef = doc(firestore, 'inventory', selectedLot.pieceId);
         const inventoryUpdateData = {
             stockListo: increment(quantities.qtyAptaCalidad),
             stockInyectado: increment(quantities.qtyAptaSinPrensarCalidad)
         };
-        // Use set with merge to create the document if it doesn't exist
         batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
         
         try {
             await batch.commit();
             toast({ title: "Éxito", description: "Inspección de calidad guardada y stock actualizado." });
             handleCloseInspectionDialog();
-            forceRefresh(); // Force refresh of collections
+            forceRefresh();
         } catch (error) {
-             const contextualError = new FirestorePermissionError({ path: prodDocRef.path, operation: 'update', requestResourceData: updatedProdData });
+             const contextualError = new FirestorePermissionError({ path: lotDocRef.path, operation: 'update', requestResourceData: updatedLotData });
              errorEmitter.emit('permission-error', contextualError);
         } finally {
             setIsSaving(false);
@@ -296,35 +282,26 @@ export default function QualityPage() {
         }
 
         setIsSaving(true);
-        const batch = writeBatch(firestore);
         
         try {
-            // Create the segregation production record. This DOES NOT affect inventory.
-            const segregationData: Omit<Production, 'id' > = {
+            const segregationData: Omit<QualityLot, 'id'> = {
                 ...segregateForm,
                 qtySegregada: qtyToSegregate,
                 pieceId: pieceId,
-                qtyFinalizada: 0,
-                qtySinPrensar: 0,
-                qtyScrap: 0,
-                qtyArranque: 0,
                 createdBy: user.uid,
-                inspeccionadoCalidad: false,
-                fechaISO: new Date().toISOString(),
-                origenSegregado: "Pertrak",
+                createdAt: new Date().toISOString(),
+                status: 'pending',
+                machineId: segregateForm.origen === 'Pertrak' ? 'mecanizado-externo' : segregateForm.machineId,
             };
-            const newProdDocRef = doc(collection(firestore, "production"));
-            batch.set(newProdDocRef, segregationData);
-
-            await batch.commit();
+            await addDoc(collection(firestore, 'quality'), segregationData);
 
             toast({ title: "Éxito", description: "Lote segregado creado y pendiente de inspección." });
             setIsSegregateDialogOpen(false);
-            setSegregateForm({ turno: '', machineId: '', moldId: '', nroRack: '', defecto: '', defectoOtro: '', tipoControl: '', qtySegregada: '' });
+            setSegregateForm({ turno: '', machineId: '', moldId: '', nroRack: '', defecto: '', defectoOtro: '', tipoControl: '', qtySegregada: '', origen: 'Interno' });
             forceRefresh();
 
         } catch(error) {
-            const contextualError = new FirestorePermissionError({ path: 'production', operation: 'create', requestResourceData: segregateForm });
+            const contextualError = new FirestorePermissionError({ path: 'quality', operation: 'create', requestResourceData: segregateForm });
             errorEmitter.emit('permission-error', contextualError);
         } finally {
             setIsSaving(false);
@@ -344,8 +321,8 @@ export default function QualityPage() {
         }
         
         setIsSaving(true);
-        const updatedData = {
-            turno: formData.get('turno') as string,
+        const updatedData: Partial<QualityLot> = {
+            turno: formData.get('turno') as QualityLot['turno'],
             machineId: formData.get('machineId') as string,
             moldId: formData.get('moldId') as string,
             nroRack: formData.get('nroRack') as string,
@@ -356,7 +333,7 @@ export default function QualityPage() {
             pieceId: pieceId,
         };
 
-        const lotDocRef = doc(firestore, 'production', lotToEdit.id);
+        const lotDocRef = doc(firestore, 'quality', lotToEdit.id);
         
         updateDoc(lotDocRef, updatedData)
             .then(() => {
@@ -371,10 +348,11 @@ export default function QualityPage() {
             .finally(() => { setIsSaving(false); });
     }
 
-    const isLoading = isLoadingProd || isLoadingMachines || isLoadingMolds || isLoadingPieces;
+    const isLoading = isLoadingQuality || isLoadingMachines || isLoadingMolds || isLoadingPieces;
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
-    const getMoldName = (id: string) => molds?.find(m => m.id === id)?.nombre || 'N/A';
+    const getMoldName = (id: string | undefined) => molds?.find(m => m.id === id)?.nombre || 'N/A';
+
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
@@ -414,26 +392,26 @@ export default function QualityPage() {
                     </TableCell>
                 </TableRow>
               )}
-              {!isLoading && pendingInspection.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
+              {!isLoading && pendingInspection.map((lot) => (
+                  <TableRow key={lot.id}>
+                    <TableCell>{new Date(lot.createdAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                     <TableCell className="font-medium">
-                        {p.origenSegregado === 'Pertrak' ? (
+                        {lot.machineId === 'mecanizado-externo' ? (
                             <Badge variant="outline">Pertrak</Badge>
                         ) : (
-                            getMachineName(p.machineId)
+                            getMachineName(lot.machineId)
                         )}
                     </TableCell>
-                    <TableCell>{getPieceCode(p.pieceId)} / {getMoldName(p.moldId)}</TableCell>
-                    <TableCell className="capitalize">{p.turno}</TableCell>
-                    <TableCell>{p.nroRack}</TableCell>
-                    <TableCell className="text-right font-bold text-lg">{p.qtySegregada.toLocaleString()}</TableCell>
+                    <TableCell>{getPieceCode(lot.pieceId)} / {getMoldName(lot.moldId)}</TableCell>
+                    <TableCell className="capitalize">{lot.turno}</TableCell>
+                    <TableCell>{lot.nroRack}</TableCell>
+                    <TableCell className="text-right font-bold text-lg">{lot.qtySegregada.toLocaleString()}</TableCell>
                     <TableCell className="text-center">
                         <div className="flex flex-col md:flex-row gap-2 justify-center items-center">
-                            <Button variant="outline" size="sm" onClick={() => setLotToEdit(p)}>
+                            <Button variant="outline" size="sm" onClick={() => setLotToEdit(lot)}>
                                 <Edit className="mr-2 h-4 w-4" /> Detalles
                             </Button>
-                            <Button onClick={() => setSelectedProduction(p)}>
+                            <Button onClick={() => setSelectedLot(lot)}>
                                 <Check className="mr-2 h-4 w-4" /> Inspeccionar
                             </Button>
                         </div>
@@ -524,11 +502,11 @@ export default function QualityPage() {
                         const aptaTotal = (p.qtyAptaCalidad || 0) + (p.qtyAptaSinPrensarCalidad || 0);
                         return (
                         <TableRow key={p.id}>
-                            <TableCell>{new Date(p.inspectionDate || p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
+                            <TableCell>{new Date(p.inspectionDate || p.createdAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                             <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
                             <TableCell>{getPieceCode(p.pieceId)} / {getMoldName(p.moldId)}</TableCell>
                             <TableCell>{p.nroRack}</TableCell>
-                            <TableCell className="text-right font-medium">{(aptaTotal) + (p.qtyScrapCalidad || 0)}</TableCell>
+                            <TableCell className="text-right font-medium">{p.qtySegregada.toLocaleString()}</TableCell>
                             <TableCell className="text-right text-green-600 font-bold">{aptaTotal.toLocaleString()}</TableCell>
                             <TableCell className="text-right text-destructive font-bold">{(p.qtyScrapCalidad || 0).toLocaleString()}</TableCell>
                         </TableRow>
@@ -550,9 +528,9 @@ export default function QualityPage() {
           <DialogContent className="max-w-3xl flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Inspección de Calidad</DialogTitle>
-                    {selectedProduction && (
+                    {selectedLot && (
                          <DialogDescription className="text-base">
-                            Lote del {new Date(selectedProduction.fechaISO).toLocaleDateString('es-ES')} | Pieza: {getPieceCode(selectedProduction.pieceId)} | Total a inspeccionar: <strong>{selectedProduction.qtySegregada.toLocaleString()}</strong>
+                            Lote del {new Date(selectedLot.createdAt).toLocaleDateString('es-ES')} | Pieza: {getPieceCode(selectedLot.pieceId)} | Total a inspeccionar: <strong>{selectedLot.qtySegregada.toLocaleString()}</strong>
                         </DialogDescription>
                     )}
                 </DialogHeader>
@@ -605,10 +583,20 @@ export default function QualityPage() {
           <DialogHeader>
             <DialogTitle>Segregar Lote para Inspección</DialogTitle>
             <DialogDescription>
-              Crea un nuevo lote de piezas que requieren inspección de calidad. Este lote no se descuenta del stock existente.
+              Crea un nuevo lote de piezas que requieren inspección de calidad.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveSegregation} className="grid gap-4 py-4">
+               <div className="space-y-2">
+                    <Label htmlFor="seg-origen">Origen</Label>
+                    <Select required value={segregateForm.origen} onValueChange={(v) => setSegregateForm(s => ({...s, origen: v, machineId: '', moldId: ''}))}>
+                        <SelectTrigger id="seg-origen"><SelectValue placeholder="Selecciona origen..." /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Interno">Producción Interna</SelectItem>
+                            <SelectItem value="Pertrak">Proveedor Externo (Pertrak)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="seg-turno">Turno</Label>
@@ -626,13 +614,15 @@ export default function QualityPage() {
                     <Input id="seg-rack" required value={segregateForm.nroRack} onChange={(e) => setSegregateForm(s => ({...s, nroRack: e.target.value}))} />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="seg-machine">Máquina</Label>
-                <Select required value={segregateForm.machineId} onValueChange={(v) => setSegregateForm(s => ({...s, machineId: v}))}>
-                    <SelectTrigger id="seg-machine"><SelectValue placeholder="Selecciona máquina..." /></SelectTrigger>
-                    <SelectContent>{machines?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+              {segregateForm.origen === 'Interno' && (
+                <div className="space-y-2">
+                    <Label htmlFor="seg-machine">Máquina</Label>
+                    <Select required value={segregateForm.machineId} onValueChange={(v) => setSegregateForm(s => ({...s, machineId: v}))}>
+                        <SelectTrigger id="seg-machine"><SelectValue placeholder="Selecciona máquina..." /></SelectTrigger>
+                        <SelectContent>{machines?.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="seg-mold">Molde</Label>
                 <Select required value={segregateForm.moldId} onValueChange={(v) => setSegregateForm(s => ({...s, moldId: v}))} disabled={!!machines?.find(m=>m.id === segregateForm.machineId)?.assignments?.some(a => isWithinInterval(new Date(), { start: new Date(a.startDate), end: new Date(a.endDate) }))}>
@@ -759,8 +749,3 @@ export default function QualityPage() {
     </main>
   );
 }
-    
-
-    
-
-    
