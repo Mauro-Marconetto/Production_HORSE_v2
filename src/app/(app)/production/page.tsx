@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -422,17 +421,17 @@ export default function ProductionPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Máquina</TableHead>
-                <TableHead>Pieza</TableHead>
-                <TableHead>Molde</TableHead>
-                <TableHead>Turno</TableHead>
-                <TableHead className="text-right">Unidades OK</TableHead>
-                <TableHead className="text-right">Unidades Sin Prensar</TableHead>
-                <TableHead className="text-right text-destructive">Rechazo Interno</TableHead>
-                <TableHead className="text-right">Unidades Producidas</TableHead>
-                <TableHead className="text-right">Rechazo Interno (%)</TableHead>
-                <TableHead className="text-center">Calidad </TableHead>
+                <TableHead className="p-2">Fecha</TableHead>
+                <TableHead className="p-2">Máquina</TableHead>
+                <TableHead className="p-2">Pieza</TableHead>
+                <TableHead className="p-2">Molde</TableHead>
+                <TableHead className="p-2">Turno</TableHead>
+                <TableHead className="p-2 text-right">OK</TableHead>
+                <TableHead className="p-2 text-right">Sin Prensar</TableHead>
+                <TableHead className="p-2 text-right text-destructive">Rechazo</TableHead>
+                <TableHead className="p-2 text-right">Total</TableHead>
+                <TableHead className="p-2 text-right">Rechazo (%)</TableHead>
+                <TableHead className="p-2 text-center">Calidad </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -454,19 +453,19 @@ export default function ProductionPage() {
 
                 return (
                   <TableRow key={p.id}>
-                    <TableCell>{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
-                    <TableCell className="font-medium">{getMachineName(p.machineId)}</TableCell>
-                    <TableCell>{getPieceCode(p.pieceId)}</TableCell>
-                    <TableCell>{getMoldName(p.moldId)}</TableCell>
-                    <TableCell className="capitalize">{p.turno}</TableCell>
-                    <TableCell className="text-right font-semibold">{unidadesOK.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{unidadesSinPrensar.toLocaleString()}</TableCell>
-                    <TableCell className="text-right text-destructive">{scrapTotal.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-bold">{totalUnits.toLocaleString()}</TableCell>
-                    <TableCell className={`text-right ${isScrapHigh ? 'text-destructive' : ''}`}>
+                    <TableCell className="p-2">{new Date(p.fechaISO).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
+                    <TableCell className="p-2 font-medium">{getMachineName(p.machineId)}</TableCell>
+                    <TableCell className="p-2">{getPieceCode(p.pieceId)}</TableCell>
+                    <TableCell className="p-2">{getMoldName(p.moldId)}</TableCell>
+                    <TableCell className="p-2 capitalize">{p.turno}</TableCell>
+                    <TableCell className="p-2 text-right font-semibold">{unidadesOK.toLocaleString()}</TableCell>
+                    <TableCell className="p-2 text-right">{unidadesSinPrensar.toLocaleString()}</TableCell>
+                    <TableCell className="p-2 text-right text-destructive">{scrapTotal.toLocaleString()}</TableCell>
+                    <TableCell className="p-2 text-right font-bold">{totalUnits.toLocaleString()}</TableCell>
+                    <TableCell className={`p-2 text-right ${isScrapHigh ? 'text-destructive' : ''}`}>
                       {(scrapPct * 100).toFixed(1)}%
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="p-2 text-center">
                       {(p.qtySegregada || 0) > 0 ? (
                         p.inspeccionadoCalidad ? (
                           <Badge variant="secondary">Inspeccionado</Badge>
@@ -562,7 +561,7 @@ export default function ProductionPage() {
                                 <Button
                                     key={key}
                                     variant={prodActiveField === key ? "default" : "secondary"}
-                                    className="h-auto py-4 text-lg justify-between"
+                                    className="h-auto py-4 text-lg justify-between text-center"
                                     onClick={() => {
                                         setProdActiveField(key);
                                         setProdCurrentInput(String(prodQuantities[key] || ''));
@@ -702,34 +701,34 @@ export default function ProductionPage() {
                             </Card>
                             <Button
                                 variant={pressingActiveField === 'pressedQty' ? "default" : "secondary"}
-                                className="h-16 text-lg justify-between"
+                                className="h-16 text-base justify-between"
                                 onClick={() => {
                                     setPressingActiveField('pressedQty');
                                     setPressingCurrentInput(String(pressingQuantities.pressedQty || ''));
                                 }}
                             >
                                 <span>Piezas Prensadas (OK)</span>
-                                <span className="font-bold text-2xl">{pressingQuantities.pressedQty.toLocaleString()}</span>
+                                <span className="font-bold text-lg">{pressingQuantities.pressedQty.toLocaleString()}</span>
                             </Button>
                              <Button
                                 variant={pressingActiveField === 'scrapQty' ? "destructive" : "secondary"}
-                                className={`h-16 text-lg justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
+                                className={`h-16 text-base justify-between ${pressingActiveField === 'scrapQty' ? 'bg-destructive text-destructive-foreground' : ''}`}
                                 onClick={() => {
                                     setPressingActiveField('scrapQty');
                                     setPressingCurrentInput(String(pressingQuantities.scrapQty || ''));
                                 }}
                             >
                                 <span>Scrap de Prensado</span>
-                                <span className="font-bold text-2xl">{pressingQuantities.scrapQty.toLocaleString()}</span>
+                                <span className="font-bold text-lg">{pressingQuantities.scrapQty.toLocaleString()}</span>
                             </Button>
                          </div>
                          <div className="grid grid-cols-3 gap-2">
                             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
-                                <Button key={n} variant="outline" className="h-full text-4xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + n)}>{n}</Button>
+                                <Button key={n} variant="outline" className="h-full text-2xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + n)}>{n}</Button>
                             ))}
-                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={() => setPressingCurrentInput('')}>C</Button>
-                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + '0')}>0</Button>
-                            <Button variant="outline" className="h-full text-4xl font-bold" onClick={() => setPressingCurrentInput(p => p.slice(0, -1))}>←</Button>
+                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={() => setPressingCurrentInput('')}>C</Button>
+                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={(e) => setPressingCurrentInput(p => p + '0')}>0</Button>
+                            <Button variant="outline" className="h-full text-2xl font-bold" onClick={() => setPressingCurrentInput(p => p.slice(0, -1))}>←</Button>
                         </div>
                     </div>
                 )}
