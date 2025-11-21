@@ -234,34 +234,66 @@ export default function QualityPage() {
         }
 
         setIsSaving(true);
-        const batch = writeBatch(firestore);
         
-        // 1. Update Quality Lot
-        const lotDocRef = doc(firestore, 'quality', selectedLot.id);
-        const updatedLotData: Partial<QualityLot> = {
-            ...quantities,
-            status: 'inspected',
-            inspectionDate: new Date().toISOString(),
-            inspectedBy: user.uid,
-        };
-        batch.update(lotDocRef, updatedLotData);
-
-        // 2. Update Inventory
-        const inventoryDocRef = doc(firestore, 'inventory', selectedLot.pieceId);
-        const inventoryUpdateData = {
-            stockListo: increment(quantities.qtyAptaCalidad),
-            stockInyectado: increment(quantities.qtyAptaSinPrensarCalidad),
-            stockPendienteCalidad: increment(-selectedLot.qtySegregada), // Decrement from pending
-        };
-        batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
-
         try {
+            const batch = writeBatch(firestore);
+            
+            // 1. Update Quality Lot
+            const lotDocRef = doc(firestore, 'quality', selectedLot.id);
+            const updatedLotData: Partial<QualityLot> = {
+                ...quantities,
+                status: 'inspected',
+                inspectionDate: new Date().toISOString(),
+                inspectedBy: user.uid,
+            };
+            batch.update(lotDocRef, updatedLotData);
+
+            // 2. Update Inventory
+            const inventoryDocRef = doc(firestore, 'inventory', selectedLot.pieceId);
+            const inventoryUpdateData = {
+                stockListo: increment(quantities.qtyAptaCalidad),
+                stockInyectado: increment(quantities.qtyAptaSinPrensarCalidad),
+                stockPendienteCalidad: increment(-selectedLot.qtySegregada), // Decrement from pending
+            };
+            batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
+
+            // 3. Find and update the original Production document
+            const lotCreationDate = new Date(selectedLot.createdAt);
+            const startOfLotDay = startOfDay(lotCreationDate);
+            const endOfLotDay = endOfDay(lotCreationDate);
+            
+            const prodQuery = query(collection(firestore, 'production'),
+                where('machineId', '==', selectedLot.machineId),
+                where('pieceId', '==', selectedLot.pieceId),
+                where('turno', '==', selectedLot.turno),
+                where('createdAt', '>=', startOfLotDay),
+                where('createdAt', '<=', endOfLotDay),
+            );
+
+            const prodSnap = await getDocs(prodQuery);
+            
+            if (!prodSnap.empty) {
+                const prodDoc = prodSnap.docs[0];
+                const prodDocRef = prodDoc.ref;
+                batch.update(prodDocRef, {
+                    qtyFinalizada: increment(quantities.qtyAptaCalidad),
+                    qtySinPrensar: increment(quantities.qtyAptaSinPrensarCalidad),
+                    qtyScrap: increment(quantities.qtyScrapCalidad),
+                    inspeccionadoCalidad: true,
+                    qtySegregada: 0,
+                });
+            } else if (selectedLot.machineId !== 'mecanizado-externo') {
+                // Only warn if it's not an external process, where a prod record might not exist
+                console.warn(`Could not find matching production document for quality lot ${selectedLot.id}`);
+            }
+
             await batch.commit();
+
             toast({ title: "Éxito", description: "Inspección de calidad guardada y stock actualizado." });
             handleCloseInspectionDialog();
             forceRefresh();
         } catch (error) {
-             const contextualError = new FirestorePermissionError({ path: lotDocRef.path, operation: 'update', requestResourceData: updatedLotData });
+             const contextualError = new FirestorePermissionError({ path: 'quality or inventory', operation: 'update', requestResourceData: {lotId: selectedLot.id, ...quantities} });
              errorEmitter.emit('permission-error', contextualError);
         } finally {
             setIsSaving(false);
@@ -803,6 +835,7 @@ export default function QualityPage() {
     </main>
   );
 }
+
 
 
 
