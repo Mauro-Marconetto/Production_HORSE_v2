@@ -128,14 +128,10 @@ export default function SubprocessesPage() {
     
     const machiningHistory = useMemo(() => {
         if (!machiningProcesses) return [];
-        
-        let filteredProcesses = machiningProcesses.filter(p => 
+        return machiningProcesses.filter(p => 
             p.qtyMecanizada || p.qtyEnsamblada || p.qtySegregada || p.qtyScrapMecanizado || p.qtyScrapEnsamblado
         );
-
-        return filteredProcesses;
-
-    }, [machiningProcesses, qualityLots, historyDate]);
+    }, [machiningProcesses]);
 
 
     const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingQuality;
@@ -298,15 +294,18 @@ export default function SubprocessesPage() {
             }
 
             // Create a single machining process record for the declared scrap quantities
-            if (qtyScrapMecanizado > 0 || qtyScrapEnsamblado > 0) {
-                const scrapDeclarationId = `scrap-${Date.now()}-${selectedPieceId}`;
-                 const scrapDocRef = doc(firestore, 'machining', scrapDeclarationId);
-                 batch.set(scrapDocRef, {
-                    id: scrapDeclarationId,
+            if (qtyScrapMecanizado > 0 || qtyScrapEnsamblado > 0 || qtyMecanizada > 0 || qtyEnsamblada > 0 || qtySegregada > 0) {
+                const declarationId = `decl-${Date.now()}-${selectedPieceId}`;
+                 const declarationDocRef = doc(firestore, 'machining', declarationId);
+                 batch.set(declarationDocRef, {
+                    id: declarationId,
                     remitoId: 'N/A', // No specific remito for this scrap record
                     pieceId: selectedPieceId,
                     qtyEnviada: 0,
                     status: 'Finalizado',
+                    qtyMecanizada: piece.requiereEnsamblado ? 0 : qtyMecanizada,
+                    qtyEnsamblada: qtyEnsamblada,
+                    qtySegregada: qtySegregada,
                     qtyScrapMecanizado: qtyScrapMecanizado,
                     qtyScrapEnsamblado: qtyScrapEnsamblado
                  }, { merge: true });
@@ -381,7 +380,7 @@ export default function SubprocessesPage() {
         <CardHeader>
              <div className="flex items-start justify-between">
                 <div>
-                    <CardTitle>Historial de Declaraciones de Mecanizado</CardTitle>
+                    <CardTitle>Historial de Declaraciones de Produccion</CardTitle>
                     <CardDescription>
                         Producción y scrap declarado en proveedores externos.
                     </CardDescription>
@@ -560,3 +559,4 @@ export default function SubprocessesPage() {
     </main>
   );
 }
+
