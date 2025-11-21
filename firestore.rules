@@ -1,8 +1,81 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
+    match /users/{userId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /roles/{roleId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /pieces/{pieceId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /molds/{moldId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /machines/{machineId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    
+    match /clients/{clientId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    
+    match /suppliers/{supplierId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /demand/{document=**} {
+      allow read, write: if isAuth();
+    }
+    
+    match /inventory/{inventoryId} {
+       allow read, write: if isAuth();
+    }
+
+    match /production/{prodId} {
+      allow read, write: if isAuth();
+    }
+    
+    match /quality/{qualityId} {
+      allow read, write: if isAuth();
+    }
+    
+    match /remitos/{remitoId} {
+      allow read, write: if isAuth();
+    }
+    
+     match /machining/{machiningId} {
+      allow read, write: if isAuth();
+    }
+    
+    match /settings/{settingId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
