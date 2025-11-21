@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight, ShieldAlert, Package, Ship } from "lucide-react";
+import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight, ShieldAlert, Package, Ship, X } from "lucide-react";
 import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings, Production, MachiningProcess, Client, Export, QualityLot } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -32,6 +32,8 @@ interface ExportItem {
     qty: number;
     origenStock: 'stockListo' | 'stockEnsamblado';
 }
+
+const ALL_STATES: InventoryRow['state'][] = ['Sin Prensar', 'En Mecanizado', 'Mecanizado', 'Granallado', 'Listo', 'Pendiente Calidad', 'Ensamblado'];
 
 
 export default function StockPage() {
@@ -67,11 +69,14 @@ export default function StockPage() {
     const [exportItems, setExportItems] = useState<ExportItem[]>([]);
 
     const [isSaving, setIsSaving] = useState(false);
+
+    const [filterPiece, setFilterPiece] = useState<string>('all');
+    const [filterState, setFilterState] = useState<string>('all');
     
     const inventoryData = useMemo((): InventoryRow[] => {
         if (!pieces || !inventory || !machiningProcesses) return [];
         
-        const rows: InventoryRow[] = [];
+        let rows: InventoryRow[] = [];
 
         const pendingQualityStock = new Map<string, number>();
         if(pendingQualityLots) {
@@ -119,11 +124,25 @@ export default function StockPage() {
                  rows.push({ piece, state: 'Listo', stock: 0, totalStockForPiece: 0 });
             }
         });
+        
+        // Apply filters
+        if (filterPiece !== 'all') {
+            rows = rows.filter(row => row.piece.id === filterPiece);
+        }
+        if (filterState !== 'all') {
+            rows = rows.filter(row => row.state === filterState);
+        }
+
 
         return rows;
-    }, [pieces, inventory, pendingQualityLots, machiningProcesses]);
+    }, [pieces, inventory, pendingQualityLots, machiningProcesses, filterPiece, filterState]);
     
     const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers || isLoadingQuality || isLoadingClients || isLoadingMachining;
+
+    const clearFilters = () => {
+        setFilterPiece('all');
+        setFilterState('all');
+    };
 
     const handleCreateRemito = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -326,8 +345,41 @@ export default function StockPage() {
             </div>
             <Card>
                 <CardHeader>
-                    <CardTitle>Niveles de Stock por Etapa</CardTitle>
-                    <CardDescription>Resumen de todas las piezas en stock, diferenciando entre cada etapa del proceso productivo.</CardDescription>
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <CardTitle>Niveles de Stock por Etapa</CardTitle>
+                            <CardDescription>Resumen de todas las piezas en stock, diferenciando entre cada etapa del proceso productivo.</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                             <Select value={filterPiece} onValueChange={setFilterPiece}>
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Filtrar por Pieza" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas las piezas</SelectItem>
+                                    {pieces?.map(p => (
+                                        <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select value={filterState} onValueChange={setFilterState}>
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Filtrar por Estado" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos los estados</SelectItem>
+                                    {ALL_STATES.map(s => (
+                                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                             {(filterPiece !== 'all' || filterState !== 'all') && (
+                                <Button variant="ghost" onClick={clearFilters} size="icon" title="Limpiar filtros">
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            )}
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -397,7 +449,7 @@ export default function StockPage() {
                             {!isLoading && inventoryData.length === 0 && (
                                  <TableRow>
                                     <TableCell colSpan={6} className="h-24 text-center">
-                                        No se encontraron piezas o datos de inventario.
+                                        No se encontraron piezas para el filtro seleccionado.
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -555,5 +607,6 @@ export default function StockPage() {
 
         </main>
     );
+}
 
     
