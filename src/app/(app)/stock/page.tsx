@@ -92,11 +92,18 @@ export default function StockPage() {
             
             const stockInyectado = invItem?.stockInyectado || 0;
             const stockEnMecanizado = machiningStock.get(piece.id) || 0;
-            const stockMecanizado = invItem?.stockMecanizado || 0;
+            
+            let stockMecanizado = invItem?.stockMecanizado || 0;
             const stockGranallado = invItem?.stockGranallado || 0;
-            const stockListo = invItem?.stockListo || 0;
+            let stockListo = invItem?.stockListo || 0;
             const stockEnsamblado = invItem?.stockEnsamblado || 0;
             const stockPendiente = pendingQualityStock.get(piece.id) || 0;
+
+            if (piece.requiereEnsamblado && stockMecanizado > 0) {
+              stockListo += stockMecanizado;
+              stockMecanizado = 0;
+            }
+            
 
             const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo + stockEnsamblado + stockPendiente;
 
@@ -285,7 +292,7 @@ export default function StockPage() {
         switch(state) {
             case 'Sin Prensar': return 'outline';
             case 'En Mecanizado': return 'destructive';
-            case 'Mecanizado': return 'secondary';
+            case 'Mecanizado': return 'default';
             case 'Granallado': return 'secondary';
             case 'Pendiente Calidad': return 'destructive';
             case 'Listo': return 'default';
@@ -550,4 +557,3 @@ export default function StockPage() {
         </main>
     );
 }
-
