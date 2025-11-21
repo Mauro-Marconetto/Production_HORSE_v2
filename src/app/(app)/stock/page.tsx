@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
@@ -99,7 +98,7 @@ export default function StockPage() {
             const stockEnsamblado = invItem?.stockEnsamblado || 0;
             const stockPendiente = pendingQualityStock.get(piece.id) || 0;
 
-            if (piece.requiereEnsamblado && stockMecanizado > 0) {
+            if (!piece.requiereEnsamblado && stockMecanizado > 0) {
               stockListo += stockMecanizado;
               stockMecanizado = 0;
             }
@@ -433,7 +432,7 @@ export default function StockPage() {
                                             <Select value={item.pieceId} onValueChange={(v) => updateRemitoItem(index, 'pieceId', v)}>
                                                 <SelectTrigger className="flex-1"><SelectValue placeholder="Selecciona pieza..." /></SelectTrigger>
                                                 <SelectContent>
-                                                    {pieces?.filter(p => p.requiereMecanizado).map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
+                                                    {pieces?.filter(p => p.requiereMecanizado || p.requiereEnsamblado).map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
                                             <Input 
@@ -556,4 +555,5 @@ export default function StockPage() {
 
         </main>
     );
-}
+
+    
