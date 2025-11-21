@@ -325,6 +325,8 @@ export default function SubprocessesPage() {
         }
     };
 
+    const selectedPiece = useMemo(() => pieces?.find(p => p.id === selectedPieceId), [pieces, selectedPieceId]);
+
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -503,13 +505,23 @@ export default function SubprocessesPage() {
                 {step === 'declaration' && (
                     <div className="flex-grow p-6 grid grid-cols-2 gap-8">
                         <div className="flex flex-col gap-4">
-                            {declarationFieldsConfig.map(({key, label}) => (
-                                <Button key={key} variant={activeField === key ? (key.includes('Scrap') ? 'destructive' : 'default') : "secondary"} className="h-14 text-sm justify-between"
-                                    onClick={() => { setActiveField(key); setCurrentInput(String(quantities[key] || '')); }}>
+                            {declarationFieldsConfig.map(({key, label}) => {
+                                const isAssemblyField = key === 'qtyEnsamblada' || key === 'qtyScrapEnsamblado';
+                                const isDisabled = isAssemblyField && !selectedPiece?.requiereEnsamblado;
+
+                                return (
+                                <Button 
+                                    key={key} 
+                                    variant={activeField === key ? (key.includes('Scrap') ? 'destructive' : 'default') : "secondary"} 
+                                    className="h-14 text-sm justify-between"
+                                    onClick={() => { setActiveField(key); setCurrentInput(String(quantities[key] || '')); }}
+                                    disabled={isDisabled}
+                                >
                                     <span>{label}</span>
                                     <span className="font-bold text-lg">{quantities[key].toLocaleString()}</span>
                                 </Button>
-                            ))}
+                                )
+                            })}
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => ( <Button key={n} variant="outline" className="h-full text-xl font-bold" onClick={() => handleNumericButton(n)}>{n}</Button>))}
@@ -548,7 +560,3 @@ export default function SubprocessesPage() {
     </main>
   );
 }
-
-
-
-
