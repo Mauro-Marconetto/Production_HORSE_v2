@@ -13,6 +13,7 @@ export interface Piece {
   stockMax?: number;
   requiereGranallado?: boolean;
   requiereMecanizado?: boolean;
+  requiereEnsamblado?: boolean;
   tiempoDeCiclo?: number;
 }
 
@@ -292,3 +293,5 @@ export interface Export {
   origenStock: 'stockListo' | 'stockEnsamblado';
   fecha: string; // ISO Date
 }
+
+    

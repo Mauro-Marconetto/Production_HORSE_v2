@@ -33,7 +33,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from '@/components/ui/checkbox';
-import { MoreHorizontal, PlusCircle, Loader2, Trash2, Wrench } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Loader2, Trash2, Wrench, Package } from 'lucide-react';
 import type { Piece, Mold, Machine, Inventory } from '@/lib/types';
 import { Wind } from 'lucide-react';
 
@@ -57,6 +57,7 @@ export default function AdminPiecesPage() {
     const [compatibleMachines, setCompatibleMachines] = useState<string[]>([]);
     const [requiereGranallado, setRequiereGranallado] = useState<boolean>(false);
     const [requiereMecanizado, setRequiereMecanizado] = useState<boolean>(false);
+    const [requiereEnsamblado, setRequiereEnsamblado] = useState<boolean>(false);
     
     const isLoading = isLoadingPieces || isLoadingMolds || isLoadingMachines;
 
@@ -68,12 +69,14 @@ export default function AdminPiecesPage() {
                 setCompatibleMachines(associatedMold?.compatibilidad || []);
                 setRequiereGranallado(selectedPiece.requiereGranallado || false);
                 setRequiereMecanizado(selectedPiece.requiereMecanizado || false);
+                setRequiereEnsamblado(selectedPiece.requiereEnsamblado || false);
             } else {
                 // Reset for new piece
                 setCurrentMoldName('');
                 setCompatibleMachines([]);
                 setRequiereGranallado(false);
                 setRequiereMecanizado(false);
+                setRequiereEnsamblado(false);
             }
         }
     }, [isDialogOpen, selectedPiece, molds]);
@@ -103,6 +106,7 @@ export default function AdminPiecesPage() {
         const tiempoDeCiclo = Number(formData.get('tiempoDeCiclo'));
         const requiereGranalladoValue = formData.get('requiereGranallado') === 'on';
         const requiereMecanizadoValue = formData.get('requiereMecanizado') === 'on';
+        const requiereEnsambladoValue = formData.get('requiereEnsamblado') === 'on';
 
 
         if (!codigo || !moldNameFromInput) {
@@ -125,6 +129,7 @@ export default function AdminPiecesPage() {
                 tiempoDeCiclo: tiempoDeCiclo || 0,
                 requiereGranallado: requiereGranalladoValue,
                 requiereMecanizado: requiereMecanizadoValue,
+                requiereEnsamblado: requiereEnsambladoValue,
             };
             batch.set(pieceDocRef, pieceData, { merge: true });
 
@@ -320,6 +325,12 @@ export default function AdminPiecesPage() {
                                                     Mecanizado
                                                 </Badge>
                                             )}
+                                            {piece.requiereEnsamblado && (
+                                                <Badge variant="outline" className="flex items-center gap-1">
+                                                    <Package className="h-3 w-3"/>
+                                                    Ensamblado
+                                                </Badge>
+                                            )}
                                         </div>
                                    </TableCell>
                                     <TableCell className="text-right">{(piece.stockMin || 0).toLocaleString()}</TableCell>
@@ -476,6 +487,20 @@ export default function AdminPiecesPage() {
                                         Requiere Mecanizado
                                     </label>
                                 </div>
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id="requiereEnsamblado"
+                                        name="requiereEnsamblado"
+                                        checked={requiereEnsamblado}
+                                        onCheckedChange={(checked) => setRequiereEnsamblado(Boolean(checked))}
+                                    />
+                                    <label
+                                        htmlFor="requiereEnsamblado"
+                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                    >
+                                        Requiere Ensamblado
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
@@ -493,3 +518,5 @@ export default function AdminPiecesPage() {
         </main>
     );
 }
+
+    

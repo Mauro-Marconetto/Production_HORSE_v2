@@ -90,6 +90,9 @@
         "requiereMecanizado": {
           "type": "boolean"
         },
+        "requiereEnsamblado": {
+          "type": "boolean"
+        },
         "requiereGranallado": {
           "type": "boolean"
         },
@@ -1199,3 +1202,5 @@
     "reasoning": "The Firestore data structure is designed to support the ForgeFlow application's production planning and execution features. It prioritizes authorization independence and QAPs by denormalizing data where necessary and using structural segregation. Path-based ownership is used for user-specific data, and membership maps are avoided since there's no collaborative data in the application. The structure enables secure list operations by ensuring that each collection has a homogeneous security posture.\n\n**Authorization Independence:** Data such as the Machines, Molds and Pieces collections are global, so they don't need any explicit authorization besides roles. User-specific collections like Assignments are secured via path-based ownership.\n\n**QAPs:** List operations are secured by structural segregation. For instance, listing assignments is only allowed within a specific plan (plans/{planId}/assignments/{assignmentId}).  This prevents unauthorized listing of assignments across different plans."
   }
 }
+
+    
