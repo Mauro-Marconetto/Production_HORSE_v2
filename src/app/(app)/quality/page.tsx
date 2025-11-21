@@ -140,15 +140,14 @@ export default function QualityPage() {
 
     useEffect(() => {
         if (selectedLot) {
-            const initialApta = selectedLot.qtySegregada;
             let initialQuantities = { 
-                qtyAptaCalidad: initialApta, 
+                qtyAptaCalidad: 0, 
                 qtyAptaSinPrensarCalidad: 0, 
                 qtyScrapCalidad: 0 
             };
             
             setQuantities(initialQuantities);
-            setCurrentInput(String(initialApta));
+            setCurrentInput('');
             setActiveField('qtyAptaCalidad');
             setIsInspectionDialogOpen(true);
         }
@@ -802,3 +801,4 @@ export default function QualityPage() {
     </main>
   );
 }
+
