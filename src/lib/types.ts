@@ -1,11 +1,5 @@
 
 
-
-
-
-
-
-
 export interface Client {
   id: string;
   nombre: string;
@@ -158,6 +152,10 @@ export interface Production {
   // Quality related fields
   qtySegregada?: number;
   inspeccionadoCalidad?: boolean;
+  qtyAptaCalidad?: number;
+  qtyAptaSinPrensarCalidad?: number;
+  qtyScrapCalidad?: number;
+
 
   // Machining specific fields
   qtyMecanizada?: number;
@@ -282,7 +280,6 @@ export interface MachiningProcess {
   qtyMecanizada?: number;
   qtyEnsamblada?: number;
   qtySegregada?: number;
-  qtyScrap?: number;
   qtyScrapMecanizado?: number;
   qtyScrapEnsamblado?: number;
 }

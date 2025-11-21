@@ -6,28 +6,19 @@ import { useMemo, useState, useEffect } from "react";
 import { collection, writeBatch, query, where, getDocs, orderBy, doc, increment, addDoc } from "firebase/firestore";
 import { useFirestore, useCollection, useMemoFirebase, useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MoreHorizontal, Loader2, PlusCircle, Calendar as CalendarIcon } from "lucide-react";
+import { Loader2, PlusCircle, Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Remito, Piece, Supplier, MachiningProcess, Production, Inventory, QualityLot } from "@/lib/types";
+import type { Remito, Piece, Supplier, MachiningProcess, QualityLot } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { addDays, format } from "date-fns";
 import type { DateRange } from "react-day-picker";
-
-
-const statusConfig: { [key: string]: { label: string, color: string } } = {
-    enviado: { label: "Enviado", color: "bg-yellow-500" },
-    en_proceso: { label: "En Proceso", color: "bg-blue-500" },
-    retornado_parcial: { label: "Retornado Parcial", color: "bg-purple-500" },
-    retornado_completo: { label: "Retornado Completo", color: "bg-green-500" },
-};
 
 type DeclarationField = 'qtyMecanizada' | 'qtyEnsamblada' | 'qtySegregada' | 'qtyScrapMecanizado' | 'qtyScrapEnsamblado';
 type MachiningDeclarationStep = 'selection' | 'declaration' | 'summary';
@@ -40,7 +31,6 @@ const declarationFieldsConfig: { key: DeclarationField, label: string }[] = [
     { key: 'qtyScrapEnsamblado', label: 'MMU (Ensamblado)' },
 ];
 
-
 export default function SubprocessesPage() {
     const firestore = useFirestore();
     const router = useRouter();
@@ -48,7 +38,7 @@ export default function SubprocessesPage() {
     const { toast } = useToast();
 
     // Data Hooks
-    const machiningQuery = useMemoFirebase(() => firestore ? query(collection(firestore, "machining"), orderBy("remitoId", "desc")) : null, [firestore]);
+    const machiningQuery = useMemoFirebase(() => firestore ? query(collection(firestore, "machining")) : null, [firestore]);
     const { data: machiningProcesses, isLoading: isLoadingMachining, forceRefresh: refreshMachining } = useCollection<MachiningProcess>(machiningQuery);
 
     const suppliersQuery = useMemoFirebase(() => firestore ? collection(firestore, "suppliers") : null, [firestore]);
@@ -56,60 +46,84 @@ export default function SubprocessesPage() {
     
     const piecesQuery = useMemoFirebase(() => firestore ? collection(firestore, "pieces") : null, [firestore]);
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesQuery);
+
+    const [date, setDate] = useState<DateRange | undefined>();
     
-    const remitosQuery = useMemoFirebase(() => firestore ? collection(firestore, "remitos") : null, [firestore]);
+    const remitosQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        let q = query(collection(firestore, "remitos"), orderBy("fecha", "desc"));
+        if (date?.from && date?.to) {
+            const endDate = addDays(date.to, 1);
+            q = query(q, where("fecha", ">=", date.from.toISOString()), where("fecha", "<=", endDate.toISOString()));
+        }
+        return q;
+    }, [firestore, date]);
     const { data: remitos, isLoading: isLoadingRemitos } = useCollection<Remito>(remitosQuery);
-
-    const inventoryQuery = useMemoFirebase(() => firestore ? collection(firestore, "inventory") : null, [firestore]);
-    const { data: inventory, isLoading: isLoadingInventory } = useCollection<Inventory>(inventoryQuery);
-
-    const [date, setDate] = useState<DateRange | undefined>({
-        from: addDays(new Date(), -30),
-        to: new Date(),
-    });
-
-
-    const machiningHistory = useMemo(() => {
-        if (!machiningProcesses) return [];
-        // Filter for processes that have some declared quantities
-        return machiningProcesses.filter(p => 
-            (p.qtyMecanizada || 0) > 0 ||
-            (p.qtyEnsamblada || 0) > 0 ||
-            (p.qtyScrapMecanizado || 0) > 0 ||
-            (p.qtyScrapEnsamblado || 0) > 0
-        );
-    }, [machiningProcesses]);
+    
+    const qualityQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'quality'), where('machineId', '==', 'mecanizado-externo')) : null, [firestore]);
+    const { data: qualityLots, isLoading: isLoadingQuality } = useCollection<QualityLot>(qualityQuery);
 
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [step, setStep] = useState<MachiningDeclarationStep>('selection');
     const [selectedPieceId, setSelectedPieceId] = useState('');
     const [quantities, setQuantities] = useState<Record<DeclarationField, number>>({
-        qtyMecanizada: 0,
-        qtyEnsamblada: 0,
-        qtySegregada: 0,
-        qtyScrapMecanizado: 0,
-        qtyScrapEnsamblado: 0,
+        qtyMecanizada: 0, qtyEnsamblada: 0, qtySegregada: 0, qtyScrapMecanizado: 0, qtyScrapEnsamblado: 0,
     });
     const [activeField, setActiveField] = useState<DeclarationField>('qtyMecanizada');
     const [currentInput, setCurrentInput] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     
+    const displayedRemitos = useMemo(() => {
+        if (!remitos) return [];
+        if (date?.from && date?.to) return remitos;
+        return remitos.slice(0, 5);
+    }, [remitos, date]);
 
-    const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingInventory;
+    const supplierStock = useMemo(() => {
+        if (!pieces || !machiningProcesses) return [];
+        const stockMap = new Map<string, { pendienteMecanizado: number, pendienteEnsamblado: number, enCalidad: number }>();
+
+        pieces.forEach(piece => {
+            if (piece.requiereMecanizado) {
+                 stockMap.set(piece.id, { pendienteMecanizado: 0, pendienteEnsamblado: 0, enCalidad: 0 });
+            }
+        });
+        
+        machiningProcesses.forEach(proc => {
+            const current = stockMap.get(proc.pieceId);
+            if (current) {
+                current.pendienteMecanizado += proc.qtyEnviada;
+                current.pendienteEnsamblado += proc.qtyMecanizada || 0;
+                current.enCalidad += proc.qtySegregada || 0;
+            }
+        });
+        
+        // Adjust for quality lots
+        if (qualityLots) {
+             qualityLots.forEach(lot => {
+                const current = stockMap.get(lot.pieceId);
+                if (current && lot.status === 'pending') {
+                    // This logic might need refinement based on how returns from quality are handled
+                    // For now, it just shows what's currently segregated.
+                }
+             });
+        }
+        
+        return Array.from(stockMap.entries()).map(([pieceId, data]) => ({
+            pieceId, ...data
+        }));
+
+    }, [pieces, machiningProcesses, qualityLots]);
+
+    const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingQuality;
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     
-    const activeLots = useMemo(() => {
-        if (!machiningProcesses) return [];
-        return machiningProcesses.filter(p => p.status === 'Enviado' || p.status === 'En Proceso');
-    }, [machiningProcesses]);
-
-
     const piecesInMachining = useMemo(() => {
-        if (!activeLots || !pieces) return [];
-        const pieceIds = [...new Set(activeLots.map(p => p.pieceId))];
+        if (!machiningProcesses || !pieces) return [];
+        const pieceIds = [...new Set(machiningProcesses.filter(p => p.qtyEnviada > 0).map(p => p.pieceId))];
         return pieces.filter(p => pieceIds.includes(p.id));
-    }, [activeLots, pieces]);
+    }, [machiningProcesses, pieces]);
 
 
     useEffect(() => {
@@ -130,20 +144,12 @@ export default function SubprocessesPage() {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (!isDialogOpen || step !== 'declaration') return;
-
-            if (e.key >= '0' && e.key <= '9') {
-                handleNumericButton(e.key);
-            } else if (e.key === 'Backspace') {
-                handleBackspace();
-            } else if (e.key === 'Escape') {
-                setIsDialogOpen(false);
-            }
+            if (e.key >= '0' && e.key <= '9') { handleNumericButton(e.key); } 
+            else if (e.key === 'Backspace') { handleBackspace(); } 
+            else if (e.key === 'Escape') { setIsDialogOpen(false); }
         };
-
         window.addEventListener('keydown', handleKeyDown);
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-        };
+        return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isDialogOpen, step, currentInput]);
 
     const handleNumericButton = (value: string) => setCurrentInput(prev => prev + value);
@@ -162,86 +168,43 @@ export default function SubprocessesPage() {
         try {
             const batch = writeBatch(firestore);
             
-            // --- VALIDATION & PREPARATION ---
-            let { qtyMecanizada, qtyEnsamblada, qtySegregada, qtyScrapMecanizado, qtyScrapEnsamblado } = quantities;
-            let remainingToDeductFromLots = qtyMecanizada + qtySegregada + qtyScrapMecanizado + qtyScrapEnsamblado;
-            let remainingToDeductForAssembly = qtyEnsamblada;
-    
-            const lotsForPiece = activeLots.filter(p => p.pieceId === selectedPieceId);
-            const inventoryItem = inventory?.find(i => i.id === selectedPieceId);
-            const stockMecanizado = inventoryItem?.stockMecanizado || 0;
+            const lotsForPiece = (machiningProcesses || []).filter(p => p.pieceId === selectedPieceId && p.qtyEnviada > 0);
             const stockEnProveedor = lotsForPiece.reduce((sum, lot) => sum + lot.qtyEnviada, 0);
             
-            if (remainingToDeductFromLots > stockEnProveedor) {
-                 throw new Error(`No hay suficiente stock en proveedor para la pieza ${getPieceCode(selectedPieceId)}. Se intentan declarar ${remainingToDeductFromLots} y solo hay ${stockEnProveedor}.`);
-            }
-            if (remainingToDeductForAssembly > (stockEnProveedor + stockMecanizado)) {
-                throw new Error(`No hay suficiente stock para ensamblar la pieza ${getPieceCode(selectedPieceId)}. Se intentan ensamblar ${remainingToDeductForAssembly} y solo hay ${stockEnProveedor + stockMecanizado} disponibles (proveedor + stock mecanizado).`);
+            const totalToDeductFromProvider = quantities.qtyMecanizada + quantities.qtySegregada + quantities.qtyScrapMecanizado;
+
+            if (totalToDeductFromProvider > stockEnProveedor) {
+                 throw new Error(`Cantidad declarada (${totalToDeductFromProvider}) supera el stock en proveedor (${stockEnProveedor}).`);
             }
     
-            // --- INVENTORY & LOT UPDATES ---
-            const inventoryDocRef = doc(firestore, 'inventory', selectedPieceId);
-            
-            // 1. Consume from stockMecanizado first for assembly
-            const fromStockMecanizado = Math.min(remainingToDeductForAssembly, stockMecanizado);
-            if (fromStockMecanizado > 0) {
-                batch.update(inventoryDocRef, { stockMecanizado: increment(-fromStockMecanizado) });
-                remainingToDeductForAssembly -= fromStockMecanizado;
-            }
-            
-            // 2. Add remaining assembly qty to be deducted from lots
-            remainingToDeductFromLots += remainingToDeductForAssembly;
-    
-            // 3. Consume from lots (FIFO)
-            if (remainingToDeductFromLots > 0) {
-                 const sortedLots = lotsForPiece
-                    .map(lot => ({ ...lot, remitoDate: remitos?.find(r => r.id === lot.remitoId)?.fecha || '9999' }))
-                    .sort((a, b) => a.remitoDate.localeCompare(b.remitoDate));
+            const sortedLots = lotsForPiece
+                .map(lot => ({ ...lot, remitoDate: remitos?.find(r => r.id === lot.remitoId)?.fecha || '9999' }))
+                .sort((a, b) => a.remitoDate.localeCompare(b.remitoDate));
 
-                for (const lot of sortedLots) {
-                    if (remainingToDeductFromLots <= 0) break;
-                    const lotDocRef = doc(firestore, 'machining', lot.id);
-                    const deductable = Math.min(remainingToDeductFromLots, lot.qtyEnviada);
-                    
-                    batch.update(lotDocRef, { 
-                        qtyEnviada: increment(-deductable),
-                        status: (lot.qtyEnviada - deductable) > 0 ? 'En Proceso' : 'Finalizado',
-                        qtyMecanizada: increment(quantities.qtyMecanizada),
-                        qtyEnsamblada: increment(quantities.qtyEnsamblada),
-                        qtyScrapMecanizado: increment(quantities.qtyScrapMecanizado),
-                        qtyScrapEnsamblado: increment(quantities.qtyScrapEnsamblado),
-                        qtySegregada: increment(quantities.qtySegregada),
-
-                    });
-                    remainingToDeductFromLots -= deductable;
-                }
+            let remainingToDeduct = totalToDeductFromProvider;
+            for (const lot of sortedLots) {
+                if (remainingToDeduct <= 0) break;
+                const lotDocRef = doc(firestore, 'machining', lot.id);
+                const deductable = Math.min(remainingToDeduct, lot.qtyEnviada);
+                
+                batch.update(lotDocRef, { 
+                    qtyEnviada: increment(-deductable),
+                    status: (lot.qtyEnviada - deductable) > 0 ? 'En Proceso' : 'Finalizado',
+                    qtyMecanizada: increment(quantities.qtyMecanizada * (deductable / totalToDeductFromProvider)),
+                    qtySegregada: increment(quantities.qtySegregada * (deductable / totalToDeductFromProvider)),
+                    qtyScrapMecanizado: increment(quantities.qtyScrapMecanizado * (deductable / totalToDeductFromProvider)),
+                });
+                remainingToDeduct -= deductable;
             }
 
-            // 4. Update inventory with final results from machining and assembly. Segregated items are handled separately.
-            batch.set(inventoryDocRef, {
-                stockMecanizado: increment(qtyMecanizada),
-                stockEnsamblado: increment(qtyEnsamblada),
-            }, { merge: true });
-            
-            // --- CREATE QUALITY LOT if segregated ---
-            if (qtySegregada > 0) {
+            if (quantities.qtySegregada > 0) {
                 const qualityLotData: Omit<QualityLot, 'id'> = {
-                    createdAt: new Date().toISOString(),
-                    createdBy: user.uid,
-                    pieceId: selectedPieceId,
-                    machineId: 'mecanizado-externo',
-                    turno: '',
-                    nroRack: '',
-                    defecto: 'Segregado en Proveedor',
-                    tipoControl: 'Dimensional/Visual',
-                    qtySegregada: qtySegregada,
-                    status: 'pending',
+                    createdAt: new Date().toISOString(), createdBy: user.uid, pieceId: selectedPieceId,
+                    machineId: 'mecanizado-externo', turno: '', nroRack: 'N/A', defecto: 'Segregado en Proveedor',
+                    tipoControl: 'Dimensional/Visual', qtySegregada: quantities.qtySegregada, status: 'pending',
                 };
                 const qualityLotRef = doc(collection(firestore, 'quality'));
                 batch.set(qualityLotRef, qualityLotData);
-                 batch.set(inventoryDocRef, {
-                    stockPendienteCalidad: increment(qtySegregada)
-                }, { merge: true });
             }
     
             await batch.commit();
@@ -262,7 +225,7 @@ export default function SubprocessesPage() {
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Producción en Mecanizado</h1>
+          <h1 className="text-3xl font-headline font-bold">Gestión de Mecanizado</h1>
           <p className="text-muted-foreground">Declara la producción y el scrap de los lotes enviados a proveedores.</p>
         </div>
          <Button onClick={() => setIsDialogOpen(true)}>
@@ -270,66 +233,26 @@ export default function SubprocessesPage() {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Lotes en Proveedor</CardTitle>
-          <CardDescription>
-            Piezas actualmente en procesos externos. A medida que declares producción, se descontarán del remito más antiguo.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Remito ID</TableHead>
-                <TableHead>Fecha de Envío</TableHead>
-                <TableHead>Proveedor</TableHead>
-                <TableHead>Pieza</TableHead>
-                <TableHead className="text-right">Cantidad Pendiente</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading && (
-                <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
-                    </TableCell>
-                </TableRow>
-              )}
-              {!isLoading && activeLots.map((process) => {
-                const remito = remitos?.find(r => r.id === process.remitoId);
-                const supplier = suppliers?.find(s => s.id === remito?.supplierId);
-                return (
-                  <TableRow key={process.id}>
-                    <TableCell className="font-mono text-xs">{remito?.numero ? `0008-${String(remito.numero).padStart(8, '0')}` : remito?.id.slice(-6)}</TableCell>
-                    <TableCell>{remito ? new Date(remito.fecha).toLocaleDateString() : 'N/A'}</TableCell>
-                    <TableCell>{supplier?.nombre}</TableCell>
-                    <TableCell>{getPieceCode(process.pieceId)}</TableCell>
-                    <TableCell className="text-right font-bold">{process.qtyEnviada.toLocaleString()}</TableCell>
-                  </TableRow>
-                );
-              })}
-              {!isLoading && activeLots.length === 0 && (
-                <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                        No hay lotes en proceso de mecanizado.
-                    </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
        <Card>
         <CardHeader>
-             <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle>Historial de Declaraciones de Mecanizado</CardTitle>
-                  <CardDescription>
-                    Registros de producción y scrap declarados para procesos externos.
-                  </CardDescription>
-                </div>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle>Historial de Envíos a Proveedor</CardTitle>
+              <CardDescription>
+                Muestra los últimos 5 remitos de envío. Usa el filtro para buscar en un rango de fechas.
+              </CardDescription>
+            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button id="date" variant={"outline"} className={cn("w-[260px] justify-start text-left font-normal",!date && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date?.from ? (date.to ? (<> {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")} </>) : (format(date.from, "LLL dd, y"))) : (<span>Filtrar por fecha</span>)}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2}/>
+              </PopoverContent>
+            </Popover>
           </div>
         </CardHeader>
         <CardContent>
@@ -337,51 +260,71 @@ export default function SubprocessesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Remito</TableHead>
+                <TableHead>Fecha de Envío</TableHead>
+                <TableHead>Proveedor</TableHead>
                 <TableHead>Pieza</TableHead>
-                <TableHead className="text-right">Mecanizadas (OK)</TableHead>
-                <TableHead className="text-right">Ensambladas (OK)</TableHead>
-                <TableHead className="text-right text-destructive">MMU (Mecanizado)</TableHead>
-                <TableHead className="text-right text-destructive">MMU (Ensamblado)</TableHead>
+                <TableHead className="text-right">Cantidad Enviada</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-                {isLoading && (
-                    <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center">
-                            <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
-                        </TableCell>
+              {isLoading && (<TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" /></TableCell></TableRow>)}
+              {!isLoading && displayedRemitos.map((remito) => {
+                const supplier = suppliers?.find(s => s.id === remito.supplierId);
+                return remito.items.map((item, index) => (
+                    <TableRow key={`${remito.id}-${index}`}>
+                        <TableCell className="font-mono text-xs">{remito.numero ? `0008-${String(remito.numero).padStart(8, '0')}` : 'N/A'}</TableCell>
+                        <TableCell>{new Date(remito.fecha).toLocaleDateString()}</TableCell>
+                        <TableCell>{supplier?.nombre}</TableCell>
+                        <TableCell>{getPieceCode(item.pieceId)}</TableCell>
+                        <TableCell className="text-right font-bold">{item.qty.toLocaleString()}</TableCell>
                     </TableRow>
-                )}
-                {!isLoading && machiningHistory?.map(proc => {
-                    const remito = remitos?.find(r => r.id === proc.remitoId);
-                    return (
-                    <TableRow key={proc.id}>
-                        <TableCell className="font-mono text-xs">{remito?.numero ? `0008-${String(remito.numero).padStart(8, '0')}` : 'N/A'}</TableCell>
-                        <TableCell>{getPieceCode(proc.pieceId)}</TableCell>
-                        <TableCell className="text-right">{((proc.qtyMecanizada || 0)).toLocaleString()}</TableCell>
-                        <TableCell className="text-right">{((proc.qtyEnsamblada || 0)).toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-destructive">{((proc.qtyScrapMecanizado || 0)).toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-destructive">{((proc.qtyScrapEnsamblado || 0)).toLocaleString()}</TableCell>
-                    </TableRow>
-                )})}
-                 {!isLoading && (!machiningHistory || machiningHistory.length === 0) && (
-                    <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                            No hay declaraciones de mecanizado en el rango seleccionado.
-                        </TableCell>
-                    </TableRow>
-                )}
+                ))
+              })}
+              {!isLoading && displayedRemitos.length === 0 && (<TableRow><TableCell colSpan={5} className="h-24 text-center text-muted-foreground">No se encontraron remitos en el rango seleccionado.</TableCell></TableRow>)}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Estado de Lotes en Proveedor</CardTitle>
+          <CardDescription>
+            Visión en tiempo real de las cantidades de piezas en cada etapa del proceso externo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Pieza</TableHead>
+                <TableHead className="text-right">Pendiente de Mecanizado</TableHead>
+                <TableHead className="text-right">Pendiente de Ensamblado</TableHead>
+                <TableHead className="text-right">En Calidad</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+               {isLoading && (<TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" /></TableCell></TableRow>)}
+               {!isLoading && supplierStock.map((item) => (
+                  <TableRow key={item.pieceId}>
+                    <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
+                    <TableCell className="text-right font-semibold">{item.pendienteMecanizado.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-semibold">{item.pendienteEnsamblado.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-semibold text-destructive">{item.enCalidad.toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+                {!isLoading && supplierStock.length === 0 && (<TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">No hay piezas en proceso de mecanizado.</TableCell></TableRow>)}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-2xl flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-3xl font-bold">Declarar Producción de Mecanizado</DialogTitle>
                 </DialogHeader>
-
                 {step === 'selection' && (
                     <div className="flex-grow p-6 flex flex-col justify-center items-center gap-8">
                         <div className="w-full max-w-sm flex flex-col gap-4">
@@ -395,36 +338,25 @@ export default function SubprocessesPage() {
                         </div>
                     </div>
                 )}
-                
                 {step === 'declaration' && (
                     <div className="flex-grow p-6 grid grid-cols-2 gap-8">
                         <div className="flex flex-col gap-4">
                             {declarationFieldsConfig.map(({key, label}) => (
-                                <Button
-                                    key={key}
-                                    variant={activeField === key ? (key.includes('Scrap') ? 'destructive' : 'default') : "secondary"}
-                                    className="h-14 text-sm justify-between"
-                                    onClick={() => {
-                                        setActiveField(key);
-                                        setCurrentInput(String(quantities[key] || ''));
-                                    }}
-                                >
+                                <Button key={key} variant={activeField === key ? (key.includes('Scrap') ? 'destructive' : 'default') : "secondary"} className="h-14 text-sm justify-between"
+                                    onClick={() => { setActiveField(key); setCurrentInput(String(quantities[key] || '')); }}>
                                     <span>{label}</span>
                                     <span className="font-bold text-lg">{quantities[key].toLocaleString()}</span>
                                 </Button>
                             ))}
                         </div>
                         <div className="grid grid-cols-3 gap-2">
-                             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
-                                <Button key={n} variant="outline" className="h-full text-xl font-bold" onClick={() => handleNumericButton(n)}>{n}</Button>
-                            ))}
+                             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => ( <Button key={n} variant="outline" className="h-full text-xl font-bold" onClick={() => handleNumericButton(n)}>{n}</Button> ))}
                             <Button variant="outline" className="h-full text-xl font-bold" onClick={handleClear}>C</Button>
                             <Button variant="outline" className="h-full text-xl font-bold" onClick={() => handleNumericButton('0')}>0</Button>
                             <Button variant="outline" className="h-full text-xl font-bold" onClick={handleBackspace}>←</Button>
                         </div>
                     </div>
                 )}
-                
                 {step === 'summary' && (
                      <div className="flex-grow p-6 flex flex-col items-center justify-center gap-6">
                         <Card className="w-full max-w-3xl">
@@ -433,54 +365,24 @@ export default function SubprocessesPage() {
                                 <CardDescription>Confirma las cantidades para la pieza <span className="font-bold">{getPieceCode(selectedPieceId)}</span>.</CardDescription>
                             </CardHeader>
                             <CardContent className="text-lg space-y-2">
-                               {declarationFieldsConfig.map(({key, label}) => (
-                                    <div key={key} className="flex justify-between items-center">
-                                        <span>{label}:</span>
-                                        <span className="font-bold">{quantities[key].toLocaleString()}</span>
-                                    </div>
-                               ))}
+                               {declarationFieldsConfig.map(({key, label}) => (<div key={key} className="flex justify-between items-center"><span>{label}:</span><span className="font-bold">{quantities[key].toLocaleString()}</span></div>))}
                                 <hr className="my-2"/>
-                                <div className="flex justify-between items-center font-bold text-xl">
-                                    <span>Total Declarado:</span>
-                                    <span>{totalDeclared.toLocaleString()}</span>
-                                </div>
+                                <div className="flex justify-between items-center font-bold text-xl"><span>Total Declarado:</span><span>{totalDeclared.toLocaleString()}</span></div>
                             </CardContent>
                         </Card>
                     </div>
                 )}
-
-
                 <DialogFooter className="p-6 pt-2 bg-muted border-t">
-                    {step === 'selection' && (
-                        <Button type="button" className="w-48 h-12 text-lg" onClick={() => setStep('declaration')} disabled={!selectedPieceId}>Siguiente</Button>
-                    )}
-                    {step === 'declaration' && (
-                        <>
-                            <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={() => setStep('selection')}>Anterior</Button>
-                            <Button type="button" className="w-48 h-12 text-lg" onClick={() => setStep('summary')}>Revisar</Button>
-                        </>
-                    )}
-                    {step === 'summary' && (
-                        <>
-                            <Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={() => setStep('declaration')}>Anterior</Button>
-                            <Button type="button" className="w-48 h-12 text-lg" onClick={handleSaveProduction} disabled={isSaving || totalDeclared <= 0}>
-                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                {isSaving ? "Guardando..." : "Confirmar y Guardar"}
-                            </Button>
-                        </>
-                    )}
+                    {step === 'selection' && (<Button type="button" className="w-48 h-12 text-lg" onClick={() => setStep('declaration')} disabled={!selectedPieceId}>Siguiente</Button>)}
+                    {step === 'declaration' && (<><Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={() => setStep('selection')}>Anterior</Button><Button type="button" className="w-48 h-12 text-lg" onClick={() => setStep('summary')}>Revisar</Button></>)}
+                    {step === 'summary' && (<><Button type="button" variant="outline" className="w-48 h-12 text-lg" onClick={() => setStep('declaration')}>Anterior</Button>
+                        <Button type="button" className="w-48 h-12 text-lg" onClick={handleSaveProduction} disabled={isSaving || totalDeclared <= 0}>
+                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {isSaving ? "Guardando..." : "Confirmar y Guardar"}
+                        </Button></>)}
                 </DialogFooter>
           </DialogContent>
       </Dialog>
     </main>
   );
 }
-
-
-
-
-
-
-
-    
-    
