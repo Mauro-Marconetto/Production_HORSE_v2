@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useMemo, useState, useEffect } from "react";
@@ -126,11 +127,27 @@ export default function SubprocessesPage() {
     }, [pieces, machiningProcesses, qualityLots]);
     
     const machiningHistory = useMemo(() => {
-        if (!machiningProcesses) return [];
-        return machiningProcesses.filter(p => 
-            p.qtyMecanizada || p.qtyEnsamblada || p.qtySegregada || p.qtyScrapMecanizado || p.qtyScrapEnsamblado
-        );
-    }, [machiningProcesses]);
+        if (!machiningProcesses && !qualityLots) return [];
+        let history: (MachiningProcess | QualityLot & { fecha: string })[] = [];
+
+        if (machiningProcesses) {
+            const declarations = machiningProcesses.filter(p => 
+                p.qtyMecanizada || p.qtyEnsamblada || p.qtySegregada || p.qtyScrapMecanizado || p.qtyScrapEnsamblado
+            );
+            history.push(...declarations);
+        }
+        
+        if (qualityLots) {
+            const externalQualityLots = qualityLots.filter(q => q.machineId === 'mecanizado-externo').map(q => ({...q, fecha: q.createdAt}));
+            history.push(...externalQualityLots);
+        }
+
+        return history.sort((a, b) => {
+            const dateA = new Date((a as any).createdAt || (a as any).fecha || 0).getTime();
+            const dateB = new Date((b as any).createdAt || (b as any).fecha || 0).getTime();
+            return dateB - dateA;
+        });
+    }, [machiningProcesses, qualityLots]);
 
 
     const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingQuality;
@@ -292,31 +309,29 @@ export default function SubprocessesPage() {
                 batch.set(qualityLotRef, qualityLotData);
             }
 
-            // Create a single machining process record for the declared scrap quantities
+            // Create a single machining process record for the declared quantities
             if (qtyScrapMecanizado > 0 || qtyScrapEnsamblado > 0 || qtyMecanizada > 0 || qtyEnsamblada > 0 || qtySegregada > 0) {
                 const declarationId = `decl-${Date.now()}-${selectedPieceId}`;
                  const declarationDocRef = doc(firestore, 'machining', declarationId);
                  batch.set(declarationDocRef, {
                     id: declarationId,
-                    remitoId: 'N/A', // No specific remito for this scrap record
+                    remitoId: 'N/A', 
                     pieceId: selectedPieceId,
                     qtyEnviada: 0,
                     status: 'Finalizado',
-                    // This is where qtyMecanizada for non-assembly parts is recorded
                     qtyMecanizada: piece.requiereEnsamblado ? 0 : qtyMecanizada,
                     qtyEnsamblada: qtyEnsamblada,
                     qtySegregada: qtySegregada,
                     qtyScrapMecanizado: qtyScrapMecanizado,
-                    qtyScrapEnsamblado: qtyScrapEnsamblado
+                    qtyScrapEnsamblado: qtyScrapEnsamblado,
+                    createdAt: new Date().toISOString(),
                  }, { merge: true });
             }
     
-            // *** NEW LOGIC: UPDATE INVENTORY COLLECTION ***
+            // *** UPDATE INVENTORY COLLECTION ***
             const inventoryDocRef = doc(firestore, 'inventory', selectedPieceId);
             const inventoryUpdateData = {
-                // For pieces that only need machining, qtyMecanizada goes to stockMecanizado.
                 stockMecanizado: increment(piece.requiereEnsamblado ? 0 : qtyMecanizada),
-                // For pieces that need assembly, qtyEnsamblada goes to stockEnsamblado.
                 stockEnsamblado: increment(qtyEnsamblada),
             };
             batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
@@ -413,6 +428,7 @@ export default function SubprocessesPage() {
           <Table>
             <TableHeader>
                 <TableRow>
+                    <TableHead>Fecha</TableHead>
                     <TableHead>Pieza</TableHead>
                     <TableHead className="text-right">Mecanizado OK</TableHead>
                     <TableHead className="text-right">Ensamblado OK</TableHead>
@@ -422,20 +438,24 @@ export default function SubprocessesPage() {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {isLoading && <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /></TableCell></TableRow>}
+                {isLoading && <TableRow><TableCell colSpan={7} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /></TableCell></TableRow>}
                 {!isLoading && machiningHistory.map((item) => {
+                    const isQualityLot = 'createdBy' in item;
+                    const date = new Date((item as any).createdAt || (item as any).fecha || new Date());
+                    const formattedDate = format(date, 'dd/MM/yyyy HH:mm');
                     return (
                         <TableRow key={item.id}>
+                            <TableCell>{formattedDate}</TableCell>
                             <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
-                            <TableCell className="text-right">{(item.qtyMecanizada || 0).toLocaleString()}</TableCell>
-                            <TableCell className="text-right">{(item.qtyEnsamblada || 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{(!isQualityLot && !(item as MachiningProcess).qtyScrapMecanizado ? (item as MachiningProcess).qtyMecanizada || 0 : 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{(!isQualityLot && !(item as MachiningProcess).qtyScrapEnsamblado ? (item as MachiningProcess).qtyEnsamblada || 0 : 0).toLocaleString()}</TableCell>
                             <TableCell className="text-right">{(item.qtySegregada || 0).toLocaleString()}</TableCell>
-                            <TableCell className="text-right text-destructive">{(item.qtyScrapMecanizado || 0).toLocaleString()}</TableCell>
-                            <TableCell className="text-right text-destructive">{(item.qtyScrapEnsamblado || 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-destructive">{(!isQualityLot ? (item as MachiningProcess).qtyScrapMecanizado || 0 : 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-destructive">{(!isQualityLot ? (item as MachiningProcess).qtyScrapEnsamblado || 0 : 0).toLocaleString()}</TableCell>
                         </TableRow>
                     );
                 })}
-                {!isLoading && machiningHistory.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No hay declaraciones de mecanizado.</TableCell></TableRow>}
+                {!isLoading && machiningHistory.length === 0 && <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No hay declaraciones de mecanizado.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
@@ -570,6 +590,7 @@ export default function SubprocessesPage() {
     </main>
   );
 }
+
 
 
     
