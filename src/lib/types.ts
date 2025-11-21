@@ -274,12 +274,15 @@ export interface MachiningProcess {
   id: string;
   remitoId: string;
   pieceId: string;
-  qtyEnviada: number;
   status: 'Enviado' | 'En Proceso' | 'Finalizado';
   
-  // Quantities declared during the process
-  qtyMecanizada?: number;
-  qtyEnsamblada?: number;
+  // State quantities
+  qtyEnviada: number; // Stock en Bruto
+  qtyEnProcesoEnsamblado?: number; // En Proceso para Ensamblado
+  qtyMecanizada?: number; // Mecanizado OK
+  qtyEnsamblada?: number; // Ensamblado OK
+  
+  // Scrap quantities
   qtySegregada?: number;
   qtyScrapMecanizado?: number;
   qtyScrapEnsamblado?: number;

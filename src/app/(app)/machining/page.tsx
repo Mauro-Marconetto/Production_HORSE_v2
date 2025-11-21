@@ -93,24 +93,24 @@ export default function SubprocessesPage() {
 
     const supplierStock = useMemo(() => {
         if (!pieces || !machiningProcesses) return [];
-        const stockMap = new Map<string, { pendienteMecanizado: number, pendienteEnsamblado: number, enCalidad: number, ensambladoOK: number }>();
+        const stockMap = new Map<string, { stockBruto: number; enProceso: number; mecanizadoOK: number; ensambladoOK: number; enCalidad: number }>();
 
         pieces.forEach(piece => {
             if (piece.requiereMecanizado || piece.requiereEnsamblado) {
-                 stockMap.set(piece.id, { pendienteMecanizado: 0, pendienteEnsamblado: 0, enCalidad: 0, ensambladoOK: 0 });
+                 stockMap.set(piece.id, { stockBruto: 0, enProceso: 0, mecanizadoOK: 0, ensambladoOK: 0, enCalidad: 0 });
             }
         });
         
         machiningProcesses.forEach(proc => {
             const current = stockMap.get(proc.pieceId);
             if (current) {
-                current.pendienteMecanizado += proc.qtyEnviada;
-                current.pendienteEnsamblado += proc.qtyMecanizada || 0;
+                current.stockBruto += proc.qtyEnviada;
+                current.enProceso += proc.qtyEnProcesoEnsamblado || 0;
+                current.mecanizadoOK += proc.qtyMecanizada || 0;
                 current.ensambladoOK += proc.qtyEnsamblada || 0;
             }
         });
         
-        // Adjust for quality lots
         if (qualityLots) {
              qualityLots.forEach(lot => {
                 const current = stockMap.get(lot.pieceId);
@@ -143,7 +143,7 @@ export default function SubprocessesPage() {
     
     const piecesInMachining = useMemo(() => {
         if (!machiningProcesses || !pieces) return [];
-        const pieceIds = [...new Set(machiningProcesses.filter(p => p.qtyEnviada > 0).map(p => p.pieceId))];
+        const pieceIds = [...new Set(machiningProcesses.filter(p => p.qtyEnviada > 0 || p.qtyEnProcesoEnsamblado > 0).map(p => p.pieceId))];
         return pieces.filter(p => pieceIds.includes(p.id) && (p.requiereMecanizado || p.requiereEnsamblado));
     }, [machiningProcesses, pieces]);
 
@@ -180,55 +180,136 @@ export default function SubprocessesPage() {
     const totalDeclared = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
 
     const handleSaveProduction = async () => {
-        if (!firestore || !selectedPieceId || totalDeclared <= 0 || !user) {
+        if (!firestore || !selectedPieceId || totalDeclared <= 0 || !user || !pieces) {
             toast({ title: "Error", description: "Selecciona una pieza y declara al menos una cantidad.", variant: "destructive" });
             return;
         }
     
         setIsSaving(true);
+        const piece = pieces.find(p => p.id === selectedPieceId);
+        if (!piece) {
+            toast({ title: "Error", description: "Pieza seleccionada no válida.", variant: "destructive" });
+            setIsSaving(false);
+            return;
+        }
         
         try {
             const batch = writeBatch(firestore);
             
-            const lotsForPiece = (machiningProcesses || []).filter(p => p.pieceId === selectedPieceId && p.qtyEnviada > 0);
-            const stockEnProveedor = lotsForPiece.reduce((sum, lot) => sum + lot.qtyEnviada, 0);
-            
-            const totalToDeductFromProvider = quantities.qtyMecanizada + quantities.qtySegregada + quantities.qtyScrapMecanizado;
-
-            if (totalToDeductFromProvider > stockEnProveedor) {
-                 throw new Error(`Cantidad declarada (${totalToDeductFromProvider}) supera el stock en proveedor (${stockEnProveedor}).`);
-            }
-    
-            const sortedLots = lotsForPiece
+            const lotsForPiece = (machiningProcesses || [])
+                .filter(p => p.pieceId === selectedPieceId && (p.qtyEnviada > 0 || (p.qtyEnProcesoEnsamblado || 0) > 0))
                 .map(lot => ({ ...lot, remitoDate: remitos?.find(r => r.id === lot.remitoId)?.fecha || '9999' }))
                 .sort((a, b) => a.remitoDate.localeCompare(b.remitoDate));
 
-            let remainingToDeduct = totalToDeductFromProvider;
-            for (const lot of sortedLots) {
-                if (remainingToDeduct <= 0) break;
-                const lotDocRef = doc(firestore, 'machining', lot.id);
-                const deductable = Math.min(remainingToDeduct, lot.qtyEnviada);
+            let { qtyMecanizada, qtyEnsamblada, qtySegregada, qtyScrapMecanizado, qtyScrapEnsamblado } = quantities;
+
+            // --- Logic for pieces requiring assembly ---
+            if (piece.requiereEnsamblado) {
+                // Fulfilling qtyMecanizada: Moves from Bruto to EnProceso
+                let remainingToMachine = qtyMecanizada;
+                for (const lot of lotsForPiece) {
+                    if (remainingToMachine <= 0) break;
+                    const availableInLot = lot.qtyEnviada;
+                    const amountToProcess = Math.min(remainingToMachine, availableInLot);
+                    if (amountToProcess > 0) {
+                        const lotDocRef = doc(firestore, 'machining', lot.id);
+                        batch.update(lotDocRef, {
+                            qtyEnviada: increment(-amountToProcess),
+                            qtyEnProcesoEnsamblado: increment(amountToProcess)
+                        });
+                        remainingToMachine -= amountToProcess;
+                        lot.qtyEnviada -= amountToProcess; // Update local state for next loop
+                    }
+                }
                 
-                batch.update(lotDocRef, { 
-                    qtyEnviada: increment(-deductable),
-                    status: (lot.qtyEnviada - deductable) > 0 ? 'En Proceso' : 'Finalizado',
-                    qtyMecanizada: increment((quantities.qtyMecanizada / totalToDeductFromProvider) * deductable),
-                    qtyEnsamblada: increment(quantities.qtyEnsamblada),
-                    qtySegregada: increment((quantities.qtySegregada / totalToDeductFromProvider) * deductable),
-                    qtyScrapMecanizado: increment(quantities.qtyScrapMecanizado),
-                    qtyScrapEnsamblado: increment(quantities.qtyScrapEnsamblado),
-                });
-                remainingToDeduct -= deductable;
+                // Fulfilling qtyEnsamblada: Consumes first from EnProceso, then from Bruto
+                let remainingToAssemble = qtyEnsamblada;
+                // 1. Consume from EnProceso
+                for (const lot of lotsForPiece) {
+                    if (remainingToAssemble <= 0) break;
+                    const availableInLot = lot.qtyEnProcesoEnsamblado || 0;
+                    const amountToProcess = Math.min(remainingToAssemble, availableInLot);
+                    if (amountToProcess > 0) {
+                        const lotDocRef = doc(firestore, 'machining', lot.id);
+                        batch.update(lotDocRef, {
+                            qtyEnProcesoEnsamblado: increment(-amountToProcess),
+                            qtyEnsamblada: increment(amountToProcess)
+                        });
+                        remainingToAssemble -= amountToProcess;
+                        lot.qtyEnProcesoEnsamblado = (lot.qtyEnProcesoEnsamblado || 0) - amountToProcess;
+                    }
+                }
+                // 2. Consume from Bruto if still needed
+                for (const lot of lotsForPiece) {
+                     if (remainingToAssemble <= 0) break;
+                     const availableInLot = lot.qtyEnviada;
+                     const amountToProcess = Math.min(remainingToAssemble, availableInLot);
+                     if (amountToProcess > 0) {
+                         const lotDocRef = doc(firestore, 'machining', lot.id);
+                         batch.update(lotDocRef, {
+                             qtyEnviada: increment(-amountToProcess),
+                             qtyEnsamblada: increment(amountToProcess)
+                         });
+                         remainingToAssemble -= amountToProcess;
+                         lot.qtyEnviada -= amountToProcess;
+                     }
+                }
+
+            } else { // --- Logic for pieces NOT requiring assembly ---
+                // Fulfilling qtyMecanizada: Moves from Bruto to MecanizadoOK
+                 let remainingToMachine = qtyMecanizada;
+                 for (const lot of lotsForPiece) {
+                    if (remainingToMachine <= 0) break;
+                    const availableInLot = lot.qtyEnviada;
+                    const amountToProcess = Math.min(remainingToMachine, availableInLot);
+                    if (amountToProcess > 0) {
+                        const lotDocRef = doc(firestore, 'machining', lot.id);
+                        batch.update(lotDocRef, {
+                            qtyEnviada: increment(-amountToProcess),
+                            qtyMecanizada: increment(amountToProcess)
+                        });
+                        remainingToMachine -= amountToProcess;
+                        lot.qtyEnviada -= amountToProcess;
+                    }
+                 }
             }
 
-            if (quantities.qtySegregada > 0) {
+            // --- Common logic for Segregation and Scrap ---
+            let remainingToSegregate = qtySegregada + qtyScrapMecanizado + qtyScrapEnsamblado;
+             for (const lot of lotsForPiece) {
+                if (remainingToSegregate <= 0) break;
+                 const availableInLot = lot.qtyEnviada;
+                 const amountToProcess = Math.min(remainingToSegregate, availableInLot);
+                 if (amountToProcess > 0) {
+                     const lotDocRef = doc(firestore, 'machining', lot.id);
+                     batch.update(lotDocRef, { qtyEnviada: increment(-amountToProcess) });
+                     remainingToSegregate -= amountToProcess;
+                 }
+             }
+
+             if (qtySegregada > 0) {
                 const qualityLotData: Omit<QualityLot, 'id'> = {
                     createdAt: new Date().toISOString(), createdBy: user.uid, pieceId: selectedPieceId,
                     machineId: 'mecanizado-externo', turno: '', nroRack: 'N/A', defecto: 'Segregado en Proveedor',
-                    tipoControl: 'Dimensional/Visual', qtySegregada: quantities.qtySegregada, status: 'pending',
+                    tipoControl: 'Dimensional/Visual', qtySegregada: qtySegregada, status: 'pending',
                 };
                 const qualityLotRef = doc(collection(firestore, 'quality'));
                 batch.set(qualityLotRef, qualityLotData);
+            }
+
+            // Create a single machining process record for the declared scrap quantities
+            if (qtyScrapMecanizado > 0 || qtyScrapEnsamblado > 0) {
+                const scrapDeclarationId = `scrap-${Date.now()}-${selectedPieceId}`;
+                 const scrapDocRef = doc(firestore, 'machining', scrapDeclarationId);
+                 batch.set(scrapDocRef, {
+                    id: scrapDeclarationId,
+                    remitoId: 'N/A', // No specific remito for this scrap record
+                    pieceId: selectedPieceId,
+                    qtyEnviada: 0,
+                    status: 'Finalizado',
+                    qtyScrapMecanizado: qtyScrapMecanizado,
+                    qtyScrapEnsamblado: qtyScrapEnsamblado
+                 }, { merge: true });
             }
     
             await batch.commit();
@@ -269,24 +350,26 @@ export default function SubprocessesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Pieza</TableHead>
-                <TableHead className="text-right">Pendiente de Mecanizado</TableHead>
-                <TableHead className="text-right">Pendiente de Ensamblado</TableHead>
+                <TableHead className="text-right">Stock en Bruto</TableHead>
+                <TableHead className="text-right">En Proceso</TableHead>
+                <TableHead className="text-right">Mecanizado OK</TableHead>
                 <TableHead className="text-right">Ensamblado OK</TableHead>
                 <TableHead className="text-right">En Calidad</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-               {isLoading && (<TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" /></TableCell></TableRow>)}
+               {isLoading && (<TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" /></TableCell></TableRow>)}
                {!isLoading && supplierStock.map((item) => (
                   <TableRow key={item.pieceId}>
                     <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
-                    <TableCell className="text-right font-semibold">{item.pendienteMecanizado.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-semibold">{item.pendienteEnsamblado.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-semibold">{item.stockBruto.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-semibold">{item.enProceso.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-bold text-green-600">{item.mecanizadoOK.toLocaleString()}</TableCell>
                     <TableCell className="text-right font-bold text-green-600">{item.ensambladoOK.toLocaleString()}</TableCell>
                     <TableCell className="text-right font-semibold text-destructive">{item.enCalidad.toLocaleString()}</TableCell>
                   </TableRow>
                 ))}
-                {!isLoading && supplierStock.length === 0 && (<TableRow><TableCell colSpan={5} className="h-24 text-center text-muted-foreground">No hay piezas en proceso de mecanizado.</TableCell></TableRow>)}
+                {!isLoading && supplierStock.length === 0 && (<TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No hay piezas en proceso de mecanizado.</TableCell></TableRow>)}
             </TableBody>
           </Table>
         </CardContent>
@@ -465,6 +548,7 @@ export default function SubprocessesPage() {
     </main>
   );
 }
+
 
 
 
