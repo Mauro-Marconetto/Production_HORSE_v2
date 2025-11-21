@@ -249,7 +249,8 @@ export default function QualityPage() {
         const inventoryDocRef = doc(firestore, 'inventory', selectedLot.pieceId);
         const inventoryUpdateData = {
             stockListo: increment(quantities.qtyAptaCalidad),
-            stockInyectado: increment(quantities.qtyAptaSinPrensarCalidad)
+            stockInyectado: increment(quantities.qtyAptaSinPrensarCalidad),
+            stockPendienteCalidad: increment(-selectedLot.qtySegregada), // Decrement from pending
         };
         batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
         
@@ -291,6 +292,8 @@ export default function QualityPage() {
         setIsSaving(true);
         
         try {
+            const batch = writeBatch(firestore);
+
             const segregationData: Omit<QualityLot, 'id'> = {
                 turno: segregateForm.turno as QualityLot['turno'],
                 nroRack: segregateForm.nroRack,
@@ -305,9 +308,19 @@ export default function QualityPage() {
                 machineId: segregateForm.origen === 'Pertrak' ? 'mecanizado-externo' : segregateForm.machineId,
                 moldId: segregateForm.origen === 'Pertrak' ? '' : segregateForm.moldId,
             };
-            await addDoc(collection(firestore, 'quality'), segregationData);
+            const qualityLotRef = doc(collection(firestore, 'quality'));
+            batch.set(qualityLotRef, segregationData);
 
-            toast({ title: "Éxito", description: "Lote segregado creado y pendiente de inspección." });
+            // Update inventory
+            const inventoryDocRef = doc(firestore, 'inventory', finalPieceId);
+            batch.set(inventoryDocRef, {
+                stockPendienteCalidad: increment(qtyToSegregate)
+            }, { merge: true });
+            
+
+            await batch.commit();
+
+            toast({ title: "Éxito", description: "Lote segregado creado y stock de calidad actualizado." });
             setIsSegregateDialogOpen(false);
             setSegregateForm({ turno: '', machineId: '', moldId: '', pieceId: '', nroRack: '', defecto: '', defectoOtro: '', tipoControl: '', qtySegregada: '', origen: 'Interno' });
             forceRefresh();
@@ -325,6 +338,9 @@ export default function QualityPage() {
         if (!firestore || !user || !lotToEdit) return;
 
         const formData = new FormData(e.currentTarget);
+        const originalQty = lotToEdit.qtySegregada;
+        const newQty = Number(formData.get('qtySegregada'));
+        const qtyDifference = newQty - originalQty;
         
         const pieceId = molds?.find(m => m.id === (formData.get('moldId') as string))?.pieces[0];
         if (!pieceId) {
@@ -333,6 +349,8 @@ export default function QualityPage() {
         }
         
         setIsSaving(true);
+        const batch = writeBatch(firestore);
+
         const updatedData: Partial<QualityLot> = {
             turno: formData.get('turno') as QualityLot['turno'],
             machineId: formData.get('machineId') as string,
@@ -341,23 +359,34 @@ export default function QualityPage() {
             defecto: formData.get('defecto') as string,
             defectoOtro: formData.get('defecto') === 'Otros' ? formData.get('defectoOtro') as string : '',
             tipoControl: formData.get('tipoControl') as string,
-            qtySegregada: Number(formData.get('qtySegregada')),
+            qtySegregada: newQty,
             pieceId: pieceId,
         };
 
         const lotDocRef = doc(firestore, 'quality', lotToEdit.id);
+        batch.update(lotDocRef, updatedData);
+
+        // Update inventory if the quantity has changed
+        if (qtyDifference !== 0) {
+            const inventoryDocRef = doc(firestore, 'inventory', pieceId);
+            batch.set(inventoryDocRef, {
+                stockPendienteCalidad: increment(qtyDifference)
+            }, { merge: true });
+        }
         
-        updateDoc(lotDocRef, updatedData)
-            .then(() => {
-                toast({ title: "Éxito", description: "Lote segregado actualizado correctamente." });
-                setIsDetailDialogOpen(false);
-                setLotToEdit(null);
-            })
-            .catch((error) => {
-                const contextualError = new FirestorePermissionError({ path: lotDocRef.path, operation: 'update', requestResourceData: updatedData });
-                errorEmitter.emit('permission-error', contextualError);
-            })
-            .finally(() => { setIsSaving(false); });
+        
+        try {
+            await batch.commit();
+            toast({ title: "Éxito", description: "Lote segregado actualizado correctamente." });
+            setIsDetailDialogOpen(false);
+            setLotToEdit(null);
+            forceRefresh();
+        } catch (error) {
+            const contextualError = new FirestorePermissionError({ path: lotDocRef.path, operation: 'update', requestResourceData: updatedData });
+            errorEmitter.emit('permission-error', contextualError);
+        } finally {
+            setIsSaving(false);
+        }
     }
 
     const isLoading = isLoadingQuality || isLoadingMachines || isLoadingMolds || isLoadingPieces;
@@ -773,4 +802,3 @@ export default function QualityPage() {
     </main>
   );
 }
-
