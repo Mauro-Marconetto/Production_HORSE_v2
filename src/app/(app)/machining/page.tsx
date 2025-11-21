@@ -48,6 +48,7 @@ export default function SubprocessesPage() {
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(piecesQuery);
 
     const [date, setDate] = useState<DateRange | undefined>();
+    const [historyDate, setHistoryDate] = useState<DateRange | undefined>();
     
     const remitosQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -60,7 +61,14 @@ export default function SubprocessesPage() {
     }, [firestore, date]);
     const { data: remitos, isLoading: isLoadingRemitos } = useCollection<Remito>(remitosQuery);
     
-    const qualityQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'quality'), where('machineId', '==', 'mecanizado-externo')) : null, [firestore]);
+    const qualityQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        let q = query(collection(firestore, 'quality'), where('machineId', '==', 'mecanizado-externo'), orderBy('createdAt', 'desc'));
+        if (historyDate?.from && historyDate?.to) {
+             q = query(q, where("createdAt", ">=", historyDate.from.toISOString()), where("createdAt", "<=", addDays(historyDate.to, 1).toISOString()));
+        }
+        return q;
+    }, [firestore, historyDate]);
     const { data: qualityLots, isLoading: isLoadingQuality } = useCollection<QualityLot>(qualityQuery);
 
 
@@ -95,7 +103,6 @@ export default function SubprocessesPage() {
             if (current) {
                 current.pendienteMecanizado += proc.qtyEnviada;
                 current.pendienteEnsamblado += proc.qtyMecanizada || 0;
-                current.enCalidad += proc.qtySegregada || 0;
             }
         });
         
@@ -104,8 +111,7 @@ export default function SubprocessesPage() {
              qualityLots.forEach(lot => {
                 const current = stockMap.get(lot.pieceId);
                 if (current && lot.status === 'pending') {
-                    // This logic might need refinement based on how returns from quality are handled
-                    // For now, it just shows what's currently segregated.
+                    current.enCalidad += lot.qtySegregada;
                 }
              });
         }
@@ -118,10 +124,23 @@ export default function SubprocessesPage() {
     
     const machiningHistory = useMemo(() => {
         if (!machiningProcesses) return [];
-        return machiningProcesses.filter(p => 
+        let filteredProcesses = machiningProcesses.filter(p => 
             p.qtyMecanizada || p.qtyEnsamblada || p.qtySegregada || p.qtyScrapMecanizado || p.qtyScrapEnsamblado
         );
-    }, [machiningProcesses]);
+
+        if (historyDate?.from && historyDate?.to && qualityLots) {
+            const qualityLotIds = new Set(qualityLots.map(lot => lot.id));
+            // This is an approximation. A better way would be to timestamp declarations in the machining doc.
+            // For now, we filter based on if a related quality lot falls in the date range.
+            filteredProcesses = filteredProcesses.filter(p => {
+                const relatedQualityLot = qualityLots.find(ql => ql.pieceId === p.pieceId); // Simplified logic
+                return !!relatedQualityLot;
+            })
+        }
+        
+        return filteredProcesses;
+
+    }, [machiningProcesses, qualityLots, historyDate]);
 
 
     const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingQuality;
@@ -274,6 +293,59 @@ export default function SubprocessesPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+             <div className="flex items-start justify-between">
+                <div>
+                    <CardTitle>Historial de Declaraciones de Mecanizado</CardTitle>
+                    <CardDescription>
+                        Producción y scrap declarado en proveedores externos.
+                    </CardDescription>
+                </div>
+                 <Popover>
+                    <PopoverTrigger asChild>
+                        <Button id="history-date" variant={"outline"} className={cn("w-[260px] justify-start text-left font-normal",!historyDate && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {historyDate?.from ? (historyDate.to ? (<> {format(historyDate.from, "LLL dd, y")} - {format(historyDate.to, "LLL dd, y")} </>) : (format(historyDate.from, "LLL dd, y"))) : (<span>Filtrar por fecha</span>)}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                        <Calendar initialFocus mode="range" defaultMonth={historyDate?.from} selected={historyDate} onSelect={setHistoryDate} numberOfMonths={2}/>
+                    </PopoverContent>
+                </Popover>
+            </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Pieza</TableHead>
+                    <TableHead className="text-right">Mecanizado OK</TableHead>
+                    <TableHead className="text-right">Ensamblado OK</TableHead>
+                    <TableHead className="text-right">Segregado</TableHead>
+                    <TableHead className="text-right text-destructive">Scrap Mecanizado</TableHead>
+                    <TableHead className="text-right text-destructive">Scrap Ensamblado</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {isLoading && <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /></TableCell></TableRow>}
+                {!isLoading && machiningHistory.map((item) => {
+                    return (
+                        <TableRow key={item.id}>
+                            <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
+                            <TableCell className="text-right">{(item.qtyMecanizada || 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{(item.qtyEnsamblada || 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{(item.qtySegregada || 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-destructive">{(item.qtyScrapMecanizado || 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-destructive">{(item.qtyScrapEnsamblado || 0).toLocaleString()}</TableCell>
+                        </TableRow>
+                    );
+                })}
+                {!isLoading && machiningHistory.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No hay declaraciones de mecanizado.</TableCell></TableRow>}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
        <Card>
         <CardHeader>
@@ -328,49 +400,6 @@ export default function SubprocessesPage() {
         </CardContent>
       </Card>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Historial de Declaraciones de Mecanizado</CardTitle>
-          <CardDescription>
-            Producción y scrap declarado en proveedores externos.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead>Pieza</TableHead>
-                    <TableHead>Remito Origen</TableHead>
-                    <TableHead className="text-right">Mecanizado OK</TableHead>
-                    <TableHead className="text-right">Ensamblado OK</TableHead>
-                    <TableHead className="text-right">Segregado</TableHead>
-                    <TableHead className="text-right">Scrap Mecanizado</TableHead>
-                    <TableHead className="text-right">Scrap Ensamblado</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {isLoading && <TableRow><TableCell colSpan={7} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /></TableCell></TableRow>}
-                {!isLoading && machiningHistory.map((item) => {
-                    const remito = remitos?.find(r => r.id === item.remitoId);
-                    return (
-                        <TableRow key={item.id}>
-                            <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
-                            <TableCell className="font-mono text-xs">{remito?.numero ? `0008-${String(remito.numero).padStart(8, '0')}` : item.remitoId.slice(0, 8)}</TableCell>
-                            <TableCell className="text-right">{item.qtyMecanizada?.toLocaleString() || 0}</TableCell>
-                            <TableCell className="text-right">{item.qtyEnsamblada?.toLocaleString() || 0}</TableCell>
-                            <TableCell className="text-right">{item.qtySegregada?.toLocaleString() || 0}</TableCell>
-                            <TableCell className="text-right text-destructive">{item.qtyScrapMecanizado?.toLocaleString() || 0}</TableCell>
-                            <TableCell className="text-right text-destructive">{item.qtyScrapEnsamblado?.toLocaleString() || 0}</TableCell>
-                        </TableRow>
-                    );
-                })}
-                {!isLoading && machiningHistory.length === 0 && <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No hay declaraciones de mecanizado.</TableCell></TableRow>}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-2xl flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
@@ -401,7 +430,7 @@ export default function SubprocessesPage() {
                             ))}
                         </div>
                         <div className="grid grid-cols-3 gap-2">
-                             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => ( <Button key={n} variant="outline" className="h-full text-xl font-bold" onClick={() => handleNumericButton(n)}>{n}</Button> ))}
+                             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => ( <Button key={n} variant="outline" className="h-full text-xl font-bold" onClick={() => handleNumericButton(n)}>{n}</Button>))}
                             <Button variant="outline" className="h-full text-xl font-bold" onClick={handleClear}>C</Button>
                             <Button variant="outline" className="h-full text-xl font-bold" onClick={() => handleNumericButton('0')}>0</Button>
                             <Button variant="outline" className="h-full text-xl font-bold" onClick={handleBackspace}>←</Button>
