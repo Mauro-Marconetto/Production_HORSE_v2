@@ -8,7 +8,7 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2 } from "lucide-react";
-import type { Production, Piece, Client } from "@/lib/types";
+import type { Production, Piece, Client, MachiningProcess } from "@/lib/types";
 import { format } from 'date-fns';
 
 interface AggregatedScrapEntry {
@@ -35,74 +35,82 @@ export default function ScrapHistoryPage() {
             ? query(collection(firestore, 'production'), orderBy('fechaISO', 'desc')) 
             : null,
     [firestore]);
-
     const { data: productionWithScrap, isLoading: isLoadingProduction } = useCollection<Production>(scrapProductionQuery);
+    
+    const machiningQuery = useMemoFirebase(() => firestore ? collection(firestore, 'machining') : null, [firestore]);
+    const { data: machiningProcesses, isLoading: isLoadingMachining } = useCollection<MachiningProcess>(machiningQuery);
 
-    const isLoading = isLoadingPieces || isLoadingClients || isLoadingProduction;
+
+    const isLoading = isLoadingPieces || isLoadingClients || isLoadingProduction || isLoadingMachining;
 
     const aggregatedScrap = useMemo(() => {
-        if (!productionWithScrap) return [];
-
         const scrapEntries: AggregatedScrapEntry[] = [];
 
-        productionWithScrap.forEach(prod => {
-            const monthYear = format(new Date(prod.fechaISO), 'yyyy-MM');
-            
-            if (prod.qtyScrap > 0) {
-                scrapEntries.push({
-                    id: `${prod.id}-prod`,
-                    periodo: monthYear,
-                    pieceId: prod.pieceId,
-                    qty: prod.qtyScrap,
-                    origen: prod.machineId === 'prensado-manual' ? 'Prensado Manual' : 'Producción Interna',
-                    causa: 'N/A',
-                });
-            }
-            if (prod.qtyScrapCalidad > 0) {
-                 scrapEntries.push({
-                    id: `${prod.id}-calidad`,
-                    periodo: monthYear,
-                    pieceId: prod.pieceId,
-                    qty: prod.qtyScrapCalidad,
-                    origen: 'Inspección de Calidad',
-                    causa: prod.defecto || 'Sin especificar',
-                });
-            }
-             if (prod.qtyArranque > 0) {
-                 scrapEntries.push({
-                    id: `${prod.id}-arranque`,
-                    periodo: monthYear,
-                    pieceId: prod.pieceId,
-                    qty: prod.qtyArranque,
-                    origen: 'Piezas de Arranque',
-                    causa: 'N/A',
-                });
-            }
-             if (prod.qtyScrapMecanizado > 0) {
-                scrapEntries.push({
-                    id: `${prod.id}-scrap-mecanizado`,
-                    periodo: monthYear,
-                    pieceId: prod.pieceId,
-                    qty: prod.qtyScrapMecanizado,
-                    origen: 'Mecanizado (Scrap)',
-                    causa: 'N/A',
-                });
-            }
-            if (prod.qtyScrapEnsamblado > 0) {
-                scrapEntries.push({
-                    id: `${prod.id}-scrap-ensamblado`,
-                    periodo: monthYear,
-                    pieceId: prod.pieceId,
-                    qty: prod.qtyScrapEnsamblado,
-                    origen: 'Ensamblado (Scrap)',
-                    causa: 'N/A',
-                });
-            }
-        });
+        if (productionWithScrap) {
+            productionWithScrap.forEach(prod => {
+                const monthYear = format(new Date(prod.fechaISO), 'yyyy-MM');
+                
+                if (prod.qtyScrap > 0) {
+                    scrapEntries.push({
+                        id: `${prod.id}-prod`,
+                        periodo: monthYear,
+                        pieceId: prod.pieceId,
+                        qty: prod.qtyScrap,
+                        origen: prod.machineId === 'prensado-manual' ? 'Prensado Manual' : 'Producción Interna',
+                        causa: 'N/A',
+                    });
+                }
+                if (prod.qtyScrapCalidad > 0) {
+                     scrapEntries.push({
+                        id: `${prod.id}-calidad`,
+                        periodo: monthYear,
+                        pieceId: prod.pieceId,
+                        qty: prod.qtyScrapCalidad,
+                        origen: 'Inspección de Calidad',
+                        causa: prod.defecto || 'Sin especificar',
+                    });
+                }
+                 if (prod.qtyArranque > 0) {
+                     scrapEntries.push({
+                        id: `${prod.id}-arranque`,
+                        periodo: monthYear,
+                        pieceId: prod.pieceId,
+                        qty: prod.qtyArranque,
+                        origen: 'Piezas de Arranque',
+                        causa: 'N/A',
+                    });
+                }
+            });
+        }
+        
+        if (machiningProcesses) {
+            machiningProcesses.forEach(proc => {
+                if(proc.qtyScrapMecanizado) {
+                    scrapEntries.push({
+                        id: `${proc.id}-scrap-mecanizado`,
+                        periodo: 'N/A', // We don't have a date for this yet, could be added to the model
+                        pieceId: proc.pieceId,
+                        qty: proc.qtyScrapMecanizado,
+                        origen: 'Mecanizado (Scrap)',
+                        causa: 'N/A'
+                    });
+                }
+                if(proc.qtyScrapEnsamblado) {
+                     scrapEntries.push({
+                        id: `${proc.id}-scrap-ensamblado`,
+                        periodo: 'N/A',
+                        pieceId: proc.pieceId,
+                        qty: proc.qtyScrapEnsamblado,
+                        origen: 'Ensamblado (Scrap)',
+                        causa: 'N/A'
+                    });
+                }
+            })
+        }
 
         // Further aggregation could be done here if needed, but for now we list all sources.
         return scrapEntries.sort((a,b) => b.periodo.localeCompare(a.periodo));
-    }, [productionWithScrap]);
+    }, [productionWithScrap, machiningProcesses]);
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getClientName = (pieceId: string) => {
@@ -172,3 +180,5 @@ export default function ScrapHistoryPage() {
     </main>
   );
 }
+
+    

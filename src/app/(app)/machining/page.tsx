@@ -212,7 +212,13 @@ export default function SubprocessesPage() {
                     
                     batch.update(lotDocRef, { 
                         qtyEnviada: increment(-deductable),
-                        status: (lot.qtyEnviada - deductable) > 0 ? 'En Proceso' : 'Finalizado'
+                        status: (lot.qtyEnviada - deductable) > 0 ? 'En Proceso' : 'Finalizado',
+                        qtyMecanizada: increment(quantities.qtyMecanizada),
+                        qtyEnsamblada: increment(quantities.qtyEnsamblada),
+                        qtyScrapMecanizado: increment(quantities.qtyScrapMecanizado),
+                        qtyScrapEnsamblado: increment(quantities.qtyScrapEnsamblado),
+                        qtySegregada: increment(quantities.qtySegregada),
+
                     });
                     remainingToDeductFromLots -= deductable;
                 }
@@ -223,17 +229,6 @@ export default function SubprocessesPage() {
                 stockMecanizado: increment(qtyMecanizada),
                 stockEnsamblado: increment(qtyEnsamblada),
             }, { merge: true });
-
-            // --- CREATE PRODUCTION RECORD ---
-            const prodDocRef = doc(collection(firestore, "production"));
-            const productionRecord: Partial<Production> = {
-                fechaISO: new Date().toISOString(),
-                machineId: 'mecanizado-externo',
-                pieceId: selectedPieceId,
-                subproceso: 'mecanizado',
-                ...quantities
-            };
-            batch.set(prodDocRef, productionRecord);
             
             // --- CREATE QUALITY LOT if segregated ---
             if (qtySegregada > 0) {
@@ -251,6 +246,9 @@ export default function SubprocessesPage() {
                 };
                 const qualityLotRef = doc(collection(firestore, 'quality'));
                 batch.set(qualityLotRef, qualityLotData);
+                 batch.set(inventoryDocRef, {
+                    stockPendienteCalidad: increment(qtySegregada)
+                }, { merge: true });
             }
     
             await batch.commit();
@@ -525,4 +523,5 @@ export default function SubprocessesPage() {
 
 
 
+    
     
