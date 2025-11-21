@@ -63,12 +63,9 @@ export default function SubprocessesPage() {
     
     const qualityQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        let q = query(collection(firestore, 'quality'), where('machineId', '==', 'mecanizado-externo'), orderBy('createdAt', 'desc'));
-        if (historyDate?.from && historyDate?.to) {
-             q = query(q, where("createdAt", ">=", historyDate.from.toISOString()), where("createdAt", "<=", addDays(historyDate.to, 1).toISOString()));
-        }
-        return q;
-    }, [firestore, historyDate]);
+        // Simplified query to avoid composite index requirement
+        return query(collection(firestore, 'quality'), orderBy('createdAt', 'desc'));
+    }, [firestore]);
     const { data: qualityLots, isLoading: isLoadingQuality } = useCollection<QualityLot>(qualityQuery);
 
 
@@ -110,7 +107,7 @@ export default function SubprocessesPage() {
         if (qualityLots) {
              qualityLots.forEach(lot => {
                 const current = stockMap.get(lot.pieceId);
-                if (current && lot.status === 'pending') {
+                if (current && lot.status === 'pending' && lot.machineId === 'mecanizado-externo') {
                     current.enCalidad += lot.qtySegregada;
                 }
              });
@@ -128,14 +125,23 @@ export default function SubprocessesPage() {
             p.qtyMecanizada || p.qtyEnsamblada || p.qtySegregada || p.qtyScrapMecanizado || p.qtyScrapEnsamblado
         );
 
+        // Client-side filtering
         if (historyDate?.from && historyDate?.to && qualityLots) {
-            const qualityLotIds = new Set(qualityLots.map(lot => lot.id));
-            // This is an approximation. A better way would be to timestamp declarations in the machining doc.
-            // For now, we filter based on if a related quality lot falls in the date range.
-            filteredProcesses = filteredProcesses.filter(p => {
-                const relatedQualityLot = qualityLots.find(ql => ql.pieceId === p.pieceId); // Simplified logic
-                return !!relatedQualityLot;
-            })
+            const from = historyDate.from;
+            const to = addDays(historyDate.to, 1);
+
+            // This logic is an approximation, as machining declarations don't have a timestamp.
+            // We can filter by finding a related quality lot within the date range.
+            const qualityLotsInRange = new Set(
+                qualityLots
+                    .filter(lot => {
+                        const lotDate = new Date(lot.createdAt);
+                        return lotDate >= from && lotDate < to;
+                    })
+                    .map(lot => lot.pieceId) 
+            );
+
+            filteredProcesses = filteredProcesses.filter(p => qualityLotsInRange.has(p.pieceId));
         }
         
         return filteredProcesses;
@@ -466,3 +472,4 @@ export default function SubprocessesPage() {
     </main>
   );
 }
+
