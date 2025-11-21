@@ -255,34 +255,9 @@ export default function QualityPage() {
         };
         batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
 
-        // 3. Find and Update original Production record
         try {
-            const lotCreationDate = new Date(selectedLot.createdAt);
-            const startOfLotDay = startOfDay(lotCreationDate).toISOString();
-            const endOfLotDay = endOfDay(lotCreationDate).toISOString();
-
-            const prodQuery = query(collection(firestore, 'production'), 
-                where('machineId', '==', selectedLot.machineId),
-                where('pieceId', '==', selectedLot.pieceId),
-                where('turno', '==', selectedLot.turno),
-                where('fechaISO', '>=', startOfLotDay),
-                where('fechaISO', '<=', endOfLotDay),
-            );
-
-            const prodSnapshot = await getDocs(prodQuery);
-            if (!prodSnapshot.empty) {
-                const prodDoc = prodSnapshot.docs[0];
-                const prodRef = prodDoc.ref;
-                batch.update(prodRef, {
-                    qtyAptaCalidad: increment(quantities.qtyAptaCalidad),
-                    qtyAptaSinPrensarCalidad: increment(quantities.qtyAptaSinPrensarCalidad),
-                    qtyScrapCalidad: increment(quantities.qtyScrapCalidad),
-                    inspeccionadoCalidad: true,
-                });
-            }
-
             await batch.commit();
-            toast({ title: "Éxito", description: "Inspección de calidad guardada y stock/producción actualizados." });
+            toast({ title: "Éxito", description: "Inspección de calidad guardada y stock actualizado." });
             handleCloseInspectionDialog();
             forceRefresh();
         } catch (error) {
@@ -828,6 +803,7 @@ export default function QualityPage() {
     </main>
   );
 }
+
 
 
 
