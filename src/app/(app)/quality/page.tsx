@@ -141,7 +141,7 @@ export default function QualityPage() {
     useEffect(() => {
         if (selectedLot) {
             let initialQuantities = { 
-                qtyAptaCalidad: 0, 
+                qtyAptaCalidad: 0,
                 qtyAptaSinPrensarCalidad: 0, 
                 qtyScrapCalidad: 0 
             };
@@ -238,7 +238,7 @@ export default function QualityPage() {
         
         // 1. Update Quality Lot
         const lotDocRef = doc(firestore, 'quality', selectedLot.id);
-        const updatedLotData = {
+        const updatedLotData: Partial<QualityLot> = {
             ...quantities,
             status: 'inspected',
             inspectionDate: new Date().toISOString(),
@@ -274,10 +274,9 @@ export default function QualityPage() {
                 const prodDoc = prodSnapshot.docs[0];
                 const prodRef = prodDoc.ref;
                 batch.update(prodRef, {
-                    qtyFinalizada: increment(quantities.qtyAptaCalidad),
-                    qtySinPrensar: increment(quantities.qtyAptaSinPrensarCalidad),
-                    qtyScrap: increment(quantities.qtyScrapCalidad),
-                    qtySegregada: increment(-selectedLot.qtySegregada),
+                    qtyAptaCalidad: increment(quantities.qtyAptaCalidad),
+                    qtyAptaSinPrensarCalidad: increment(quantities.qtyAptaSinPrensarCalidad),
+                    qtyScrapCalidad: increment(quantities.qtyScrapCalidad),
                     inspeccionadoCalidad: true,
                 });
             }
@@ -829,5 +828,6 @@ export default function QualityPage() {
     </main>
   );
 }
+
 
 
