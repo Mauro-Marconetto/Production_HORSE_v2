@@ -104,17 +104,18 @@ export default function StockPage() {
             const stockEnsamblado = invItem?.stockEnsamblado || 0;
             const stockPendiente = pendingQualityStock.get(piece.id) || 0;
 
+            // Logic correction: If piece only needs machining, 'stockMecanizado' should be 'stockListo'.
             if (!piece.requiereEnsamblado && stockMecanizado > 0) {
               stockListo += stockMecanizado;
-              stockMecanizado = 0;
+              stockMecanizado = 0; // It's now moved to Listo, so we zero it out for the "Mecanizado" state.
             }
             
-
             const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo + stockEnsamblado + stockPendiente;
 
             if (stockInyectado > 0) rows.push({ piece, state: 'Sin Prensar', stock: stockInyectado, totalStockForPiece: totalStock });
             if (stockEnMecanizado > 0) rows.push({ piece, state: 'En Mecanizado', stock: stockEnMecanizado, totalStockForPiece: totalStock });
-            if (stockMecanizado > 0) rows.push({ piece, state: 'Mecanizado', stock: stockMecanizado, totalStockForPiece: totalStock });
+            // Only show "Mecanizado" as a state if it has stock and requires further assembly.
+            if (stockMecanizado > 0 && piece.requiereEnsamblado) rows.push({ piece, state: 'Mecanizado', stock: stockMecanizado, totalStockForPiece: totalStock });
             if (stockGranallado > 0) rows.push({ piece, state: 'Granallado', stock: stockGranallado, totalStockForPiece: totalStock });
             if (stockListo > 0) rows.push({ piece, state: 'Listo', stock: stockListo, totalStockForPiece: totalStock });
             if (stockEnsamblado > 0) rows.push({ piece, state: 'Ensamblado', stock: stockEnsamblado, totalStockForPiece: totalStock });
@@ -609,4 +610,5 @@ export default function StockPage() {
         </main>
     );
 }
+
 
