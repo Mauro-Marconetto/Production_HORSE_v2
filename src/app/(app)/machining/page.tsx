@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useMemo, useState, useEffect } from "react";
@@ -139,7 +138,7 @@ export default function SubprocessesPage() {
     
     const piecesInMachining = useMemo(() => {
         if (!machiningProcesses || !pieces) return [];
-        const pieceIds = [...new Set(machiningProcesses.filter(p => p.qtyEnviada > 0 || p.qtyEnProcesoEnsamblado > 0).map(p => p.pieceId))];
+        const pieceIds = [...new Set(machiningProcesses.filter(p => p.qtyEnviada > 0 || (p.qtyEnProcesoEnsamblado || 0) > 0).map(p => p.pieceId))];
         return pieces.filter(p => pieceIds.includes(p.id) && (p.requiereMecanizado || p.requiereEnsamblado));
     }, [machiningProcesses, pieces]);
 
@@ -303,6 +302,7 @@ export default function SubprocessesPage() {
                     pieceId: selectedPieceId,
                     qtyEnviada: 0,
                     status: 'Finalizado',
+                    // This is where qtyMecanizada for non-assembly parts is recorded
                     qtyMecanizada: piece.requiereEnsamblado ? 0 : qtyMecanizada,
                     qtyEnsamblada: qtyEnsamblada,
                     qtySegregada: qtySegregada,
@@ -311,6 +311,17 @@ export default function SubprocessesPage() {
                  }, { merge: true });
             }
     
+            // *** NEW LOGIC: UPDATE INVENTORY COLLECTION ***
+            const inventoryDocRef = doc(firestore, 'inventory', selectedPieceId);
+            const inventoryUpdateData = {
+                // For pieces that only need machining, qtyMecanizada goes to stockMecanizado.
+                stockMecanizado: increment(piece.requiereEnsamblado ? 0 : qtyMecanizada),
+                // For pieces that need assembly, qtyEnsamblada goes to stockEnsamblado.
+                stockEnsamblado: increment(qtyEnsamblada),
+            };
+            batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
+
+
             await batch.commit();
             toast({ title: "Éxito", description: "Producción de mecanizado declarada y stock actualizado." });
             setIsDialogOpen(false);
@@ -380,7 +391,7 @@ export default function SubprocessesPage() {
         <CardHeader>
              <div className="flex items-start justify-between">
                 <div>
-                    <CardTitle>Historial de Declaraciones de Produccion</CardTitle>
+                    <CardTitle>Historial de Declaraciones de Producción</CardTitle>
                     <CardDescription>
                         Producción y scrap declarado en proveedores externos.
                     </CardDescription>
@@ -560,3 +571,5 @@ export default function SubprocessesPage() {
   );
 }
 
+
+    
