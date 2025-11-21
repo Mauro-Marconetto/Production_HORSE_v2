@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle, PlusCircle, Loader2, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Production, Machine, Mold, Piece, UserProfile } from "@/lib/types";
+import type { Production, Machine, Mold, Piece, UserProfile, QualityLot } from "@/lib/types";
 import { isToday, isWithinInterval } from "date-fns";
 
 type ProductionStep = 'selection' | 'declaration' | 'summary';
@@ -68,6 +69,9 @@ export default function ProductionPage() {
 
     const inventoryCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
     const { data: inventory, isLoading: isLoadingInventory } = useCollection<any>(inventoryCollection);
+    
+    const qualityQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'quality'), where('status', '==', 'pending')) : null, [firestore]);
+    const { data: pendingQualityLots, isLoading: isLoadingQuality } = useCollection<QualityLot>(qualityQuery);
 
 
     const [isProdDialogOpen, setIsProdDialogOpen] = useState(false);
@@ -455,7 +459,23 @@ export default function ProductionPage() {
     const isStep1Valid = turno && machineId && (selectedMachine?.type === 'inyectora' ? moldId : pieceId);
     const totalDeclaredInSession = prodQuantities.qtyFinalizada + prodQuantities.qtySinPrensar + prodQuantities.qtyScrap + (prodQuantities.qtyArranque || 0);
     const canEditProduction = userProfile?.role === 'Admin' || userProfile?.role === 'Editor de Producción';
-    const previousSegregatedQty = existingProduction?.qtySegregada || 0;
+    
+    const currentPieceId = useMemo(() => {
+        let pId = pieceId;
+        if (selectedMachine?.type === 'inyectora') {
+            pId = molds?.find(m => m.id === moldId)?.pieces[0] || '';
+        }
+        return pId;
+    }, [pieceId, moldId, molds, selectedMachine]);
+
+    const previousSegregatedQty = useMemo(() => {
+        if (!pendingQualityLots || !currentPieceId) return 0;
+        
+        return pendingQualityLots
+            .filter(lot => lot.pieceId === currentPieceId)
+            .reduce((sum, lot) => sum + lot.qtySegregada, 0);
+
+    }, [pendingQualityLots, currentPieceId]);
 
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
