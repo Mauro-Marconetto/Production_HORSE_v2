@@ -96,7 +96,7 @@ export default function SubprocessesPage() {
         const stockMap = new Map<string, { pendienteMecanizado: number, pendienteEnsamblado: number, enCalidad: number, ensambladoOK: number }>();
 
         pieces.forEach(piece => {
-            if (piece.requiereMecanizado) {
+            if (piece.requiereMecanizado || piece.requiereEnsamblado) {
                  stockMap.set(piece.id, { pendienteMecanizado: 0, pendienteEnsamblado: 0, enCalidad: 0, ensambladoOK: 0 });
             }
         });
@@ -144,7 +144,7 @@ export default function SubprocessesPage() {
     const piecesInMachining = useMemo(() => {
         if (!machiningProcesses || !pieces) return [];
         const pieceIds = [...new Set(machiningProcesses.filter(p => p.qtyEnviada > 0).map(p => p.pieceId))];
-        return pieces.filter(p => pieceIds.includes(p.id));
+        return pieces.filter(p => pieceIds.includes(p.id) && (p.requiereMecanizado || p.requiereEnsamblado));
     }, [machiningProcesses, pieces]);
 
 
@@ -465,5 +465,6 @@ export default function SubprocessesPage() {
     </main>
   );
 }
+
 
 
