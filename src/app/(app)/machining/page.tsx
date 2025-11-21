@@ -63,9 +63,15 @@ export default function SubprocessesPage() {
     
     const qualityQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        // Simplified query to avoid composite index requirement
-        return query(collection(firestore, 'quality'), orderBy('createdAt', 'desc'));
-    }, [firestore]);
+        let baseQuery = query(collection(firestore, 'quality'), orderBy('createdAt', 'desc'));
+        if (historyDate?.from) {
+             baseQuery = query(baseQuery, where('createdAt', '>=', historyDate.from.toISOString()));
+        }
+        if (historyDate?.to) {
+             baseQuery = query(baseQuery, where('createdAt', '<=', addDays(historyDate.to, 1).toISOString()));
+        }
+        return baseQuery;
+    }, [firestore, historyDate]);
     const { data: qualityLots, isLoading: isLoadingQuality } = useCollection<QualityLot>(qualityQuery);
 
 
@@ -87,11 +93,11 @@ export default function SubprocessesPage() {
 
     const supplierStock = useMemo(() => {
         if (!pieces || !machiningProcesses) return [];
-        const stockMap = new Map<string, { pendienteMecanizado: number, pendienteEnsamblado: number, enCalidad: number }>();
+        const stockMap = new Map<string, { pendienteMecanizado: number, pendienteEnsamblado: number, enCalidad: number, ensambladoOK: number }>();
 
         pieces.forEach(piece => {
             if (piece.requiereMecanizado) {
-                 stockMap.set(piece.id, { pendienteMecanizado: 0, pendienteEnsamblado: 0, enCalidad: 0 });
+                 stockMap.set(piece.id, { pendienteMecanizado: 0, pendienteEnsamblado: 0, enCalidad: 0, ensambladoOK: 0 });
             }
         });
         
@@ -100,6 +106,7 @@ export default function SubprocessesPage() {
             if (current) {
                 current.pendienteMecanizado += proc.qtyEnviada;
                 current.pendienteEnsamblado += proc.qtyMecanizada || 0;
+                current.ensambladoOK += proc.qtyEnsamblada || 0;
             }
         });
         
@@ -121,29 +128,11 @@ export default function SubprocessesPage() {
     
     const machiningHistory = useMemo(() => {
         if (!machiningProcesses) return [];
+        
         let filteredProcesses = machiningProcesses.filter(p => 
             p.qtyMecanizada || p.qtyEnsamblada || p.qtySegregada || p.qtyScrapMecanizado || p.qtyScrapEnsamblado
         );
 
-        // Client-side filtering
-        if (historyDate?.from && historyDate?.to && qualityLots) {
-            const from = historyDate.from;
-            const to = addDays(historyDate.to, 1);
-
-            // This logic is an approximation, as machining declarations don't have a timestamp.
-            // We can filter by finding a related quality lot within the date range.
-            const qualityLotsInRange = new Set(
-                qualityLots
-                    .filter(lot => {
-                        const lotDate = new Date(lot.createdAt);
-                        return lotDate >= from && lotDate < to;
-                    })
-                    .map(lot => lot.pieceId) 
-            );
-
-            filteredProcesses = filteredProcesses.filter(p => qualityLotsInRange.has(p.pieceId));
-        }
-        
         return filteredProcesses;
 
     }, [machiningProcesses, qualityLots, historyDate]);
@@ -224,8 +213,10 @@ export default function SubprocessesPage() {
                     qtyEnviada: increment(-deductable),
                     status: (lot.qtyEnviada - deductable) > 0 ? 'En Proceso' : 'Finalizado',
                     qtyMecanizada: increment((quantities.qtyMecanizada / totalToDeductFromProvider) * deductable),
+                    qtyEnsamblada: increment(quantities.qtyEnsamblada),
                     qtySegregada: increment((quantities.qtySegregada / totalToDeductFromProvider) * deductable),
-                    qtyScrapMecanizado: increment((quantities.qtyScrapMecanizado / totalToDeductFromProvider) * deductable),
+                    qtyScrapMecanizado: increment(quantities.qtyScrapMecanizado),
+                    qtyScrapEnsamblado: increment(quantities.qtyScrapEnsamblado),
                 });
                 remainingToDeduct -= deductable;
             }
@@ -280,20 +271,22 @@ export default function SubprocessesPage() {
                 <TableHead>Pieza</TableHead>
                 <TableHead className="text-right">Pendiente de Mecanizado</TableHead>
                 <TableHead className="text-right">Pendiente de Ensamblado</TableHead>
+                <TableHead className="text-right">Ensamblado OK</TableHead>
                 <TableHead className="text-right">En Calidad</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-               {isLoading && (<TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" /></TableCell></TableRow>)}
+               {isLoading && (<TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" /></TableCell></TableRow>)}
                {!isLoading && supplierStock.map((item) => (
                   <TableRow key={item.pieceId}>
                     <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
                     <TableCell className="text-right font-semibold">{item.pendienteMecanizado.toLocaleString()}</TableCell>
                     <TableCell className="text-right font-semibold">{item.pendienteEnsamblado.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-bold text-green-600">{item.ensambladoOK.toLocaleString()}</TableCell>
                     <TableCell className="text-right font-semibold text-destructive">{item.enCalidad.toLocaleString()}</TableCell>
                   </TableRow>
                 ))}
-                {!isLoading && supplierStock.length === 0 && (<TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">No hay piezas en proceso de mecanizado.</TableCell></TableRow>)}
+                {!isLoading && supplierStock.length === 0 && (<TableRow><TableCell colSpan={5} className="h-24 text-center text-muted-foreground">No hay piezas en proceso de mecanizado.</TableCell></TableRow>)}
             </TableBody>
           </Table>
         </CardContent>
@@ -329,8 +322,8 @@ export default function SubprocessesPage() {
                     <TableHead className="text-right">Mecanizado OK</TableHead>
                     <TableHead className="text-right">Ensamblado OK</TableHead>
                     <TableHead className="text-right">Segregado</TableHead>
-                    <TableHead className="text-right text-destructive">Scrap Mecanizado</TableHead>
-                    <TableHead className="text-right text-destructive">Scrap Ensamblado</TableHead>
+                    <TableHead className="text-right text-destructive">MMU (Mecanizado)</TableHead>
+                    <TableHead className="text-right text-destructive">MMU (Ensamblado)</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -472,4 +465,5 @@ export default function SubprocessesPage() {
     </main>
   );
 }
+
 
