@@ -245,7 +245,6 @@ export default function SubprocessesPage() {
                         const lotDocRef = doc(firestore, 'machining', lot.id);
                         batch.update(lotDocRef, {
                             qtyEnProcesoEnsamblado: increment(-amountToProcess),
-                            qtyEnsamblada: increment(amountToProcess)
                         });
                         remainingToAssemble -= amountToProcess;
                         lot.qtyEnProcesoEnsamblado = (lot.qtyEnProcesoEnsamblado || 0) - amountToProcess;
@@ -260,7 +259,6 @@ export default function SubprocessesPage() {
                          const lotDocRef = doc(firestore, 'machining', lot.id);
                          batch.update(lotDocRef, {
                              qtyEnviada: increment(-amountToProcess),
-                             qtyEnsamblada: increment(amountToProcess)
                          });
                          remainingToAssemble -= amountToProcess;
                          lot.qtyEnviada -= amountToProcess;
@@ -278,7 +276,6 @@ export default function SubprocessesPage() {
                         const lotDocRef = doc(firestore, 'machining', lot.id);
                         batch.update(lotDocRef, {
                             qtyEnviada: increment(-amountToProcess),
-                            qtyMecanizada: increment(amountToProcess)
                         });
                         remainingToMachine -= amountToProcess;
                         lot.qtyEnviada -= amountToProcess;
@@ -319,7 +316,7 @@ export default function SubprocessesPage() {
                     pieceId: selectedPieceId,
                     qtyEnviada: 0,
                     status: 'Finalizado',
-                    qtyMecanizada: piece.requiereEnsamblado ? 0 : qtyMecanizada,
+                    qtyMecanizada: qtyMecanizada,
                     qtyEnsamblada: qtyEnsamblada,
                     qtySegregada: qtySegregada,
                     qtyScrapMecanizado: qtyScrapMecanizado,
@@ -447,8 +444,8 @@ export default function SubprocessesPage() {
                         <TableRow key={item.id}>
                             <TableCell>{formattedDate}</TableCell>
                             <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
-                            <TableCell className="text-right">{(!isQualityLot && !(item as MachiningProcess).qtyScrapMecanizado ? (item as MachiningProcess).qtyMecanizada || 0 : 0).toLocaleString()}</TableCell>
-                            <TableCell className="text-right">{(!isQualityLot && !(item as MachiningProcess).qtyScrapEnsamblado ? (item as MachiningProcess).qtyEnsamblada || 0 : 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{(!isQualityLot ? (item as MachiningProcess).qtyMecanizada || 0 : 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{(!isQualityLot ? (item as MachiningProcess).qtyEnsamblada || 0 : 0).toLocaleString()}</TableCell>
                             <TableCell className="text-right">{(item.qtySegregada || 0).toLocaleString()}</TableCell>
                             <TableCell className="text-right text-destructive">{(!isQualityLot ? (item as MachiningProcess).qtyScrapMecanizado || 0 : 0).toLocaleString()}</TableCell>
                             <TableCell className="text-right text-destructive">{(!isQualityLot ? (item as MachiningProcess).qtyScrapEnsamblado || 0 : 0).toLocaleString()}</TableCell>
@@ -593,4 +590,3 @@ export default function SubprocessesPage() {
 
 
 
-    
