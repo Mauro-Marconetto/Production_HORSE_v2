@@ -46,6 +46,12 @@ export default function StockPage() {
     const inventoryCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
     const { data: inventory, isLoading: isLoadingInventory, forceRefresh } = useCollection<Inventory>(inventoryCollection);
     
+    const qualityQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'quality'), where('status', '==', 'pending')) : null, [firestore]);
+    const { data: pendingQualityLots, isLoading: isLoadingQuality } = useCollection<QualityLot>(qualityQuery);
+
+    const machiningQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'machining')) : null, [firestore]);
+    const { data: machiningProcesses, isLoading: isLoadingMachining } = useCollection<MachiningProcess>(machiningQuery);
+
     const suppliersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'suppliers') : null, [firestore]);
     const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<Supplier>(suppliersCollection);
     
@@ -64,21 +70,40 @@ export default function StockPage() {
     const [isSaving, setIsSaving] = useState(false);
     
     const inventoryData = useMemo((): InventoryRow[] => {
-        if (!pieces || !inventory) return [];
+        if (!pieces || !inventory || !machiningProcesses) return [];
         
         const rows: InventoryRow[] = [];
+
+        const pendingQualityStock = new Map<string, number>();
+        if(pendingQualityLots) {
+            pendingQualityLots.forEach(lot => {
+                pendingQualityStock.set(lot.pieceId, (pendingQualityStock.get(lot.pieceId) || 0) + lot.qtySegregada);
+            });
+        }
+        
+        const machiningStock = new Map<string, number>();
+        machiningProcesses.forEach(proc => {
+            machiningStock.set(proc.pieceId, (machiningStock.get(proc.pieceId) || 0) + proc.qtyEnviada);
+        });
+
 
         pieces.forEach(piece => {
             const invItem = inventory.find(i => i.id === piece.id);
             
             const stockInyectado = invItem?.stockInyectado || 0;
-            const stockEnMecanizado = invItem?.stockEnMecanizado || 0;
-            const stockMecanizado = invItem?.stockMecanizado || 0;
+            const stockEnMecanizado = machiningStock.get(piece.id) || 0;
+            
+            let stockMecanizado = invItem?.stockMecanizado || 0;
             const stockGranallado = invItem?.stockGranallado || 0;
-            const stockListo = invItem?.stockListo || 0;
+            let stockListo = invItem?.stockListo || 0;
             const stockEnsamblado = invItem?.stockEnsamblado || 0;
-            const stockPendiente = invItem?.stockPendienteCalidad || 0;
+            const stockPendiente = pendingQualityStock.get(piece.id) || 0;
 
+            if (!piece.requiereEnsamblado && stockMecanizado > 0) {
+              stockListo += stockMecanizado;
+              stockMecanizado = 0;
+            }
+            
             const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo + stockEnsamblado + stockPendiente;
 
             if (stockInyectado > 0) rows.push({ piece, state: 'Sin Prensar', stock: stockInyectado, totalStockForPiece: totalStock });
@@ -96,9 +121,9 @@ export default function StockPage() {
         });
 
         return rows;
-    }, [pieces, inventory]);
+    }, [pieces, inventory, pendingQualityLots, machiningProcesses]);
     
-    const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers || isLoadingClients;
+    const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers || isLoadingQuality || isLoadingClients || isLoadingMachining;
 
     const handleCreateRemito = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -152,7 +177,6 @@ export default function StockPage() {
                 const inventoryDocRef = doc(firestore, "inventory", item.pieceId);
                 batch.update(inventoryDocRef, {
                     stockListo: increment(-item.qty),
-                    stockEnMecanizado: increment(item.qty)
                 });
                 
                 const machiningId = `machining-${Date.now()}-${item.pieceId}`;
@@ -267,7 +291,7 @@ export default function StockPage() {
         switch(state) {
             case 'Sin Prensar': return 'outline';
             case 'En Mecanizado': return 'destructive';
-            case 'Mecanizado': return 'secondary';
+            case 'Mecanizado': return 'default';
             case 'Granallado': return 'secondary';
             case 'Pendiente Calidad': return 'destructive';
             case 'Listo': return 'default';
@@ -408,7 +432,7 @@ export default function StockPage() {
                                             <Select value={item.pieceId} onValueChange={(v) => updateRemitoItem(index, 'pieceId', v)}>
                                                 <SelectTrigger className="flex-1"><SelectValue placeholder="Selecciona pieza..." /></SelectTrigger>
                                                 <SelectContent>
-                                                    {pieces?.filter(p => p.requiereMecanizado).map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
+                                                    {pieces?.filter(p => p.requiereMecanizado || p.requiereEnsamblado).map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
                                             <Input 
