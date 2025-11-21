@@ -282,6 +282,7 @@ export default function QualityPage() {
                 if (matchingProdDoc) {
                     const prodDocRef = matchingProdDoc.ref;
                     batch.update(prodDocRef, {
+                        qtySegregada: increment(-selectedLot.qtySegregada), // Decrement the segregated quantity
                         qtyFinalizada: increment(quantities.qtyAptaCalidad),
                         qtySinPrensar: increment(quantities.qtyAptaSinPrensarCalidad),
                         qtyScrap: increment(quantities.qtyScrapCalidad),
@@ -299,7 +300,7 @@ export default function QualityPage() {
             handleCloseInspectionDialog();
             forceRefresh();
         } catch (error) {
-             const contextualError = new FirestorePermissionError({ path: 'quality or inventory', operation: 'update', requestResourceData: {lotId: selectedLot.id, ...quantities} });
+             const contextualError = new FirestorePermissionError({ path: 'quality or inventory or production', operation: 'update', requestResourceData: {lotId: selectedLot.id, ...quantities} });
              errorEmitter.emit('permission-error', contextualError);
         } finally {
             setIsSaving(false);
@@ -864,3 +865,6 @@ export default function QualityPage() {
 
 
 
+
+
+    
