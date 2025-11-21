@@ -5,6 +5,7 @@
 
 
 
+
 export interface Client {
   id: string;
   nombre: string;
@@ -153,6 +154,10 @@ export interface Production {
   createdBy?: string; // UID of user who declared production
   lastEditedBy?: string; // UID of user who last edited
   subproceso?: 'mecanizado' | 'granallado';
+
+  // Quality related fields
+  qtySegregada?: number;
+  inspeccionadoCalidad?: boolean;
 
   // Machining specific fields
   qtyMecanizada?: number;

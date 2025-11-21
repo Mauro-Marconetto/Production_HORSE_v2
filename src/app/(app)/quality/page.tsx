@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
-import { collection, doc, updateDoc, query, orderBy, addDoc, writeBatch, setDoc, increment } from 'firebase/firestore';
+import { collection, doc, updateDoc, query, orderBy, addDoc, writeBatch, setDoc, increment, getDocs, where } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Check, Edit, Loader2, Calendar as CalendarIcon, PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Production, Machine, Mold, Piece, Inventory, QualityLot } from "@/lib/types";
-import { addDays, format, isWithinInterval } from "date-fns";
+import { addDays, format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 
@@ -115,7 +115,7 @@ export default function QualityPage() {
         turno: '',
         machineId: '',
         moldId: '',
-        pieceId: '', // Added for Pertrak
+        pieceId: '', 
         nroRack: '',
         defecto: '',
         defectoOtro: '',
@@ -131,7 +131,7 @@ export default function QualityPage() {
 
     const inspectionFields = useMemo(() => {
         const machine = getMachineForLot(selectedLot);
-        if (machine?.type === 'granalladora') {
+        if (machine?.type === 'granalladora' || selectedLot?.machineId === 'mecanizado-externo') {
              return allInspectionFields.filter(field => field.key !== 'qtyAptaSinPrensarCalidad');
         }
         return allInspectionFields;
@@ -236,6 +236,7 @@ export default function QualityPage() {
         setIsSaving(true);
         const batch = writeBatch(firestore);
         
+        // 1. Update Quality Lot
         const lotDocRef = doc(firestore, 'quality', selectedLot.id);
         const updatedLotData = {
             ...quantities,
@@ -245,6 +246,7 @@ export default function QualityPage() {
         };
         batch.update(lotDocRef, updatedLotData);
 
+        // 2. Update Inventory
         const inventoryDocRef = doc(firestore, 'inventory', selectedLot.pieceId);
         const inventoryUpdateData = {
             stockListo: increment(quantities.qtyAptaCalidad),
@@ -252,10 +254,36 @@ export default function QualityPage() {
             stockPendienteCalidad: increment(-selectedLot.qtySegregada), // Decrement from pending
         };
         batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
-        
+
+        // 3. Find and Update original Production record
         try {
+            const lotCreationDate = new Date(selectedLot.createdAt);
+            const startOfLotDay = startOfDay(lotCreationDate).toISOString();
+            const endOfLotDay = endOfDay(lotCreationDate).toISOString();
+
+            const prodQuery = query(collection(firestore, 'production'), 
+                where('machineId', '==', selectedLot.machineId),
+                where('pieceId', '==', selectedLot.pieceId),
+                where('turno', '==', selectedLot.turno),
+                where('fechaISO', '>=', startOfLotDay),
+                where('fechaISO', '<=', endOfLotDay),
+            );
+
+            const prodSnapshot = await getDocs(prodQuery);
+            if (!prodSnapshot.empty) {
+                const prodDoc = prodSnapshot.docs[0];
+                const prodRef = prodDoc.ref;
+                batch.update(prodRef, {
+                    qtyFinalizada: increment(quantities.qtyAptaCalidad),
+                    qtySinPrensar: increment(quantities.qtyAptaSinPrensarCalidad),
+                    qtyScrap: increment(quantities.qtyScrapCalidad),
+                    qtySegregada: increment(-selectedLot.qtySegregada),
+                    inspeccionadoCalidad: true,
+                });
+            }
+
             await batch.commit();
-            toast({ title: "Éxito", description: "Inspección de calidad guardada y stock actualizado." });
+            toast({ title: "Éxito", description: "Inspección de calidad guardada y stock/producción actualizados." });
             handleCloseInspectionDialog();
             forceRefresh();
         } catch (error) {
@@ -801,4 +829,5 @@ export default function QualityPage() {
     </main>
   );
 }
+
 
