@@ -68,24 +68,17 @@ export default function SubprocessesPage() {
         to: new Date(),
     });
 
-    const productionHistoryQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, "production"), orderBy("fechaISO", "desc"));
-    }, [firestore]);
-    const { data: allProduction, isLoading: isLoadingHistory } = useCollection<Production>(productionHistoryQuery);
-
 
     const machiningHistory = useMemo(() => {
-        if (!allProduction) return [];
-        return allProduction.filter(p => {
-             if (p.subproceso !== 'mecanizado') return false;
-             if (!date?.from) return true;
-             const prodDate = new Date(p.fechaISO);
-             const fromDate = date.from;
-             const toDate = date.to ? addDays(date.to, 1) : addDays(fromDate, 1);
-             return prodDate >= fromDate && prodDate < toDate;
-        });
-    }, [allProduction, date]);
+        if (!machiningProcesses) return [];
+        // Filter for processes that have some declared quantities
+        return machiningProcesses.filter(p => 
+            (p.qtyMecanizada || 0) > 0 ||
+            (p.qtyEnsamblada || 0) > 0 ||
+            (p.qtyScrapMecanizado || 0) > 0 ||
+            (p.qtyScrapEnsamblado || 0) > 0
+        );
+    }, [machiningProcesses]);
 
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -103,7 +96,7 @@ export default function SubprocessesPage() {
     const [isSaving, setIsSaving] = useState(false);
     
 
-    const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingInventory || isLoadingHistory;
+    const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingInventory;
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     
     const activeLots = useMemo(() => {
@@ -337,49 +330,13 @@ export default function SubprocessesPage() {
                     Registros de producción y scrap declarados para procesos externos.
                   </CardDescription>
                 </div>
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        id="date"
-                        variant={"outline"}
-                        className={cn(
-                        "w-[260px] justify-start text-left font-normal",
-                        !date && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date?.from ? (
-                        date.to ? (
-                            <>
-                            {format(date.from, "LLL dd, y")} -{" "}
-                            {format(date.to, "LLL dd, y")}
-                            </>
-                        ) : (
-                            format(date.from, "LLL dd, y")
-                        )
-                        ) : (
-                        <span>Selecciona un rango</span>
-                        )}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar
-                        initialFocus
-                        mode="range"
-                        defaultMonth={date?.from}
-                        selected={date}
-                        onSelect={setDate}
-                        numberOfMonths={2}
-                    />
-                    </PopoverContent>
-                </Popover>
           </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha Declaración</TableHead>
+                <TableHead>Remito</TableHead>
                 <TableHead>Pieza</TableHead>
                 <TableHead className="text-right">Mecanizadas (OK)</TableHead>
                 <TableHead className="text-right">Ensambladas (OK)</TableHead>
@@ -388,24 +345,26 @@ export default function SubprocessesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-                {isLoadingHistory && (
+                {isLoading && (
                     <TableRow>
                         <TableCell colSpan={6} className="h-24 text-center">
                             <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                         </TableCell>
                     </TableRow>
                 )}
-                {!isLoadingHistory && machiningHistory?.map(prod => (
-                    <TableRow key={prod.id}>
-                        <TableCell>{new Date(prod.fechaISO).toLocaleString('es-AR')}</TableCell>
-                        <TableCell>{getPieceCode(prod.pieceId)}</TableCell>
-                        <TableCell className="text-right">{((prod.qtyMecanizada || 0)).toLocaleString()}</TableCell>
-                        <TableCell className="text-right">{((prod.qtyEnsamblada || 0)).toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-destructive">{((prod.qtyScrapMecanizado || 0)).toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-destructive">{((prod.qtyScrapEnsamblado || 0)).toLocaleString()}</TableCell>
+                {!isLoading && machiningHistory?.map(proc => {
+                    const remito = remitos?.find(r => r.id === proc.remitoId);
+                    return (
+                    <TableRow key={proc.id}>
+                        <TableCell className="font-mono text-xs">{remito?.numero ? `0008-${String(remito.numero).padStart(8, '0')}` : 'N/A'}</TableCell>
+                        <TableCell>{getPieceCode(proc.pieceId)}</TableCell>
+                        <TableCell className="text-right">{((proc.qtyMecanizada || 0)).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{((proc.qtyEnsamblada || 0)).toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-destructive">{((proc.qtyScrapMecanizado || 0)).toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-destructive">{((proc.qtyScrapEnsamblado || 0)).toLocaleString()}</TableCell>
                     </TableRow>
-                ))}
-                 {!isLoadingHistory && (!machiningHistory || machiningHistory.length === 0) && (
+                )})}
+                 {!isLoading && (!machiningHistory || machiningHistory.length === 0) && (
                     <TableRow>
                         <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                             No hay declaraciones de mecanizado en el rango seleccionado.
