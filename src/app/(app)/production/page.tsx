@@ -299,7 +299,7 @@ export default function ProductionPage() {
                 createdBy: user.uid,
                 fechaISO: new Date().toISOString(),
                 inspeccionadoCalidad: false,
-                qtySegregada: 0,
+                qtySegregada: previousSegregatedQty,
              };
              if (selectedMachine?.type === 'granalladora') {
                 productionData.subproceso = 'granallado';
@@ -881,3 +881,4 @@ export default function ProductionPage() {
     </main>
   );
 }
+
