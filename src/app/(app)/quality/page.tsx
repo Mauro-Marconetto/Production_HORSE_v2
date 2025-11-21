@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, Edit, Loader2, Calendar as CalendarIcon, PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Production, Machine, Mold, Piece, Inventory, QualityLot } from "@/lib/types";
+import type { Production, Machine, Mold, Piece, Inventory, QualityLot, MachiningProcess } from "@/lib/types";
 import { addDays, format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
@@ -69,6 +69,10 @@ export default function QualityPage() {
     const { data: machines, isLoading: isLoadingMachines } = useCollection<Machine>(useMemoFirebase(() => firestore ? collection(firestore, 'machines') : null, [firestore]));
     const { data: molds, isLoading: isLoadingMolds } = useCollection<Mold>(useMemoFirebase(() => firestore ? collection(firestore, 'molds') : null, [firestore]));
     const { data: pieces, isLoading: isLoadingPieces } = useCollection<Piece>(useMemoFirebase(() => firestore ? collection(firestore, 'pieces') : null, [firestore]));
+    
+    const machiningQuery = useMemoFirebase(() => firestore ? query(collection(firestore, "machining")) : null, [firestore]);
+    const { data: machiningProcesses, isLoading: isLoadingMachining } = useCollection<MachiningProcess>(machiningQuery);
+
 
     const [isInspectionDialogOpen, setIsInspectionDialogOpen] = useState(false);
     const [isSegregateDialogOpen, setIsSegregateDialogOpen] = useState(false);
@@ -257,35 +261,37 @@ export default function QualityPage() {
             };
             batch.set(inventoryDocRef, inventoryUpdateData, { merge: true });
 
-            // 3. Find and update the original Production document
-            const lotCreationDate = new Date(selectedLot.createdAt);
-            const startOfLotDay = startOfDay(lotCreationDate);
-            const endOfLotDay = endOfDay(lotCreationDate);
-            
-            const prodQuery = query(collection(firestore, 'production'),
-                where('machineId', '==', selectedLot.machineId),
-                where('pieceId', '==', selectedLot.pieceId),
-                where('turno', '==', selectedLot.turno),
-                where('createdAt', '>=', startOfLotDay),
-                where('createdAt', '<=', endOfLotDay),
-            );
+            // 3. Find and update the original Production document if it exists
+            if (selectedLot.machineId !== 'mecanizado-externo') {
+                const prodQuery = query(
+                    collection(firestore, 'production'),
+                    where('machineId', '==', selectedLot.machineId),
+                    where('pieceId', '==', selectedLot.pieceId),
+                    where('turno', '==', selectedLot.turno)
+                );
+                
+                const prodSnap = await getDocs(prodQuery);
+                const lotCreationDate = startOfDay(new Date(selectedLot.createdAt));
 
-            const prodSnap = await getDocs(prodQuery);
-            
-            if (!prodSnap.empty) {
-                const prodDoc = prodSnap.docs[0];
-                const prodDocRef = prodDoc.ref;
-                batch.update(prodDocRef, {
-                    qtyFinalizada: increment(quantities.qtyAptaCalidad),
-                    qtySinPrensar: increment(quantities.qtyAptaSinPrensarCalidad),
-                    qtyScrap: increment(quantities.qtyScrapCalidad),
-                    inspeccionadoCalidad: true,
-                    qtySegregada: 0,
+                // Find the specific production doc from the same day
+                const matchingProdDoc = prodSnap.docs.find(doc => {
+                    const prodDate = startOfDay(new Date(doc.data().fechaISO));
+                    return prodDate.getTime() === lotCreationDate.getTime();
                 });
-            } else if (selectedLot.machineId !== 'mecanizado-externo') {
-                // Only warn if it's not an external process, where a prod record might not exist
-                console.warn(`Could not find matching production document for quality lot ${selectedLot.id}`);
+
+                if (matchingProdDoc) {
+                    const prodDocRef = matchingProdDoc.ref;
+                    batch.update(prodDocRef, {
+                        qtyFinalizada: increment(quantities.qtyAptaCalidad),
+                        qtySinPrensar: increment(quantities.qtyAptaSinPrensarCalidad),
+                        qtyScrap: increment(quantities.qtyScrapCalidad),
+                        inspeccionadoCalidad: true,
+                    });
+                } else {
+                     console.warn(`Could not find matching production document for quality lot ${selectedLot.id}`);
+                }
             }
+
 
             await batch.commit();
 
@@ -321,6 +327,23 @@ export default function QualityPage() {
             toast({ title: "Error", description: "La cantidad a segregar debe ser mayor a cero.", variant: "destructive" });
             return;
         }
+
+        // Validation for external provider
+        if (segregateForm.origen === 'Pertrak' && machiningProcesses) {
+            const stockAtProvider = machiningProcesses
+                .filter(p => p.pieceId === finalPieceId && (p.status === 'Enviado' || p.status === 'En Proceso'))
+                .reduce((sum, p) => sum + p.qtyEnviada, 0);
+
+            if (qtyToSegregate > stockAtProvider) {
+                toast({ 
+                    title: "Error de Stock", 
+                    description: `La cantidad a segregar (${qtyToSegregate}) supera el stock disponible en el proveedor (${stockAtProvider}) para esta pieza.`, 
+                    variant: "destructive" 
+                });
+                return;
+            }
+        }
+
 
         setIsSaving(true);
         
@@ -422,7 +445,7 @@ export default function QualityPage() {
         }
     }
 
-    const isLoading = isLoadingQuality || isLoadingMachines || isLoadingMolds || isLoadingPieces;
+    const isLoading = isLoadingQuality || isLoadingMachines || isLoadingMolds || isLoadingPieces || isLoadingMachining;
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
     const getMachineName = (id: string) => machines?.find(m => m.id === id)?.nombre || 'N/A';
     const getMoldName = (id: string | undefined) => molds?.find(m => m.id === id)?.nombre || 'N/A';
@@ -835,6 +858,7 @@ export default function QualityPage() {
     </main>
   );
 }
+
 
 
 
