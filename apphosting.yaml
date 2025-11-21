@@ -16,3 +16,11 @@ backends:
       variables:
         NEXT_PUBLIC_EXPORT_ENABLED: "1"
 
+backends:
+  production:
+    branch: main
+    runConfig:
+      maxInstances: 1
+    environment:
+      variables:
+        NEXT_PUBLIC_EXPORT_ENABLED: "1"
