@@ -115,6 +115,14 @@ export default function SubprocessesPage() {
         }));
 
     }, [pieces, machiningProcesses, qualityLots]);
+    
+    const machiningHistory = useMemo(() => {
+        if (!machiningProcesses) return [];
+        return machiningProcesses.filter(p => 
+            p.qtyMecanizada || p.qtyEnsamblada || p.qtySegregada || p.qtyScrapMecanizado || p.qtyScrapEnsamblado
+        );
+    }, [machiningProcesses]);
+
 
     const isLoading = isLoadingMachining || isLoadingSuppliers || isLoadingPieces || isLoadingRemitos || isLoadingQuality;
     const getPieceCode = (pieceId: string) => pieces?.find(p => p.id === pieceId)?.codigo || 'N/A';
@@ -190,9 +198,9 @@ export default function SubprocessesPage() {
                 batch.update(lotDocRef, { 
                     qtyEnviada: increment(-deductable),
                     status: (lot.qtyEnviada - deductable) > 0 ? 'En Proceso' : 'Finalizado',
-                    qtyMecanizada: increment(quantities.qtyMecanizada * (deductable / totalToDeductFromProvider)),
-                    qtySegregada: increment(quantities.qtySegregada * (deductable / totalToDeductFromProvider)),
-                    qtyScrapMecanizado: increment(quantities.qtyScrapMecanizado * (deductable / totalToDeductFromProvider)),
+                    qtyMecanizada: increment((quantities.qtyMecanizada / totalToDeductFromProvider) * deductable),
+                    qtySegregada: increment((quantities.qtySegregada / totalToDeductFromProvider) * deductable),
+                    qtyScrapMecanizado: increment((quantities.qtyScrapMecanizado / totalToDeductFromProvider) * deductable),
                 });
                 remainingToDeduct -= deductable;
             }
@@ -232,6 +240,40 @@ export default function SubprocessesPage() {
             <PlusCircle className="mr-2 h-4 w-4" /> Declarar Producción
         </Button>
       </div>
+      
+       <Card>
+        <CardHeader>
+          <CardTitle>Estado de Lotes en Proveedor</CardTitle>
+          <CardDescription>
+            Visión en tiempo real de las cantidades de piezas en cada etapa del proceso externo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Pieza</TableHead>
+                <TableHead className="text-right">Pendiente de Mecanizado</TableHead>
+                <TableHead className="text-right">Pendiente de Ensamblado</TableHead>
+                <TableHead className="text-right">En Calidad</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+               {isLoading && (<TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" /></TableCell></TableRow>)}
+               {!isLoading && supplierStock.map((item) => (
+                  <TableRow key={item.pieceId}>
+                    <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
+                    <TableCell className="text-right font-semibold">{item.pendienteMecanizado.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-semibold">{item.pendienteEnsamblado.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-semibold text-destructive">{item.enCalidad.toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+                {!isLoading && supplierStock.length === 0 && (<TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">No hay piezas en proceso de mecanizado.</TableCell></TableRow>)}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
 
        <Card>
         <CardHeader>
@@ -285,35 +327,44 @@ export default function SubprocessesPage() {
           </Table>
         </CardContent>
       </Card>
-
+      
       <Card>
         <CardHeader>
-          <CardTitle>Estado de Lotes en Proveedor</CardTitle>
+          <CardTitle>Historial de Declaraciones de Mecanizado</CardTitle>
           <CardDescription>
-            Visión en tiempo real de las cantidades de piezas en cada etapa del proceso externo.
+            Producción y scrap declarado en proveedores externos.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Pieza</TableHead>
-                <TableHead className="text-right">Pendiente de Mecanizado</TableHead>
-                <TableHead className="text-right">Pendiente de Ensamblado</TableHead>
-                <TableHead className="text-right">En Calidad</TableHead>
-              </TableRow>
+                <TableRow>
+                    <TableHead>Pieza</TableHead>
+                    <TableHead>Remito Origen</TableHead>
+                    <TableHead className="text-right">Mecanizado OK</TableHead>
+                    <TableHead className="text-right">Ensamblado OK</TableHead>
+                    <TableHead className="text-right">Segregado</TableHead>
+                    <TableHead className="text-right">Scrap Mecanizado</TableHead>
+                    <TableHead className="text-right">Scrap Ensamblado</TableHead>
+                </TableRow>
             </TableHeader>
             <TableBody>
-               {isLoading && (<TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" /></TableCell></TableRow>)}
-               {!isLoading && supplierStock.map((item) => (
-                  <TableRow key={item.pieceId}>
-                    <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
-                    <TableCell className="text-right font-semibold">{item.pendienteMecanizado.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-semibold">{item.pendienteEnsamblado.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-semibold text-destructive">{item.enCalidad.toLocaleString()}</TableCell>
-                  </TableRow>
-                ))}
-                {!isLoading && supplierStock.length === 0 && (<TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">No hay piezas en proceso de mecanizado.</TableCell></TableRow>)}
+                {isLoading && <TableRow><TableCell colSpan={7} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /></TableCell></TableRow>}
+                {!isLoading && machiningHistory.map((item) => {
+                    const remito = remitos?.find(r => r.id === item.remitoId);
+                    return (
+                        <TableRow key={item.id}>
+                            <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
+                            <TableCell className="font-mono text-xs">{remito?.numero ? `0008-${String(remito.numero).padStart(8, '0')}` : item.remitoId.slice(0, 8)}</TableCell>
+                            <TableCell className="text-right">{item.qtyMecanizada?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="text-right">{item.qtyEnsamblada?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="text-right">{item.qtySegregada?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="text-right text-destructive">{item.qtyScrapMecanizado?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="text-right text-destructive">{item.qtyScrapEnsamblado?.toLocaleString() || 0}</TableCell>
+                        </TableRow>
+                    );
+                })}
+                {!isLoading && machiningHistory.length === 0 && <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No hay declaraciones de mecanizado.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
