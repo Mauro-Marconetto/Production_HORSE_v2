@@ -353,16 +353,21 @@ export default function SubprocessesPage() {
             </TableHeader>
             <TableBody>
                {isLoading && (<TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" /></TableCell></TableRow>)}
-               {!isLoading && supplierStock.map((item) => (
+               {!isLoading && supplierStock.map((item) => {
+                  const piece = pieces?.find(p => p.id === item.pieceId);
+                  const requiresAssembly = piece?.requiereEnsamblado;
+                  return (
                   <TableRow key={item.pieceId}>
                     <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
                     <TableCell className="text-right font-semibold">{item.stockBruto.toLocaleString()}</TableCell>
                     <TableCell className="text-right font-semibold">{item.enProceso.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-bold text-green-600">{item.mecanizadoOK.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-bold text-green-600">
+                        {requiresAssembly ? '-' : item.mecanizadoOK.toLocaleString()}
+                    </TableCell>
                     <TableCell className="text-right font-bold text-green-600">{item.ensambladoOK.toLocaleString()}</TableCell>
                     <TableCell className="text-right font-semibold text-destructive">{item.enCalidad.toLocaleString()}</TableCell>
                   </TableRow>
-                ))}
+                )})}
                 {!isLoading && supplierStock.length === 0 && (<TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No hay piezas en proceso de mecanizado.</TableCell></TableRow>)}
             </TableBody>
           </Table>
@@ -410,11 +415,12 @@ export default function SubprocessesPage() {
                     const isQualityLot = 'createdBy' in item;
                     const date = new Date((item as any).createdAt || (item as any).fecha || new Date());
                     const formattedDate = format(date, 'dd/MM/yyyy HH:mm');
+                    const mecanizadoOK = (item as MachiningProcess).qtyEnProcesoEnsamblado || (item as MachiningProcess).qtyMecanizada || 0;
                     return (
                         <TableRow key={item.id}>
                             <TableCell>{formattedDate}</TableCell>
                             <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
-                            <TableCell className="text-right">{(!isQualityLot ? ((item as MachiningProcess).qtyEnProcesoEnsamblado || (item as MachiningProcess).qtyMecanizada || 0) : 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{(!isQualityLot ? mecanizadoOK : 0).toLocaleString()}</TableCell>
                             <TableCell className="text-right">{(!isQualityLot ? (item as MachiningProcess).qtyEnsamblada || 0 : 0).toLocaleString()}</TableCell>
                             <TableCell className="text-right">{(item.qtySegregada || 0).toLocaleString()}</TableCell>
                             <TableCell className="text-right text-destructive">{(!isQualityLot ? (item as MachiningProcess).qtyScrapMecanizado || 0 : 0).toLocaleString()}</TableCell>
