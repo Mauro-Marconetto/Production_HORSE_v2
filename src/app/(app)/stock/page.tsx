@@ -88,7 +88,9 @@ export default function StockPage() {
         
         const machiningStock = new Map<string, number>();
         machiningProcesses.forEach(proc => {
-            machiningStock.set(proc.pieceId, (machiningStock.get(proc.pieceId) || 0) + proc.qtyEnviada);
+            if (proc.status === 'Enviado') {
+                machiningStock.set(proc.pieceId, (machiningStock.get(proc.pieceId) || 0) + proc.qtyEnviada);
+            }
         });
 
 
@@ -97,25 +99,17 @@ export default function StockPage() {
             
             const stockInyectado = invItem?.stockInyectado || 0;
             const stockEnMecanizado = machiningStock.get(piece.id) || 0;
-            
-            let stockMecanizado = invItem?.stockMecanizado || 0;
+            const stockMecanizado = invItem?.stockMecanizado || 0;
             const stockGranallado = invItem?.stockGranallado || 0;
-            let stockListo = invItem?.stockListo || 0;
+            const stockListo = invItem?.stockListo || 0;
             const stockEnsamblado = invItem?.stockEnsamblado || 0;
             const stockPendiente = pendingQualityStock.get(piece.id) || 0;
 
-            // Logic correction: If piece only needs machining, 'stockMecanizado' should be 'stockListo'.
-            if (!piece.requiereEnsamblado && stockMecanizado > 0) {
-              stockListo += stockMecanizado;
-              stockMecanizado = 0; // It's now moved to Listo, so we zero it out for the "Mecanizado" state.
-            }
-            
             const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo + stockEnsamblado + stockPendiente;
 
             if (stockInyectado > 0) rows.push({ piece, state: 'Sin Prensar', stock: stockInyectado, totalStockForPiece: totalStock });
             if (stockEnMecanizado > 0) rows.push({ piece, state: 'En Mecanizado', stock: stockEnMecanizado, totalStockForPiece: totalStock });
-            // Only show "Mecanizado" as a state if it has stock and requires further assembly.
-            if (stockMecanizado > 0 && piece.requiereEnsamblado) rows.push({ piece, state: 'Mecanizado', stock: stockMecanizado, totalStockForPiece: totalStock });
+            if (stockMecanizado > 0) rows.push({ piece, state: 'Mecanizado', stock: stockMecanizado, totalStockForPiece: totalStock });
             if (stockGranallado > 0) rows.push({ piece, state: 'Granallado', stock: stockGranallado, totalStockForPiece: totalStock });
             if (stockListo > 0) rows.push({ piece, state: 'Listo', stock: stockListo, totalStockForPiece: totalStock });
             if (stockEnsamblado > 0) rows.push({ piece, state: 'Ensamblado', stock: stockEnsamblado, totalStockForPiece: totalStock });
@@ -128,15 +122,16 @@ export default function StockPage() {
         });
         
         // Apply filters
+        let filteredRows = rows;
         if (filterPiece !== 'all') {
-            rows = rows.filter(row => row.piece.id === filterPiece);
+            filteredRows = filteredRows.filter(row => row.piece.id === filterPiece);
         }
         if (filterState !== 'all') {
-            rows = rows.filter(row => row.state === filterState);
+            filteredRows = filteredRows.filter(row => row.state === filterState);
         }
 
 
-        return rows;
+        return filteredRows;
     }, [pieces, inventory, pendingQualityLots, machiningProcesses, filterPiece, filterState]);
     
     const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers || isLoadingQuality || isLoadingClients || isLoadingMachining;
@@ -610,5 +605,6 @@ export default function StockPage() {
         </main>
     );
 }
+
 
 
