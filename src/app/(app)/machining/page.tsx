@@ -104,7 +104,7 @@ export default function SubprocessesPage() {
         machiningProcesses.forEach(proc => {
             const current = stockMap.get(proc.pieceId);
             if (current) {
-                current.stockBruto += proc.qtyEnviada;
+                current.stockBruto += proc.qtyEnviada || 0;
                 current.enProceso += proc.qtyEnProcesoEnsamblado || 0;
                 current.mecanizadoOK += proc.qtyMecanizada || 0;
                 current.ensambladoOK += proc.qtyEnsamblada || 0;
@@ -128,11 +128,11 @@ export default function SubprocessesPage() {
     
     const machiningHistory = useMemo(() => {
         if (!machiningProcesses && !qualityLots) return [];
-        let history: (MachiningProcess | QualityLot & { fecha: string })[] = [];
+        let history: (MachiningProcess | (QualityLot & { fecha: string }))[] = [];
 
         if (machiningProcesses) {
             const declarations = machiningProcesses.filter(p => 
-                p.qtyMecanizada || p.qtyEnsamblada || p.qtySegregada || p.qtyScrapMecanizado || p.qtyScrapEnsamblado
+                p.qtyEnProcesoEnsamblado || p.qtyMecanizada || p.qtyEnsamblada || p.qtySegregada || p.qtyScrapMecanizado || p.qtyScrapEnsamblado
             );
             history.push(...declarations);
         }
@@ -155,7 +155,7 @@ export default function SubprocessesPage() {
     
     const piecesInMachining = useMemo(() => {
         if (!machiningProcesses || !pieces) return [];
-        const pieceIds = [...new Set(machiningProcesses.filter(p => p.qtyEnviada > 0 || (p.qtyEnProcesoEnsamblado || 0) > 0).map(p => p.pieceId))];
+        const pieceIds = [...new Set(machiningProcesses.filter(p => (p.qtyEnviada || 0) > 0 || (p.qtyEnProcesoEnsamblado || 0) > 0).map(p => p.pieceId))];
         return pieces.filter(p => pieceIds.includes(p.id) && (p.requiereMecanizado || p.requiereEnsamblado));
     }, [machiningProcesses, pieces]);
 
@@ -209,32 +209,19 @@ export default function SubprocessesPage() {
             const batch = writeBatch(firestore);
             
             const lotsForPiece = (machiningProcesses || [])
-                .filter(p => p.pieceId === selectedPieceId && (p.qtyEnviada > 0 || (p.qtyEnProcesoEnsamblado || 0) > 0))
+                .filter(p => p.pieceId === selectedPieceId && ((p.qtyEnviada || 0) > 0 || (p.qtyEnProcesoEnsamblado || 0) > 0))
                 .map(lot => ({ ...lot, remitoDate: remitos?.find(r => r.id === lot.remitoId)?.fecha || '9999' }))
                 .sort((a, b) => a.remitoDate.localeCompare(b.remitoDate));
 
             let { qtyMecanizada, qtyEnsamblada, qtySegregada, qtyScrapMecanizado, qtyScrapEnsamblado } = quantities;
+            let totalToConsumeFromBruto = 0;
 
             // --- Logic for pieces requiring assembly ---
             if (piece.requiereEnsamblado) {
-                // Fulfilling qtyMecanizada: Moves from Bruto to EnProceso
-                let remainingToMachine = qtyMecanizada;
-                for (const lot of lotsForPiece) {
-                    if (remainingToMachine <= 0) break;
-                    const availableInLot = lot.qtyEnviada;
-                    const amountToProcess = Math.min(remainingToMachine, availableInLot);
-                    if (amountToProcess > 0) {
-                        const lotDocRef = doc(firestore, 'machining', lot.id);
-                        batch.update(lotDocRef, {
-                            qtyEnviada: increment(-amountToProcess),
-                            qtyEnProcesoEnsamblado: increment(amountToProcess)
-                        });
-                        remainingToMachine -= amountToProcess;
-                        lot.qtyEnviada -= amountToProcess; // Update local state for next step
-                    }
-                }
+                // Fulfilling qtyMecanizada simply moves stock from Bruto to a new "En Proceso" declaration
+                totalToConsumeFromBruto += qtyMecanizada;
                 
-                // Fulfilling qtyEnsamblada: Consumes first from EnProceso, then from Bruto
+                // Fulfilling qtyEnsamblada consumes first from existing "En Proceso", then from Bruto
                 let remainingToAssemble = qtyEnsamblada;
                 
                 // 1. Consume from EnProceso
@@ -242,58 +229,36 @@ export default function SubprocessesPage() {
                 for (const lot of lotsWithEnProceso) {
                     if (remainingToAssemble <= 0) break;
                     const availableInLot = lot.qtyEnProcesoEnsamblado || 0;
-                    const amountToProcess = Math.min(remainingToAssemble, availableInLot);
-                    if (amountToProcess > 0) {
+                    const amountToConsume = Math.min(remainingToAssemble, availableInLot);
+                    if (amountToConsume > 0) {
                         const lotDocRef = doc(firestore, 'machining', lot.id);
-                        batch.update(lotDocRef, {
-                            qtyEnProcesoEnsamblado: increment(-amountToProcess),
-                        });
-                        remainingToAssemble -= amountToProcess;
+                        batch.update(lotDocRef, { qtyEnProcesoEnsamblado: increment(-amountToConsume) });
+                        remainingToAssemble -= amountToConsume;
                     }
                 }
                  // 2. Consume from Bruto if still needed
                 if (remainingToAssemble > 0) {
-                    for (const lot of lotsForPiece) {
-                         if (remainingToAssemble <= 0) break;
-                         const availableInLot = lot.qtyEnviada;
-                         const amountToProcess = Math.min(remainingToAssemble, availableInLot);
-                         if (amountToProcess > 0) {
-                             const lotDocRef = doc(firestore, 'machining', lot.id);
-                             batch.update(lotDocRef, {
-                                 qtyEnviada: increment(-amountToProcess),
-                             });
-                             remainingToAssemble -= amountToProcess;
-                         }
-                    }
+                    totalToConsumeFromBruto += remainingToAssemble;
                 }
 
             } else { // --- Logic for pieces NOT requiring assembly ---
-                // Fulfilling qtyMecanizada: Moves from Bruto to inventory
-                 let remainingToMachine = qtyMecanizada;
-                 for (const lot of lotsForPiece) {
-                    if (remainingToMachine <= 0) break;
-                    const availableInLot = lot.qtyEnviada;
-                    const amountToProcess = Math.min(remainingToMachine, availableInLot);
-                    if (amountToProcess > 0) {
-                        const lotDocRef = doc(firestore, 'machining', lot.id);
-                        batch.update(lotDocRef, {
-                            qtyEnviada: increment(-amountToProcess),
-                        });
-                        remainingToMachine -= amountToProcess;
-                    }
-                 }
+                // Fulfilling qtyMecanizada moves from Bruto to inventory
+                 totalToConsumeFromBruto += qtyMecanizada;
             }
 
             // --- Common logic for Segregation and Scrap ---
-            let remainingToSegregate = qtySegregada + qtyScrapMecanizado + qtyScrapEnsamblado;
+            totalToConsumeFromBruto += qtySegregada + qtyScrapMecanizado + qtyScrapEnsamblado;
+             
+             // --- Now, actually consume from Bruto ---
+             let amountLeftToConsume = totalToConsumeFromBruto;
              for (const lot of lotsForPiece) {
-                if (remainingToSegregate <= 0) break;
-                 const availableInLot = lot.qtyEnviada;
-                 const amountToProcess = Math.min(remainingToSegregate, availableInLot);
+                if (amountLeftToConsume <= 0) break;
+                 const availableInLot = lot.qtyEnviada || 0;
+                 const amountToProcess = Math.min(amountLeftToConsume, availableInLot);
                  if (amountToProcess > 0) {
                      const lotDocRef = doc(firestore, 'machining', lot.id);
                      batch.update(lotDocRef, { qtyEnviada: increment(-amountToProcess) });
-                     remainingToSegregate -= amountToProcess;
+                     amountLeftToConsume -= amountToProcess;
                  }
              }
 
@@ -308,16 +273,18 @@ export default function SubprocessesPage() {
             }
 
             // Create a single machining process record for the declared quantities
-            if (qtyScrapMecanizado > 0 || qtyScrapEnsamblado > 0 || qtyMecanizada > 0 || qtyEnsamblada > 0 || qtySegregada > 0) {
+            if (totalDeclared > 0) {
                 const declarationId = `decl-${Date.now()}-${selectedPieceId}`;
                  const declarationDocRef = doc(firestore, 'machining', declarationId);
                  batch.set(declarationDocRef, {
                     id: declarationId,
                     remitoId: 'N/A', 
                     pieceId: selectedPieceId,
-                    qtyEnviada: 0,
+                    qtyEnviada: 0, // This is a declaration record, not a stock-holding one
                     status: 'Finalizado',
+                    // Only set the qtyMecanizada field if the piece does NOT require assembly
                     qtyMecanizada: piece.requiereEnsamblado ? 0 : qtyMecanizada,
+                    // Only set the qtyEnProcesoEnsamblado field if the piece REQUIRES assembly
                     qtyEnProcesoEnsamblado: piece.requiereEnsamblado ? qtyMecanizada : 0,
                     qtyEnsamblada: qtyEnsamblada,
                     qtySegregada: qtySegregada,
@@ -330,6 +297,7 @@ export default function SubprocessesPage() {
             // *** UPDATE INVENTORY COLLECTION ***
             const inventoryDocRef = doc(firestore, 'inventory', selectedPieceId);
             const inventoryUpdateData = {
+                // If it doesn't require assembly, mechanized pieces go to mecanizado stock.
                 stockMecanizado: increment(piece.requiereEnsamblado ? 0 : qtyMecanizada),
                 stockEnsamblado: increment(qtyEnsamblada),
             };
@@ -446,7 +414,7 @@ export default function SubprocessesPage() {
                         <TableRow key={item.id}>
                             <TableCell>{formattedDate}</TableCell>
                             <TableCell className="font-medium">{getPieceCode(item.pieceId)}</TableCell>
-                            <TableCell className="text-right">{(!isQualityLot ? (item as MachiningProcess).qtyMecanizada || 0 : 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{(!isQualityLot ? ((item as MachiningProcess).qtyEnProcesoEnsamblado || (item as MachiningProcess).qtyMecanizada || 0) : 0).toLocaleString()}</TableCell>
                             <TableCell className="text-right">{(!isQualityLot ? (item as MachiningProcess).qtyEnsamblada || 0 : 0).toLocaleString()}</TableCell>
                             <TableCell className="text-right">{(item.qtySegregada || 0).toLocaleString()}</TableCell>
                             <TableCell className="text-right text-destructive">{(!isQualityLot ? (item as MachiningProcess).qtyScrapMecanizado || 0 : 0).toLocaleString()}</TableCell>
@@ -594,3 +562,6 @@ export default function SubprocessesPage() {
 
 
 
+
+
+    
