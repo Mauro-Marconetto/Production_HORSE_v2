@@ -219,7 +219,7 @@ export default function SubprocessesPage() {
             // --- Logic for pieces requiring assembly ---
             if (piece.requiereEnsamblado) {
                 // Fulfilling qtyMecanizada simply moves stock from Bruto to a new "En Proceso" declaration
-                totalToConsumeFromBruto += qtyMecanizada;
+                 totalToConsumeFromBruto += qtyMecanizada;
                 
                 // Fulfilling qtyEnsamblada consumes first from existing "En Proceso", then from Bruto
                 let remainingToAssemble = qtyEnsamblada;
@@ -397,7 +397,7 @@ export default function SubprocessesPage() {
                 <TableRow>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Pieza</TableHead>
-                    <TableHead className="text-right">Mecanizado (a Ensamblar)</TableHead>
+                    <TableHead className="text-right">Mecanizado OK</TableHead>
                     <TableHead className="text-right">Ensamblado OK</TableHead>
                     <TableHead className="text-right">Segregado</TableHead>
                     <TableHead className="text-right text-destructive">MMU (Mecanizado)</TableHead>
