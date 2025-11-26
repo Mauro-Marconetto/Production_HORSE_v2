@@ -230,14 +230,16 @@ export default function SubprocessesPage() {
                             qtyEnProcesoEnsamblado: increment(amountToProcess)
                         });
                         remainingToMachine -= amountToProcess;
-                        lot.qtyEnviada -= amountToProcess; // Update local state for next loop
+                        lot.qtyEnviada -= amountToProcess;
                     }
                 }
                 
                 // Fulfilling qtyEnsamblada: Consumes first from EnProceso, then from Bruto
                 let remainingToAssemble = qtyEnsamblada;
+                
                 // 1. Consume from EnProceso
-                for (const lot of lotsForPiece) {
+                const lotsWithEnProceso = lotsForPiece.filter(l => (l.qtyEnProcesoEnsamblado || 0) > 0);
+                for (const lot of lotsWithEnProceso) {
                     if (remainingToAssemble <= 0) break;
                     const availableInLot = lot.qtyEnProcesoEnsamblado || 0;
                     const amountToProcess = Math.min(remainingToAssemble, availableInLot);
@@ -247,26 +249,26 @@ export default function SubprocessesPage() {
                             qtyEnProcesoEnsamblado: increment(-amountToProcess),
                         });
                         remainingToAssemble -= amountToProcess;
-                        lot.qtyEnProcesoEnsamblado = (lot.qtyEnProcesoEnsamblado || 0) - amountToProcess;
                     }
                 }
-                // 2. Consume from Bruto if still needed
-                for (const lot of lotsForPiece) {
-                     if (remainingToAssemble <= 0) break;
-                     const availableInLot = lot.qtyEnviada;
-                     const amountToProcess = Math.min(remainingToAssemble, availableInLot);
-                     if (amountToProcess > 0) {
-                         const lotDocRef = doc(firestore, 'machining', lot.id);
-                         batch.update(lotDocRef, {
-                             qtyEnviada: increment(-amountToProcess),
-                         });
-                         remainingToAssemble -= amountToProcess;
-                         lot.qtyEnviada -= amountToProcess;
-                     }
+                 // 2. Consume from Bruto if still needed
+                if (remainingToAssemble > 0) {
+                    for (const lot of lotsForPiece) {
+                         if (remainingToAssemble <= 0) break;
+                         const availableInLot = lot.qtyEnviada;
+                         const amountToProcess = Math.min(remainingToAssemble, availableInLot);
+                         if (amountToProcess > 0) {
+                             const lotDocRef = doc(firestore, 'machining', lot.id);
+                             batch.update(lotDocRef, {
+                                 qtyEnviada: increment(-amountToProcess),
+                             });
+                             remainingToAssemble -= amountToProcess;
+                         }
+                    }
                 }
 
             } else { // --- Logic for pieces NOT requiring assembly ---
-                // Fulfilling qtyMecanizada: Moves from Bruto to MecanizadoOK
+                // Fulfilling qtyMecanizada: Moves from Bruto to inventory
                  let remainingToMachine = qtyMecanizada;
                  for (const lot of lotsForPiece) {
                     if (remainingToMachine <= 0) break;
@@ -278,7 +280,6 @@ export default function SubprocessesPage() {
                             qtyEnviada: increment(-amountToProcess),
                         });
                         remainingToMachine -= amountToProcess;
-                        lot.qtyEnviada -= amountToProcess;
                     }
                  }
             }
@@ -590,3 +591,6 @@ export default function SubprocessesPage() {
 
 
 
+
+
+    
