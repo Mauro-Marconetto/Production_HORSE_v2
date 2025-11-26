@@ -86,11 +86,12 @@ export default function StockPage() {
             });
         }
         
-        const machiningStock = new Map<string, number>();
+        const machiningStock = new Map<string, { enBruto: number, enProceso: number }>();
         machiningProcesses.forEach(proc => {
-            if (proc.status === 'Enviado') {
-                machiningStock.set(proc.pieceId, (machiningStock.get(proc.pieceId) || 0) + proc.qtyEnviada);
-            }
+            const current = machiningStock.get(proc.pieceId) || { enBruto: 0, enProceso: 0 };
+            current.enBruto += proc.qtyEnviada || 0;
+            current.enProceso += proc.qtyEnProcesoEnsamblado || 0;
+            machiningStock.set(proc.pieceId, current);
         });
 
 
@@ -98,17 +99,20 @@ export default function StockPage() {
             const invItem = inventory.find(i => i.id === piece.id);
             
             const stockInyectado = invItem?.stockInyectado || 0;
-            const stockEnMecanizado = machiningStock.get(piece.id) || 0;
+            const stockEnMecanizadoBruto = machiningStock.get(piece.id)?.enBruto || 0;
+            const stockEnMecanizadoProceso = machiningStock.get(piece.id)?.enProceso || 0;
             const stockMecanizado = invItem?.stockMecanizado || 0;
             const stockGranallado = invItem?.stockGranallado || 0;
             const stockListo = invItem?.stockListo || 0;
             const stockEnsamblado = invItem?.stockEnsamblado || 0;
             const stockPendiente = pendingQualityStock.get(piece.id) || 0;
+            
+            const stockEnMecanizadoTotal = stockEnMecanizadoBruto + stockEnMecanizadoProceso;
 
-            const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo + stockEnsamblado + stockPendiente;
+            const totalStock = stockInyectado + stockEnMecanizadoTotal + stockMecanizado + stockGranallado + stockListo + stockEnsamblado + stockPendiente;
 
             if (stockInyectado > 0) rows.push({ piece, state: 'Sin Prensar', stock: stockInyectado, totalStockForPiece: totalStock });
-            if (stockEnMecanizado > 0) rows.push({ piece, state: 'En Mecanizado', stock: stockEnMecanizado, totalStockForPiece: totalStock });
+            if (stockEnMecanizadoTotal > 0) rows.push({ piece, state: 'En Mecanizado', stock: stockEnMecanizadoTotal, totalStockForPiece: totalStock });
             if (stockMecanizado > 0) rows.push({ piece, state: 'Mecanizado', stock: stockMecanizado, totalStockForPiece: totalStock });
             if (stockGranallado > 0) rows.push({ piece, state: 'Granallado', stock: stockGranallado, totalStockForPiece: totalStock });
             if (stockListo > 0) rows.push({ piece, state: 'Listo', stock: stockListo, totalStockForPiece: totalStock });
@@ -605,6 +609,7 @@ export default function StockPage() {
         </main>
     );
 }
+
 
 
 

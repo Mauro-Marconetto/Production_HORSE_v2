@@ -230,7 +230,7 @@ export default function SubprocessesPage() {
                             qtyEnProcesoEnsamblado: increment(amountToProcess)
                         });
                         remainingToMachine -= amountToProcess;
-                        lot.qtyEnviada -= amountToProcess;
+                        lot.qtyEnviada -= amountToProcess; // Update local state for next step
                     }
                 }
                 
@@ -317,7 +317,8 @@ export default function SubprocessesPage() {
                     pieceId: selectedPieceId,
                     qtyEnviada: 0,
                     status: 'Finalizado',
-                    qtyMecanizada: qtyMecanizada,
+                    qtyMecanizada: piece.requiereEnsamblado ? 0 : qtyMecanizada,
+                    qtyEnProcesoEnsamblado: piece.requiereEnsamblado ? qtyMecanizada : 0,
                     qtyEnsamblada: qtyEnsamblada,
                     qtySegregada: qtySegregada,
                     qtyScrapMecanizado: qtyScrapMecanizado,
@@ -428,7 +429,7 @@ export default function SubprocessesPage() {
                 <TableRow>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Pieza</TableHead>
-                    <TableHead className="text-right">Mecanizado OK</TableHead>
+                    <TableHead className="text-right">Mecanizado (a Ensamblar)</TableHead>
                     <TableHead className="text-right">Ensamblado OK</TableHead>
                     <TableHead className="text-right">Segregado</TableHead>
                     <TableHead className="text-right text-destructive">MMU (Mecanizado)</TableHead>
@@ -593,4 +594,3 @@ export default function SubprocessesPage() {
 
 
 
-    
