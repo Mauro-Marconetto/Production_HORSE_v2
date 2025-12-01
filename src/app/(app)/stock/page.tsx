@@ -609,7 +609,3 @@ export default function StockPage() {
         </main>
     );
 }
-
-
-
-
