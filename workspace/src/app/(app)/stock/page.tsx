@@ -12,8 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight, ShieldAlert, Package, Ship } from "lucide-react";
-import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings, Production, MachiningProcess, Client, Export } from "@/lib/types";
+import { AlertCircle, CheckCircle, TrendingUp, Loader2, Wrench, Wind, Plus, Trash2, Printer, ArrowRight, ShieldAlert, Package, Ship, X } from "lucide-react";
+import type { Piece, Inventory, Supplier, Remito, RemitoItem, RemitoSettings, Production, MachiningProcess, Client, Export, QualityLot } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,6 +34,8 @@ interface ExportItem {
     origenStock: 'stockListo' | 'stockEnsamblado';
 }
 
+const ALL_STATES: InventoryRow['state'][] = ['Sin Prensar', 'En Mecanizado', 'Mecanizado', 'Granallado', 'Listo', 'Pendiente Calidad', 'Ensamblado'];
+
 
 export default function StockPage() {
     const firestore = useFirestore();
@@ -46,8 +48,11 @@ export default function StockPage() {
     const inventoryCollection = useMemoFirebase(() => firestore ? collection(firestore, 'inventory') : null, [firestore]);
     const { data: inventory, isLoading: isLoadingInventory, forceRefresh } = useCollection<Inventory>(inventoryCollection);
     
-    const productionQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'production'), where('inspeccionadoCalidad', '==', false)) : null, [firestore]);
-    const { data: pendingProduction, isLoading: isLoadingProduction } = useCollection<Production>(productionQuery);
+    const qualityQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'quality'), where('status', '==', 'pending')) : null, [firestore]);
+    const { data: pendingQualityLots, isLoading: isLoadingQuality } = useCollection<QualityLot>(qualityQuery);
+
+    const machiningQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'machining')) : null, [firestore]);
+    const { data: machiningProcesses, isLoading: isLoadingMachining } = useCollection<MachiningProcess>(machiningQuery);
 
     const suppliersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'suppliers') : null, [firestore]);
     const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<Supplier>(suppliersCollection);
@@ -65,37 +70,49 @@ export default function StockPage() {
     const [exportItems, setExportItems] = useState<ExportItem[]>([]);
 
     const [isSaving, setIsSaving] = useState(false);
+
+    const [filterPiece, setFilterPiece] = useState<string>('all');
+    const [filterState, setFilterState] = useState<string>('all');
     
     const inventoryData = useMemo((): InventoryRow[] => {
-        if (!pieces || !inventory) return [];
+        if (!pieces || !inventory || !machiningProcesses) return [];
         
-        const rows: InventoryRow[] = [];
+        let rows: InventoryRow[] = [];
 
         const pendingQualityStock = new Map<string, number>();
-        if(pendingProduction) {
-            pendingProduction.forEach(prod => {
-                if (prod.qtySegregada > 0) {
-                    pendingQualityStock.set(prod.pieceId, (pendingQualityStock.get(prod.pieceId) || 0) + prod.qtySegregada);
-                }
+        if(pendingQualityLots) {
+            pendingQualityLots.forEach(lot => {
+                pendingQualityStock.set(lot.pieceId, (pendingQualityStock.get(lot.pieceId) || 0) + lot.qtySegregada);
             });
         }
+        
+        const machiningStock = new Map<string, { enBruto: number, enProceso: number }>();
+        machiningProcesses.forEach(proc => {
+            const current = machiningStock.get(proc.pieceId) || { enBruto: 0, enProceso: 0 };
+            current.enBruto += proc.qtyEnviada || 0;
+            current.enProceso += proc.qtyEnProcesoEnsamblado || 0;
+            machiningStock.set(proc.pieceId, current);
+        });
 
 
         pieces.forEach(piece => {
             const invItem = inventory.find(i => i.id === piece.id);
             
             const stockInyectado = invItem?.stockInyectado || 0;
-            const stockEnMecanizado = invItem?.stockEnMecanizado || 0;
+            const stockEnMecanizadoBruto = machiningStock.get(piece.id)?.enBruto || 0;
+            const stockEnMecanizadoProceso = machiningStock.get(piece.id)?.enProceso || 0;
             const stockMecanizado = invItem?.stockMecanizado || 0;
             const stockGranallado = invItem?.stockGranallado || 0;
             const stockListo = invItem?.stockListo || 0;
             const stockEnsamblado = invItem?.stockEnsamblado || 0;
             const stockPendiente = pendingQualityStock.get(piece.id) || 0;
+            
+            const stockEnMecanizadoTotal = stockEnMecanizadoBruto + stockEnMecanizadoProceso;
 
-            const totalStock = stockInyectado + stockEnMecanizado + stockMecanizado + stockGranallado + stockListo + stockEnsamblado;
+            const totalStock = stockInyectado + stockEnMecanizadoTotal + stockMecanizado + stockGranallado + stockListo + stockEnsamblado + stockPendiente;
 
             if (stockInyectado > 0) rows.push({ piece, state: 'Sin Prensar', stock: stockInyectado, totalStockForPiece: totalStock });
-            if (stockEnMecanizado > 0) rows.push({ piece, state: 'En Mecanizado', stock: stockEnMecanizado, totalStockForPiece: totalStock });
+            if (stockEnMecanizadoTotal > 0) rows.push({ piece, state: 'En Mecanizado', stock: stockEnMecanizadoTotal, totalStockForPiece: totalStock });
             if (stockMecanizado > 0) rows.push({ piece, state: 'Mecanizado', stock: stockMecanizado, totalStockForPiece: totalStock });
             if (stockGranallado > 0) rows.push({ piece, state: 'Granallado', stock: stockGranallado, totalStockForPiece: totalStock });
             if (stockListo > 0) rows.push({ piece, state: 'Listo', stock: stockListo, totalStockForPiece: totalStock });
@@ -107,11 +124,26 @@ export default function StockPage() {
                  rows.push({ piece, state: 'Listo', stock: 0, totalStockForPiece: 0 });
             }
         });
+        
+        // Apply filters
+        let filteredRows = rows;
+        if (filterPiece !== 'all') {
+            filteredRows = filteredRows.filter(row => row.piece.id === filterPiece);
+        }
+        if (filterState !== 'all') {
+            filteredRows = filteredRows.filter(row => row.state === filterState);
+        }
 
-        return rows;
-    }, [pieces, inventory, pendingProduction]);
+
+        return filteredRows;
+    }, [pieces, inventory, pendingQualityLots, machiningProcesses, filterPiece, filterState]);
     
-    const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers || isLoadingProduction || isLoadingClients;
+    const isLoading = isLoadingPieces || isLoadingInventory || isLoadingSuppliers || isLoadingQuality || isLoadingClients || isLoadingMachining;
+
+    const clearFilters = () => {
+        setFilterPiece('all');
+        setFilterState('all');
+    };
 
     const handleCreateRemito = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -279,7 +311,7 @@ export default function StockPage() {
         switch(state) {
             case 'Sin Prensar': return 'outline';
             case 'En Mecanizado': return 'destructive';
-            case 'Mecanizado': return 'secondary';
+            case 'Mecanizado': return 'default';
             case 'Granallado': return 'secondary';
             case 'Pendiente Calidad': return 'destructive';
             case 'Listo': return 'default';
@@ -314,8 +346,41 @@ export default function StockPage() {
             </div>
             <Card>
                 <CardHeader>
-                    <CardTitle>Niveles de Stock por Etapa</CardTitle>
-                    <CardDescription>Resumen de todas las piezas en stock, diferenciando entre cada etapa del proceso productivo.</CardDescription>
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <CardTitle>Niveles de Stock por Etapa</CardTitle>
+                            <CardDescription>Resumen de todas las piezas en stock, diferenciando entre cada etapa del proceso productivo.</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                             <Select value={filterPiece} onValueChange={setFilterPiece}>
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Filtrar por Pieza" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas las piezas</SelectItem>
+                                    {pieces?.map(p => (
+                                        <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select value={filterState} onValueChange={setFilterState}>
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Filtrar por Estado" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos los estados</SelectItem>
+                                    {ALL_STATES.map(s => (
+                                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                             {(filterPiece !== 'all' || filterState !== 'all') && (
+                                <Button variant="ghost" onClick={clearFilters} size="icon" title="Limpiar filtros">
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            )}
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -385,7 +450,7 @@ export default function StockPage() {
                             {!isLoading && inventoryData.length === 0 && (
                                  <TableRow>
                                     <TableCell colSpan={6} className="h-24 text-center">
-                                        No se encontraron piezas o datos de inventario.
+                                        No se encontraron piezas para el filtro seleccionado.
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -420,7 +485,7 @@ export default function StockPage() {
                                             <Select value={item.pieceId} onValueChange={(v) => updateRemitoItem(index, 'pieceId', v)}>
                                                 <SelectTrigger className="flex-1"><SelectValue placeholder="Selecciona pieza..." /></SelectTrigger>
                                                 <SelectContent>
-                                                    {pieces?.filter(p => p.requiereMecanizado).map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
+                                                    {pieces?.filter(p => p.requiereMecanizado || p.requiereEnsamblado).map(p => <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
                                             <Input 
@@ -544,4 +609,3 @@ export default function StockPage() {
         </main>
     );
 }
-
